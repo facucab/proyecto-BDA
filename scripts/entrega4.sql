@@ -209,10 +209,10 @@ CREATE TABLE pagos_y_facturas.descuento (
 -- FACTURA
 CREATE TABLE pagos_y_facturas.factura (
 	id_factura INT IDENTITY(1,1) PRIMARY KEY,
-	estado_pago VARCHAR(20) NOT NULL,
+	estado_pago VARCHAR(10) NOT NULL, -- no le pongo bit porque asumo que puede ser: pagado, pendiente, vencido y tal vez alguna mas
 	fecha_emision DATE NOT NULL DEFAULT GETDATE(), -- que cada vez que se cree un nuevo registro tome la fecha del dia
 	monto_a_pagar DECIMAL(10, 2) NOT NULL,
-	id_persona INT NOT NULL,
+	id_persona INT NOT NULL UNIQUE,
 	id_metodo_pago INT NOT NULL,
 	
 	CONSTRAINT FK_Factura_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
