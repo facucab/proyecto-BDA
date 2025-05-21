@@ -163,13 +163,13 @@ CREATE TABLE manejo_actividades.clase (
 );
 
 -- ROL
-CREATE TABLE Rol (
+CREATE TABLE manejo_personas.Rol (
     id_rol INT IDENTITY(1,1) PRIMARY KEY,
     descripcion VARCHAR(100) NOT NULL
 );
 
 -- USUARIO <-N----N-> ROL
-CREATE TABLE Usuario_Rol (
+CREATE TABLE manejo_personas.Usuario_Rol (
     id_usuario INT NOT NULL,
     id_rol INT NOT NULL,
     PRIMARY KEY (id_usuario, id_rol),
@@ -179,7 +179,7 @@ CREATE TABLE Usuario_Rol (
 );
 
 -- SOCIO <-N----N-> ACTIVIDAD
-CREATE TABLE Socio_Actividad (
+CREATE TABLE Socio_Actividad (         -- EN QUE SCHEMA LO DEBERIAMOS PONER?
     id_socio INT NOT NULL,
     id_actividad INT NOT NULL,
     fecha_inicio DATE NOT NULL DEFAULT GETDATE(),
@@ -228,6 +228,169 @@ create table pagos_y_facturas.factura_descuento (
 
 	PRIMARY KEY (id_factura, id_descuento),
 
-	CONSTRAINT FK_Factura_Descuento_Factura FOREIGN KEY (id_factura) REFERENCES pagos_y_facturas.facturas(id_factura),
+	CONSTRAINT FK_Factura_Descuento_Factura FOREIGN KEY (id_factura) REFERENCES pagos_y_facturas.factura(id_factura),
 	CONSTRAINT FK_Factura_Descuento_Descuento FOREIGN KEY (id_descuento) REFERENCES pagos_y_facturas.descuento(id_descuento)
 );
+
+
+
+
+-------- STORE PROCEDURES PARA PERSONAS
+
+-- SP TABLA PERSONAS INSERTAR
+
+-- Este SP valida los datos de entrada y realiza la inserción de un nuevo registro en la tabla persona.
+
+CREATE or ALTER PROCEDURE manejo.personas.CrearPersona
+	@dni VARCHAR(8),
+	@nombre NVARCHAR(50),
+	@apellido NVARCHAR(50),
+	@email VARCHAR(320),
+	@fecha_nac DATE,
+	@telefono VARCHAR(15)
+AS
+BEGIN
+	--validar dni
+	IF LEN(@dni) < 7 OR LEN(@dni) > 8 or ISNUMERIC(@dni) = 0 -- dni es numero y entre 1.000.000 y 99.999.999
+	BEGIN
+		SELECT 'Error' AS Resultado, 'DNI Invalido. Debe contener entre 7 y 8 digitos númericos.' AS Mensaje;
+		RETURN -1;
+	END
+
+	--validar email
+	IF @email NOT LIKE '%_@%.__%' --que email siga formato email@.fin (con fin por lo menos 2 letras)
+	BEGIN
+		SELECT 'Error' AS Resultado, 'El formato del email no es valido.' AS Mensaje;
+		RETURN -2;
+	END
+
+	--validar fecha de nacimiento
+	IF DATEDIFF(YEAR, @fecha_nac, GETDATE()) < 0 OR DATEDIFF(YEAR, @fecha_nac, GETDATE()) > 120 -- que la fecha de nacimiento no sea en el futuro ni la persona tenga mas de 120 años (se podria bajar a 90 por ejemplo)
+	BEGIN
+		SELECT 'Error' AS Resultado, 'La fecha de nacimiento no es valida.' AS Mensaje;
+		RETURN -3;
+	END
+
+	-- se podrian verificar si email y dni existen pero no se si es necesario porque el atributo es unique, si es necesario lo agrego
+
+	-- comenzamos transaccion en read comitted, q se pueda leer la tabla pero no el nuevo registro hasta confirmarlo
+	
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	BEGIN TRANSACTION;
+
+	--insertar persona luego de todas las verificaciones
+	INSERT INTO manejo_personas.persona (dni, nombre, apellido, email, fecha_nac, telefono, fecha_alta)
+	VALUES (@dni, @nombre, @apellido, @email, @fecha_nac, @telefono, GETDATE());
+
+	COMMIT TRANSACTION;
+
+	SELECT 'Exito' AS RESULTADO, 'Persona registrada correctamente.' AS Mensaje;
+	RETURN 0;
+END;
+GO
+
+
+-- SP TABLA PERSONAS MODIFICAR
+
+CREATE OR ALTER PROCEDURE manejo_personas.ModificarPersona
+	@id_persona int,
+	@nombre NVARCHAR(50) = NULL,
+	@apellido NVARCHAR(50) = NULL,
+	@email VARCHAR(320) = NULL,
+	@telefono VARCHAR(15) = NULL
+	-- tienen valor default null por si solo se quiere actualizar un cmapo
+AS
+BEGIN
+	
+	--validar existencia persona (por id)
+	IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona)
+	BEGIN
+		SELECT 'Error' AS Resultado, 'La persona no existe' AS Mensaje;
+		RETURN -1;
+	END
+
+	--validar email (si se da en el exec)
+	IF @email IS NOT NULL
+	BEGIN
+		IF @email NOT LIKE '%_@_%.__%' --validar que  este bien escrito
+		BEGIN
+			SELECT 'Error' AS Resultado, 'El formato del email no es valido.' AS Mensaje;
+			RETURN -2;
+		END
+
+		IF EXISTS (SELECT 1 FROM manejo_personas.persona WHERE email = @email AND id_persona <> @id_persona) --Validar que email existe pero es de otra persona (otro id)
+
+		BEGIN
+			SELECT 'Error' AS Resultado, 'El email esta en uso por otra persona.' AS Mensaje;
+			RETURN -3;
+		END
+	END
+
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED; --al igual que agregar, que no pueda leer el update hasta confirmado
+	BEGIN TRANSACTION;
+
+		UPDATE manejo_personas.persona
+		SET -- 
+			nombre = ISNULL(@nombre, nombre), --si, por ejemplo, nombre no es NULL, se usa ese valor, si es NULL, se mantiene el actual
+			apellido = ISNULL(@apellido, apellido), 
+			email = ISNULL(@email, email),
+			telefono = ISNULL(@telefono, telefono) 
+		WHERE id_persona = @id_persona;
+
+	COMMIT TRANSACTION;
+
+	SELECT 'Exito' AS Resultado, 'Datos actualizados' AS Mensaje, @id_persona as id_persona;
+	
+	RETURN 0;
+	
+END;
+GO
+
+-- SP ELIMINAR PERSONA
+
+CREATE or ALTER PROCEDURE manejo_personas.EliminarPersona
+	@id_persona INT
+AS
+BEGIN
+	-- Validar existencia persona
+	IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona)
+	BEGIN
+		SELECT 'Error' AS Resultado, 'La persona no existe' AS Mensaje;
+		RETURN -1;
+	END
+
+	SET TRANSACTION ISOLATION LEVEL REPEATABLE READ; -- no estoy seguro de si deberia ser este lvl, hace q no se puedan leer datos modificados pero no confirmados, y que ninguna transac pueda modificar los datos leidos por la actual
+	BEGIN TRANSACTION;
+
+		--verificamos si la persona tiene alguna relacion en ora tabla aun
+	IF EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_persona = @id_persona) OR
+	EXISTS (SELECT 1 FROM manejo_personas.usuario WHERE id_persona = @id_persona) OR
+	EXISTS (SELECT 1 FROM manejo_personas.invitado WHERE id_persona = @id_persona) OR
+	EXISTS (SELECT 1 FROM manejo_personas.responsable WHERE id_persona = @id_persona)
+
+	BEGIN -- si tiene relaciones, hacemos borrado logico, pero necesitariamos agregar un atributo a persona (no estoy seguro de q esto se haga asi, si coinciden lo agregamos a la tabla persona)
+
+		UPDATE manejo_personas.persona
+		SET activo = 0
+		WHERE id_persona = @id_persona
+		
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Persona inactivada correctamente (borrado logico ya que tiene registros relacionados)' AS Mensaje;
+	
+	END
+	ELSE
+	BEGIN
+			-- si no tiene relaciones hacemos borrado fisico
+		DELETE FROM manejo_personas.persona
+		WHERE id_persona = @id_persona;			
+		
+		COMMIT TRANSACTION;
+	
+		SELECT 'Exito' as Resultado, 'Persona eliminada completamente.' AS Mensaje;
+		
+	END
+	RETURN 0;
+
+END;
+GO
