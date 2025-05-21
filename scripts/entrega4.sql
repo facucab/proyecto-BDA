@@ -189,3 +189,45 @@ CREATE TABLE Socio_Actividad (
 	-- SCHEMA PARA ACTIVIDADES
     CONSTRAINT FK_Socio_Actividad_Actividad FOREIGN KEY (id_actividad) REFERENCES manejo_actividades.actividad(id_actividad)
 );
+
+
+-- METODO_PAGO
+
+CREATE TABLE pagos_y_facturas.metodo_pago (
+	id_metodo_pago INT IDENTITY(1,1) PRIMARY KEY,
+	nombre VARCHAR(50) NOT NULL
+);
+
+-- DESCUENTO
+
+CREATE TABLE pagos_y_facturas.descuento (
+	id_descuento INT IDENTITY(1,1) PRIMARY KEY,
+	descripcion VARCHAR(100) NOT NULL,
+	valor DECIMAL(10,2) NOT NULL -- esto era cantidad pero lo vole y puse valor porque no veo mucho sentido en el atributo cantidad, capaz me equivoco.
+);
+
+-- FACTURA
+CREATE TABLE pagos_y_facturas.factura (
+	id_factura INT IDENTITY(1,1) PRIMARY KEY,
+	estado_pago VARCHAR(20) NOT NULL,
+	fecha_emision DATE NOT NULL DEFAULT GETDATE(), -- que cada vez que se cree un nuevo registro tome la fecha del dia
+	monto_a_pagar DECIMAL(10, 2) NOT NULL,
+	id_persona INT NOT NULL,
+	id_metodo_pago INT NOT NULL,
+	
+	CONSTRAINT FK_Factura_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
+	CONSTRAINT FK_Factura_Metodo_Pago FOREIGN KEY (id_metodo_pago) REFERENCES pagos_y_facturas.metodo_pago(id_metodo_pago)
+);
+
+-- FACTURA <-N----N-> DESCUENTO
+
+create table pagos_y_facturas.factura_descuento (
+	id_factura INT NOT NULL,
+	id_descuento INT NOT NULL,
+	monto_aplicado DECIMAL(10, 2) NOT NULL, -- guardar que cantidad se desconto del importe total dependiendo el porcentaje. La podriamos sacar
+
+	PRIMARY KEY (id_factura, id_descuento),
+
+	CONSTRAINT FK_Factura_Descuento_Factura FOREIGN KEY (id_factura) REFERENCES pagos_y_facturas.facturas(id_factura),
+	CONSTRAINT FK_Factura_Descuento_Descuento FOREIGN KEY (id_descuento) REFERENCES pagos_y_facturas.descuento(id_descuento)
+);
