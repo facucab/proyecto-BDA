@@ -65,6 +65,29 @@ CREATE TABLE manejo_personas.persona(
 	fecha_alta DATE NOT NULL DEFAULT GETDATE()
 );
 
+
+
+-- OBRA SOCIAL
+CREATE TABLE manejo_personas.obra_social (
+    id_obra_social INT IDENTITY(1,1) PRIMARY KEY,
+    descripcion VARCHAR(50) NOT NULL
+);
+
+-- GRUPO FAMILIAR
+CREATE TABLE manejo_personas.grupo_familiar (
+    id_grupo INT IDENTITY(1,1) PRIMARY KEY,
+    fecha_alta DATE NOT NULL DEFAULT GETDATE(),
+    estado BIT NOT NULL DEFAULT 1 -- 1 significa activo y 0 inactivo
+);
+
+-- CATEGORIA
+CREATE TABLE manejo_actividades.categoria (
+    id_categoria INT IDENTITY(1,1) PRIMARY KEY,
+    nombre_categoria VARCHAR(50) NOT NULL,
+    costo_membrecia DECIMAL(10, 2) NOT NULL,
+    edad_maxima INT NOT NULL
+);
+
 -- SOCIO
 CREATE TABLE manejo_personas.socio (
 	--Atributos propios
@@ -78,18 +101,91 @@ CREATE TABLE manejo_personas.socio (
     id_grupo INT NULL,
 	--SCHEMA PARA PERSONAS
     CONSTRAINT FK_Socio_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
-    CONSTRAINT FK_Socio_Obra_social FOREIGN KEY (id_obra_social) REFERENCES manejo_personas.bbra_social(id_obra_social),
-    CONSTRAINT FK_Socio_Grupo_familiar FOREIGN KEY (id_grupo) REFERENCES manejo_personas.grupo_familiar(id_grupo),
+    CONSTRAINT FK_Socio_Obra_social FOREIGN KEY (id_obra_social) REFERENCES manejo_personas.obra_social(id_obra_social),
+    CONSTRAINT FK_Socio_Grupo_Familiar FOREIGN KEY (id_grupo) REFERENCES manejo_personas.grupo_familiar(id_grupo),
 	-- SCHEMA PARA ACTIVIDADES
 	CONSTRAINT FK_Socio_Categoria FOREIGN KEY (id_categoria) REFERENCES manejo_actividades.categoria(id_categoria)
 );
 
 -- INVITADO
-CREATE TABLE Invitado (
+CREATE TABLE manejo_personas.invitado (
     id_invitado INT IDENTITY(1,1) PRIMARY KEY,
     id_persona INT NOT NULL UNIQUE, -- Conexion con su entidad padre
     id_socio INT NOT NULL, -- Conexion con la entidad fuerte
 	-- SCHEMA PARA PERSONAS
     CONSTRAINT FK_Invitado_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
     CONSTRAINT FK_Invitado_Socio FOREIGN KEY (id_socio) REFERENCES manejo_personas.socio(id_socio)
+);
+
+-- USUARIO
+CREATE TABLE manejo_personas.usuario (
+    id_usuario INT IDENTITY(1,1) PRIMARY KEY,
+    id_persona INT NOT NULL UNIQUE, -- Conexion identidad padre
+    username VARCHAR(50) NOT NULL UNIQUE,
+    password_hash VARCHAR(256) NOT NULL, -- Asumo que vamos a hashear en SHA-256
+    fecha_alta_contraseña DATE NOT NULL DEFAULT GETDATE(),
+	-- SCHEMA PARA PERSONAS
+    CONSTRAINT FK_Usuario_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona)
+);
+
+-- RESPONSABLE
+CREATE TABLE manejo_personas.responsable (
+    id_grupo INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
+    id_responsable INT UNIQUE,
+    id_persona INT NOT NULL UNIQUE,
+    parentesco VARCHAR(10) NOT NULL, -- Todos los roles que dice el TP Pone 5 digitos, le doy 10 por la dudas
+	-- SCHEMA PARA PERSONAS
+    CONSTRAINT FK_Responsable_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
+    CONSTRAINT FK_Responsable_Grupo_Familiar FOREIGN KEY (id_grupo) REFERENCES manejo_personas.grupo_familiar(id_grupo)
+);
+
+-- ACTIVIDAD
+CREATE TABLE manejo_actividades.actividad (
+    id_actividad INT IDENTITY(1,1) PRIMARY KEY,
+    nombre_actividad VARCHAR(100) NOT NULL,
+    costo_mensual DECIMAL(10, 2) NOT NULL
+);
+
+-- CLASE
+CREATE TABLE manejo_actividades.clase (
+    id_clase INT IDENTITY(1,1) PRIMARY KEY,
+    id_actividad INT NOT NULL,
+    id_categoria INT NOT NULL,
+    dia VARCHAR(9) NOT NULL, -- El dia de la semana con el nombre mas largo es MIE RCO LES
+    horario TIME NOT NULL,
+    id_usuario INT NOT NULL,
+	-- SCHEMA PARA PERSONAS
+	CONSTRAINT FK_Clase_Usuario FOREIGN KEY (id_usuario) REFERENCES manejo_personas.usuario(id_usuario),
+	-- SCHEMA PARA ACTIVIDADES
+    CONSTRAINT FK_Clase_Actividad FOREIGN KEY (id_actividad) REFERENCES manejo_actividades.actividad(id_actividad),
+    CONSTRAINT FK_Clase_Categoria FOREIGN KEY (id_categoria) REFERENCES manejo_actividades.categoria(id_categoria)
+    
+);
+
+-- ROL
+CREATE TABLE Rol (
+    id_rol INT IDENTITY(1,1) PRIMARY KEY,
+    descripcion VARCHAR(100) NOT NULL
+);
+
+-- USUARIO <-N----N-> ROL
+CREATE TABLE Usuario_Rol (
+    id_usuario INT NOT NULL,
+    id_rol INT NOT NULL,
+    PRIMARY KEY (id_usuario, id_rol),
+	-- SCHEMA PARA PERSONAS
+    CONSTRAINT FK_Usuario_Rol_Usuario FOREIGN KEY (id_usuario) REFERENCES manejo_personas.usuario(id_usuario),
+    CONSTRAINT FK_Usuario_Rol_Rol FOREIGN KEY (id_rol) REFERENCES manejo_personas.rol(id_rol)
+);
+
+-- SOCIO <-N----N-> ACTIVIDAD
+CREATE TABLE Socio_Actividad (
+    id_socio INT NOT NULL,
+    id_actividad INT NOT NULL,
+    fecha_inicio DATE NOT NULL DEFAULT GETDATE(),
+    PRIMARY KEY (id_socio, id_actividad),
+	-- SCHEMA PARA PERSONAS
+    CONSTRAINT FK_Socio_Actividad_Socio FOREIGN KEY (id_socio) REFERENCES manejo_personas.socio(id_socio),
+	-- SCHEMA PARA ACTIVIDADES
+    CONSTRAINT FK_Socio_Actividad_Actividad FOREIGN KEY (id_actividad) REFERENCES manejo_actividades.actividad(id_actividad)
 );
