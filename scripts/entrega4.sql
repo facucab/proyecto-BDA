@@ -80,12 +80,15 @@ CREATE TABLE manejo_personas.persona(
 	fecha_alta DATE NOT NULL DEFAULT GETDATE(),
 	activo BIT NOT NULL DEFAULT 1
 );
+GO
 
 -- OBRA SOCIAL
 CREATE TABLE manejo_personas.obra_social (
     id_obra_social INT IDENTITY(1,1) PRIMARY KEY,
     descripcion VARCHAR(50) NOT NULL
 );
+GO
+
 
 -- GRUPO FAMILIAR
 CREATE TABLE manejo_personas.grupo_familiar (
@@ -93,6 +96,7 @@ CREATE TABLE manejo_personas.grupo_familiar (
     fecha_alta DATE NOT NULL DEFAULT GETDATE(),
     estado BIT NOT NULL DEFAULT 1 -- 1 significa activo y 0 inactivo
 );
+GO
 
 -- CATEGORIA
 CREATE TABLE manejo_actividades.categoria (
@@ -101,6 +105,7 @@ CREATE TABLE manejo_actividades.categoria (
     costo_membrecia DECIMAL(10, 2) NOT NULL,
     edad_maxima INT NOT NULL
 );
+GO
 
 -- SOCIO
 CREATE TABLE manejo_personas.socio (
@@ -120,6 +125,7 @@ CREATE TABLE manejo_personas.socio (
 	-- SCHEMA PARA ACTIVIDADES
 	CONSTRAINT FK_Socio_Categoria FOREIGN KEY (id_categoria) REFERENCES manejo_actividades.categoria(id_categoria)
 );
+GO
 
 -- INVITADO
 CREATE TABLE manejo_personas.invitado (
@@ -131,6 +137,7 @@ CREATE TABLE manejo_personas.invitado (
     CONSTRAINT FK_Invitado_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
     CONSTRAINT FK_Invitado_Socio FOREIGN KEY (id_socio) REFERENCES manejo_personas.socio(id_socio)
 );
+GO
 
 -- USUARIO
 CREATE TABLE manejo_personas.usuario (
@@ -143,6 +150,7 @@ CREATE TABLE manejo_personas.usuario (
 	-- SCHEMA PARA PERSONAS
     CONSTRAINT FK_Usuario_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona)
 );
+GO
 
 -- RESPONSABLE
 CREATE TABLE manejo_personas.responsable (
@@ -154,6 +162,7 @@ CREATE TABLE manejo_personas.responsable (
     CONSTRAINT FK_Responsable_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
     CONSTRAINT FK_Responsable_Grupo_Familiar FOREIGN KEY (id_grupo) REFERENCES manejo_personas.grupo_familiar(id_grupo)
 );
+GO
 
 -- ACTIVIDAD
 CREATE TABLE manejo_actividades.actividad (
@@ -162,6 +171,7 @@ CREATE TABLE manejo_actividades.actividad (
     costo_mensual DECIMAL(10, 2) NOT NULL,
 	estado BIT NOT NULL DEFAULT 1
 );
+GO
 
 -- CLASE
 CREATE TABLE manejo_actividades.clase (
@@ -178,12 +188,14 @@ CREATE TABLE manejo_actividades.clase (
     CONSTRAINT FK_Clase_Actividad FOREIGN KEY (id_actividad) REFERENCES manejo_actividades.actividad(id_actividad),
     CONSTRAINT FK_Clase_Categoria FOREIGN KEY (id_categoria) REFERENCES manejo_actividades.categoria(id_categoria)
 );
+GO
 
 -- ROL
-CREATE TABLE manejo_personas.Rol (
+CREATE TABLE manejo_personas.rol (
     id_rol INT IDENTITY(1,1) PRIMARY KEY,
     descripcion VARCHAR(100) NOT NULL
 );
+GO
 
 -- USUARIO <-N----N-> ROL
 CREATE TABLE manejo_personas.Usuario_Rol (
@@ -194,6 +206,7 @@ CREATE TABLE manejo_personas.Usuario_Rol (
     CONSTRAINT FK_Usuario_Rol_Usuario FOREIGN KEY (id_usuario) REFERENCES manejo_personas.usuario(id_usuario),
     CONSTRAINT FK_Usuario_Rol_Rol FOREIGN KEY (id_rol) REFERENCES manejo_personas.rol(id_rol)
 );
+GO
 
 -- SOCIO <-N----N-> ACTIVIDAD
 CREATE TABLE manejo_personas.socio_actividad (  
@@ -207,6 +220,7 @@ CREATE TABLE manejo_personas.socio_actividad (
 	-- SCHEMA PARA ACTIVIDADES
     CONSTRAINT FK_Socio_Actividad_Actividad FOREIGN KEY (id_actividad) REFERENCES manejo_actividades.actividad(id_actividad)
 );
+GO
 
 
 -- METODO_PAGO
@@ -214,6 +228,7 @@ CREATE TABLE pagos_y_facturas.metodo_pago (
 	id_metodo_pago INT IDENTITY(1,1) PRIMARY KEY,
 	nombre VARCHAR(50) NOT NULL
 );
+GO
 
 
 -- DESCUENTO
@@ -222,7 +237,7 @@ CREATE TABLE pagos_y_facturas.descuento (
 	descripcion VARCHAR(100) NOT NULL,
 	valor DECIMAL(4,3) NOT NULL -- esto era cantidad pero lo vole y puse valor porque no veo mucho sentido en el atributo cantidad, capaz me equivoco.
 );								 -- RTA: Creo que tenes razon, solo que no se si hacian falta 8 digitos adelante. Si vos guardas descuentos porcentuales como
-								 -- 50%, guardas 0.5, asi que realmente solo necesitarias 1 digito adelante y 2 o 3 atras. Mi opinion. 
+GO								 -- 50%, guardas 0.5, asi que realmente solo necesitarias 1 digito adelante y 2 o 3 atras. Mi opinion. 
 								 -- Si te parece, lo cambio por ahora y de ultima volvemos para atras ATT: Tomas
 
 -- FACTURA
@@ -237,6 +252,7 @@ CREATE TABLE pagos_y_facturas.factura (
 	CONSTRAINT FK_Factura_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
 	CONSTRAINT FK_Factura_Metodo_Pago FOREIGN KEY (id_metodo_pago) REFERENCES pagos_y_facturas.metodo_pago(id_metodo_pago)
 );
+GO
 
 -- FACTURA <-N----N-> DESCUENTO
 create table pagos_y_facturas.factura_descuento (
@@ -755,7 +771,7 @@ BEGIN
 		END
 		
 		-- Verifico que el nombre no exista ya
-		IF EXISTS (SELECT 1 FROM manejo_personas.Rol WHERE descripcion = @nombre)
+		IF EXISTS (SELECT 1 FROM manejo_personas.rol WHERE descripcion = @nombre)
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'Ese rol ya existe' AS Mensaje;
@@ -764,7 +780,7 @@ BEGIN
 
 		
 
-		INSERT INTO manejo_personas.Rol(descripcion)
+		INSERT INTO manejo_personas.rol(descripcion)
 		VALUES (@nombre);
 
 		COMMIT TRANSACTION;
@@ -824,7 +840,7 @@ BEGIN
 			RETURN -1;
 		END
 
-		UPDATE manejo_personas.Rol
+		UPDATE manejo_personas.rol
 		SET descripcion = @nombre_nuevo
 		WHERE rol.id_rol = @id;
 
@@ -861,7 +877,7 @@ BEGIN
 		END
 		
 		-- Verifico que exista en la tabla
-		IF NOT EXISTS (SELECT 1 FROM manejo_personas.Rol WHERE id_rol = @id)
+		IF NOT EXISTS (SELECT 1 FROM manejo_personas.rol WHERE id_rol = @id)
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
