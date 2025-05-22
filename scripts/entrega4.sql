@@ -2241,10 +2241,28 @@ BEGIN
         DELETE FROM manejo_personas.invitado
         WHERE id_invitado = @id_invitado;
 
-		-- Elimina a la persona asociada
-        DELETE FROM manejo_personas.persona
-        WHERE id_persona = @id_persona;
-        SELECT 'Exito' AS Resultado, 'Invitado y persona eliminados físicamente' AS Mensaje
+        -- Intentar eliminar persona si no está referenciada en otras tablas
+		-- NOTA: Agregue esto porque si bien creo que un usuario o socio no deberian ser invitados
+		-- el DER plantea que si porque son una jerarquia de subconjuntos.
+        IF NOT EXISTS (
+            SELECT 1 FROM manejo_personas.usuario WHERE id_persona = @id_persona
+        ) AND NOT EXISTS (
+            SELECT 1 FROM manejo_personas.socio WHERE id_persona = @id_persona
+        ) AND NOT EXISTS (
+            SELECT 1 FROM manejo_personas.responsable WHERE id_persona = @id_persona
+        )
+        BEGIN
+            DELETE FROM manejo_personas.persona
+            WHERE id_persona = @id_persona;
+            SELECT 'Exito' AS Resultado, 'Invitado y persona eliminados' AS Mensaje;
+        END
+        ELSE
+        BEGIN
+            UPDATE manejo_personas.persona
+            SET activo = 0
+            WHERE id_persona = @id_persona;
+            SELECT 'Exito' AS Resultado, 'Invitado eliminado. Persona inactivada (borrado logico)' AS Mensaje;
+        END
 
         COMMIT TRANSACTION;
         RETURN 0;
