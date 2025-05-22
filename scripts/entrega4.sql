@@ -196,12 +196,15 @@ CREATE TABLE pagos_y_facturas.metodo_pago (
 	nombre VARCHAR(50) NOT NULL
 );
 
+DROP TABLE 
 -- DESCUENTO
 CREATE TABLE pagos_y_facturas.descuento (
 	id_descuento INT IDENTITY(1,1) PRIMARY KEY,
 	descripcion VARCHAR(100) NOT NULL,
-	valor DECIMAL(10,2) NOT NULL -- esto era cantidad pero lo vole y puse valor porque no veo mucho sentido en el atributo cantidad, capaz me equivoco.
-);
+	valor DECIMAL(4,3) NOT NULL -- esto era cantidad pero lo vole y puse valor porque no veo mucho sentido en el atributo cantidad, capaz me equivoco.
+);								 -- RTA: Creo que tenes razon, solo que no se si hacian falta 8 digitos adelante. Si vos guardas descuentos porcentuales como
+								 -- 50%, guardas 0.5, asi que realmente solo necesitarias 1 digito adelante y 2 o 3 atras. Mi opinion. 
+								 -- Si te parece, lo cambio por ahora y de ultima volvemos para atras ATT: Tomas
 
 -- FACTURA
 CREATE TABLE pagos_y_facturas.factura (
@@ -732,7 +735,7 @@ BEGIN
 			SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje;
 			RETURN -1;
 		END
-
+		
 		-- Verifico que el nombre no exista ya
 		IF EXISTS (SELECT 1 FROM manejo_personas.Rol WHERE descripcion = @nombre)
 		BEGIN
@@ -1316,5 +1319,193 @@ BEGIN
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
         RETURN -99;
     END CATCH
+END;
+GO
+
+-------- STORED PROCEDURES PARA CATEGORIA
+--- Crear descuento
+CREATE OR ALTER PROCEDURE pagos_y_facturas.CrearDescuento
+	@descripcion VARCHAR(50),
+	@cantidad DECIMAL(4,3)
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- Chequeo que el descuento no sea nulo
+		IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Los descuentos no pueden tener nombres nulos' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que no exista ya en la base de datos
+		IF EXISTS (SELECT 1 FROM pagos_y_facturas.descuento WHERE descripcion = @descripcion)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ya existe un descuento con esta descripcion' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- Verifico que el numero no sea null ni 0
+		IF @cantidad IS NULL OR @cantidad = 0
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Un descuento no puede no tener descuento' AS Mensaje;
+			RETURN -3;
+		END
+
+		INSERT INTO pagos_y_facturas.descuento(descripcion, valor)
+		VALUES (@descripcion, @cantidad);
+
+		COMMIT TRANSACTION;
+		SELECT 'Exito' AS Resultado, 'Descuento Ingresado Correctamente' AS Mensaje;
+		RETURN 0;
+	END TRY
+
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0
+			ROLLBACK TRANSACTION;
+
+		SELECT 
+			'Error' AS Resultado,
+			ERROR_MESSAGE() AS Mensaje,
+			ERROR_NUMBER() AS CodigoError,
+			ERROR_LINE() AS Linea,
+			ERROR_PROCEDURE() AS Procedimiento;
+		RETURN -999;
+	END CATCH
+END;
+GO
+
+
+--- Modificar descuento
+CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificarDescuento
+	@id INT,
+	@descripcion VARCHAR(50),
+	@cantidad DECIMAL(4,3)
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+			
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.descuento WHERE id_descuento = @id)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- Chequeo que el descuento no sea nulo
+		IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Los descuentos no pueden tener nombres nulos' AS Mensaje;
+			RETURN -3;
+		END
+
+		-- Verifico que no exista ya en la base de datos
+		IF EXISTS (
+			SELECT 1 FROM pagos_y_facturas.descuento
+			WHERE descripcion = @descripcion AND id_descuento <> @id
+		)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ya existe un descuento con esta descripcion' AS Mensaje;
+			RETURN -4;
+		END
+
+		-- Verifico que el numero no sea null ni 0
+		IF @cantidad IS NULL OR @cantidad = 0
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Una descuento no puede no tener descuento' AS Mensaje;
+			RETURN -5;
+		END
+
+		UPDATE pagos_y_facturas.descuento
+		SET descripcion = @descripcion, valor = @cantidad
+		WHERE id_descuento = @id;
+
+		COMMIT TRANSACTION;
+		SELECT 'Exito' AS Resultado, 'Descuento modificado correctamente' AS Mensaje;
+		RETURN 0;
+	END TRY
+
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0
+			ROLLBACK TRANSACTION;
+
+		SELECT 
+			'Error' AS Resultado,
+			ERROR_MESSAGE() AS Mensaje,
+			ERROR_NUMBER() AS CodigoError,
+			ERROR_LINE() AS Linea,
+			ERROR_PROCEDURE() AS Procedimiento;
+		RETURN -999;
+	END CATCH
+END;
+GO
+
+-- Eliminas un descuento
+CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminarDescuento
+	@id INT
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.descuento WHERE id_descuento = @id)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- Elimino el descuento
+		DELETE FROM pagos_y_facturas.descuento WHERE id_descuento = @id;
+
+		COMMIT TRANSACTION;
+		SELECT 'Exito' AS Resultado, 'Descuento eliminado correctamente' AS Mensaje;
+		RETURN 0;
+	END TRY
+
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0
+			ROLLBACK TRANSACTION;
+
+		SELECT 
+			'Error' AS Resultado,
+			ERROR_MESSAGE() AS Mensaje,
+			ERROR_NUMBER() AS CodigoError,
+			ERROR_LINE() AS Linea,
+			ERROR_PROCEDURE() AS Procedimiento;
+		RETURN -999;
+	END CATCH
 END;
 GO
