@@ -1,6 +1,4 @@
 USE Com5600G01;
-
--- Este SP valida los datos de entrada y realiza la inserci?n de un nuevo registro en la tabla persona.
 /*
 * Nombre: CrearPersona
 * Descripción: Inserta una nueva persona en la tabla persona, validando su informacion. 
