@@ -2215,26 +2215,23 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
-        -- Validaciones
+        -- Verifico que el id que me pasaron no es null
         IF @id_invitado IS NULL
         BEGIN
             ROLLBACK TRANSACTION;
             SELECT 'Error' AS Resultado, 'id_invitado nulo' AS Mensaje;
             RETURN -1;
         END
-
-        IF NOT EXISTS (
-            SELECT 1
-            FROM manejo_personas.invitado
-            WHERE id_invitado = @id_invitado
-        )
+		
+		-- Verifico que el invitado existe en su tabla
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.invitado WHERE id_invitado = @id_invitado)
         BEGIN
             ROLLBACK TRANSACTION;
             SELECT 'Error' AS Resultado, 'Invitado no existe' AS Mensaje;
             RETURN -2;
         END
 
-        -- Obtener id_persona asociado
+        -- Obtengo la persona asociada al invitado
         DECLARE @id_persona INT;
         SELECT @id_persona = id_persona
         FROM manejo_personas.invitado
@@ -2244,12 +2241,12 @@ BEGIN
         DELETE FROM manejo_personas.invitado
         WHERE id_invitado = @id_invitado;
 
-        -- Eliminar de persona
+		-- Elimina a la persona asociada
         DELETE FROM manejo_personas.persona
         WHERE id_persona = @id_persona;
+        SELECT 'Exito' AS Resultado, 'Invitado y persona eliminados físicamente' AS Mensaje
 
         COMMIT TRANSACTION;
-        SELECT 'Exito' AS Resultado, 'Invitado y persona eliminados' AS Mensaje;
         RETURN 0;
     END TRY
     BEGIN CATCH
@@ -2265,4 +2262,5 @@ BEGIN
     END CATCH
 END;
 GO
+
 
