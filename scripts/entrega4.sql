@@ -153,6 +153,7 @@ CREATE TABLE manejo_actividades.clase (
     dia VARCHAR(9) NOT NULL, -- El dia de la semana con el nombre mas largo es MIE RCO LES
     horario TIME NOT NULL,
     id_usuario INT NOT NULL,
+	activo BIT NOT NULL DEFAULT 1;
 	-- SCHEMA PARA PERSONAS
 	CONSTRAINT FK_Clase_Usuario FOREIGN KEY (id_usuario) REFERENCES manejo_personas.usuario(id_usuario),
 	-- SCHEMA PARA ACTIVIDADES
@@ -244,42 +245,52 @@ CREATE or ALTER PROCEDURE manejo_personas.CrearPersona
 	@telefono VARCHAR(15)
 AS
 BEGIN
-	--validar dni
-	IF LEN(@dni) < 7 OR LEN(@dni) > 8 or ISNUMERIC(@dni) = 0 -- dni es numero y entre 1.000.000 y 99.999.999
-	BEGIN
-		SELECT 'Error' AS Resultado, 'DNI Invalido. Debe contener entre 7 y 8 digitos númericos.' AS Mensaje;
-		RETURN -1;
-	END
-
-	--validar email
-	IF @email NOT LIKE '%_@%.__%' --que email siga formato email@.fin (con fin por lo menos 2 letras)
-	BEGIN
-		SELECT 'Error' AS Resultado, 'El formato del email no es valido.' AS Mensaje;
-		RETURN -2;
-	END
-
-	--validar fecha de nacimiento
-	IF DATEDIFF(YEAR, @fecha_nac, GETDATE()) < 0 OR DATEDIFF(YEAR, @fecha_nac, GETDATE()) > 120 -- que la fecha de nacimiento no sea en el futuro ni la persona tenga mas de 120 años (se podria bajar a 90 por ejemplo)
-	BEGIN
-		SELECT 'Error' AS Resultado, 'La fecha de nacimiento no es valida.' AS Mensaje;
-		RETURN -3;
-	END
-
-	-- se podrian verificar si email y dni existen pero no se si es necesario porque el atributo es unique, si es necesario lo agrego
-
-	-- comenzamos transaccion en read comitted, q se pueda leer la tabla pero no el nuevo registro hasta confirmarlo
-	
-	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED; 
+		-- comenzamos transaccion en read comitted, q se pueda leer la tabla pero no el nuevo registro hasta confirmarlo
 	BEGIN TRANSACTION;
 
-	--insertar persona luego de todas las verificaciones
-	INSERT INTO manejo_personas.persona (dni, nombre, apellido, email, fecha_nac, telefono, fecha_alta)
-	VALUES (@dni, @nombre, @apellido, @email, @fecha_nac, @telefono, GETDATE());
+	BEGIN TRY
+		--validar dni
+		IF LEN(@dni) < 7 OR LEN(@dni) > 8 or ISNUMERIC(@dni) = 0 -- dni es numero y entre 1.000.000 y 99.999.999
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'DNI Invalido. Debe contener entre 7 y 8 digitos númericos.' AS Mensaje;
+			RETURN -1;
+		END
 
-	COMMIT TRANSACTION;
+		--validar email
+		IF @email NOT LIKE '%_@%.__%' --que email siga formato email@.fin (con fin por lo menos 2 letras)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El formato del email no es valido.' AS Mensaje;
+			RETURN -2;
+		END
 
-	SELECT 'Exito' AS RESULTADO, 'Persona registrada correctamente.' AS Mensaje;
-	RETURN 0;
+		--validar fecha de nacimiento
+		IF DATEDIFF(YEAR, @fecha_nac, GETDATE()) < 0 OR DATEDIFF(YEAR, @fecha_nac, GETDATE()) > 120 -- que la fecha de nacimiento no sea en el futuro ni la persona tenga mas de 120 años (se podria bajar a 90 por ejemplo)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La fecha de nacimiento no es valida.' AS Mensaje;
+			RETURN -3;
+		END
+
+		-- se podrian verificar si email y dni existen pero no se si es necesario porque el atributo es unique, si es necesario lo agrego
+
+
+		--insertar persona luego de todas las verificaciones
+		INSERT INTO manejo_personas.persona (dni, nombre, apellido, email, fecha_nac, telefono, fecha_alta)
+		VALUES (@dni, @nombre, @apellido, @email, @fecha_nac, @telefono, GETDATE());
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS RESULTADO, 'Persona registrada correctamente.' AS Mensaje;
+		RETURN 0;
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'error' AS Resultado, ERROR_MESSAGE() AS Mensaje; -- devuelvo que error hubo
+		RETURN -99;
+	END CATCH
 END;
 GO
 
@@ -294,47 +305,56 @@ CREATE OR ALTER PROCEDURE manejo_personas.ModificarPersona
 	-- tienen valor default null por si solo se quiere actualizar un cmapo
 AS
 BEGIN
-	
-	--validar existencia persona (por id)
-	IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona)
-	BEGIN
-		SELECT 'Error' AS Resultado, 'La persona no existe' AS Mensaje;
-		RETURN -1;
-	END
-
-	--validar email (si se da en el exec)
-	IF @email IS NOT NULL
-	BEGIN
-		IF @email NOT LIKE '%_@_%.__%' --validar que  este bien escrito
-		BEGIN
-			SELECT 'Error' AS Resultado, 'El formato del email no es valido.' AS Mensaje;
-			RETURN -2;
-		END
-
-		IF EXISTS (SELECT 1 FROM manejo_personas.persona WHERE email = @email AND id_persona <> @id_persona) --Validar que email existe pero es de otra persona (otro id)
-
-		BEGIN
-			SELECT 'Error' AS Resultado, 'El email esta en uso por otra persona.' AS Mensaje;
-			RETURN -3;
-		END
-	END
-
-	SET TRANSACTION ISOLATION LEVEL READ COMMITTED; --al igual que agregar, que no pueda leer el update hasta confirmado
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 	BEGIN TRANSACTION;
 
+	BEGIN TRY
+		--validar existencia persona (por id)
+		IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La persona no existe' AS Mensaje;
+			RETURN -1;
+		END
+
+		--validar email (si se da en el exec)
+		IF @email IS NOT NULL
+		BEGIN
+			IF @email NOT LIKE '%_@_%.__%' --validar que  este bien escrito
+			BEGIN
+				ROLLBACK TRANSACTION;
+				SELECT 'Error' AS Resultado, 'El formato del email no es valido.' AS Mensaje;
+				RETURN -2;
+			END
+
+			IF EXISTS (SELECT 1 FROM manejo_personas.persona WHERE email = @email AND id_persona <> @id_persona) --Validar que email existe pero es de otra persona (otro id)
+
+			BEGIN
+				ROLLBACK TRANSACTION;
+				SELECT 'Error' AS Resultado, 'El email esta en uso por otra persona.' AS Mensaje;
+				RETURN -3;
+			END
+		END
+
 		UPDATE manejo_personas.persona
-		SET -- 
+		SET 
 			nombre = ISNULL(@nombre, nombre), --si, por ejemplo, nombre no es NULL, se usa ese valor, si es NULL, se mantiene el actual
 			apellido = ISNULL(@apellido, apellido), 
 			email = ISNULL(@email, email),
 			telefono = ISNULL(@telefono, telefono) 
 		WHERE id_persona = @id_persona;
 
-	COMMIT TRANSACTION;
+		COMMIT TRANSACTION;
 
-	SELECT 'Exito' AS Resultado, 'Datos actualizados' AS Mensaje, @id_persona as id_persona;
-	
-	RETURN 0;
+		SELECT 'Exito' AS Resultado, 'Datos actualizados' AS Mensaje, @id_persona as id_persona;
+		RETURN 0;
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resulado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+
 	
 END;
 GO
@@ -344,45 +364,52 @@ CREATE or ALTER PROCEDURE manejo_personas.EliminarPersona
 	@id_persona INT
 AS
 BEGIN
-	-- Validar existencia persona
-	IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona)
-	BEGIN
-		SELECT 'Error' AS Resultado, 'La persona no existe' AS Mensaje;
-		RETURN -1;
-	END
-
 	SET TRANSACTION ISOLATION LEVEL REPEATABLE READ; -- no estoy seguro de si deberia ser este lvl, hace q no se puedan leer datos modificados pero no confirmados, y que ninguna transac pueda modificar los datos leidos por la actual
 	BEGIN TRANSACTION;
-
-		--verificamos si la persona tiene alguna relacion en ora tabla aun
-	IF EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_persona = @id_persona) OR
-	EXISTS (SELECT 1 FROM manejo_personas.usuario WHERE id_persona = @id_persona) OR
-	EXISTS (SELECT 1 FROM manejo_personas.invitado WHERE id_persona = @id_persona) OR
-	EXISTS (SELECT 1 FROM manejo_personas.responsable WHERE id_persona = @id_persona)
-
-	BEGIN -- si tiene relaciones, hacemos borrado logico, pero necesitariamos agregar un atributo a persona (no estoy seguro de q esto se haga asi, si coinciden lo agregamos a la tabla persona)
-
-		UPDATE manejo_personas.persona
-		SET activo = 0
-		WHERE id_persona = @id_persona
-		
-		COMMIT TRANSACTION;
-
-		SELECT 'Exito' AS Resultado, 'Persona inactivada correctamente (borrado logico ya que tiene registros relacionados)' AS Mensaje;
 	
-	END
-	ELSE
-	BEGIN
-			-- si no tiene relaciones hacemos borrado fisico
-		DELETE FROM manejo_personas.persona
-		WHERE id_persona = @id_persona;			
+	BEGIN TRY
+		-- Validar existencia persona
+		IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La persona no existe' AS Mensaje;
+			RETURN -1;
+		END
+
+			--verificamos si la persona tiene alguna relacion en ora tabla aun
+		IF EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_persona = @id_persona) OR
+		EXISTS (SELECT 1 FROM manejo_personas.usuario WHERE id_persona = @id_persona) OR
+		EXISTS (SELECT 1 FROM manejo_personas.invitado WHERE id_persona = @id_persona) OR
+		EXISTS (SELECT 1 FROM manejo_personas.responsable WHERE id_persona = @id_persona)
+
+		BEGIN -- si tiene relaciones, hacemos borrado logico, pero necesitariamos agregar un atributo a persona (no estoy seguro de q esto se haga asi, si coinciden lo agregamos a la tabla persona)
+
+			UPDATE manejo_personas.persona
+			SET activo = 0
+			WHERE id_persona = @id_persona
 		
-		COMMIT TRANSACTION;
+			COMMIT TRANSACTION;
+
+			SELECT 'Exito' AS Resultado, 'Persona inactivada correctamente (borrado logico ya que tiene registros relacionados)' AS Mensaje;
+		END
+		ELSE
+		BEGIN
+				-- si no tiene relaciones hacemos borrado fisico
+			DELETE FROM manejo_personas.persona
+			WHERE id_persona = @id_persona;			
+		
+			COMMIT TRANSACTION;
 	
-		SELECT 'Exito' as Resultado, 'Persona eliminada completamente.' AS Mensaje;
+			SELECT 'Exito' as Resultado, 'Persona eliminada completamente.' AS Mensaje;
 		
-	END
-	RETURN 0;
+		END
+		RETURN 0;
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
 
 END;
 GO
@@ -834,5 +861,460 @@ BEGIN
 		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
 		RETURN -99;
 	END CATCH
+END;
+GO
+
+-------- STORED PROCEDURES PARA CATEGORIA
+
+-- Creación categoria
+
+CREATE OR ALTER PROCEDURE manejo_actividades.CrearCategoria
+	@nombre_categoria VARCHAR(50),
+	@costo_membrecia DECIMAL(10, 2),
+	@edad_maxima INT
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- validamos nombre de la categoria
+		IF @nombre_categoria IS NULL OR LTRIM(RTRIM(@nombre_categoria)) = '' -- que no sea null ni vacio
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El nombre de la categoría no puede estar vacío' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- validar costo de membresía
+		IF @costo_membrecia <= 0
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El costo de membresía debe ser mayor a cero' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- validamos edad maxima
+		IF @edad_maxima <= 0
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La edad maxima debe ser mayor a cero' AS Mensaje;
+			RETURN -3;
+		END
+
+		-- validamos categoria unica
+
+		IF EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE nombre_categoria = @nombre_categoria)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ya existe una categoría con ese nombre' AS Mensaje;
+			RETURN -4;
+		END
+
+		-- calculamos edad minima para esta categoria
+		DECLARE @edad_minima INT = 0;
+
+		-- si EXISTE una categoria con la edad maxima MENOR a la que queremos agregar, nuestra "edad minima" sera la edad maxima existente + 1
+		IF EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE edad_maxima < @edad_maxima)
+		BEGIN
+			SELECT @edad_minima = MAX(edad_maxima) + 1
+			FROM manejo_actividades.categoria
+			WHERE edad_maxima < @edad_maxima;
+		END
+
+		-- verificamos que no haya solapamiento de edades (que ninguna categoria tenga edad_maxima dentro de nuestro rango)
+		IF EXISTS ( SELECT 1 FROM manejo_actividades.categoria WHERE edad_maxima BETWEEN @edad_minima AND @edad_maxima AND edad_maxima <> @edad_maxima) -- se busca si existe alguna categoria donde la edad maxima este entre nuestra edad minima y maxima actuales (excluyendo las que tienen nuestra misma maxima)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El rango de edad se solapa con otra categoria existente' AS Mensaje;
+			RETURN -5;
+		END
+
+		-- verificamos ademas que no haya "huecos" entre los rangos (por ejemplo, que no haya categoria de 14-16 y otra de 20-22 dejando 17-19)
+		IF EXISTS ( 
+			SELECT 1 FROM manejo_actividades.categoria WHERE edad_maxima > @edad_maxima)
+		AND NOT EXISTS ( 
+			SELECT 1 FROM manejo_actividades.categoria WHERE edad_maxima = @edad_maxima + 1)
+	
+		-- este if lo que hace es buscar primero si hay categorias con edades maximas superiores a la nuestra, y si falta la categoria que tiene que empezar luego de la actual
+
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Hay un hueco en el rango de edades entre esta categoria y la siguiente' AS Mensaje;
+			RETURN -6;
+		END
+
+		-- luego de las validaciones insertamos
+
+		INSERT INTO manejo_actividades.categoria (nombre_categoria, costo_membrecia, edad_maxima)
+		VALUES (@nombre_categoria, @costo_membrecia, @edad_maxima);
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Categoria crada correctamente' AS Mensaje;
+		RETURN 0;
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+GO
+
+-- Modificar categoria
+
+CREATE OR ALTER PROCEDURE manejo_actividades.ModificarCategoria
+	@id_categoria INT,
+	@nombre_categoria VARCHAR(50) = NULL,
+	@costo_membrecia DECIMAL(10, 2) = NULL
+AS
+BEGIN
+	
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+	-- verificamos que la categoria exista
+		IF NOT EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La categoria no existe' AS Mensaje;
+			RETURN -1
+		END
+
+	--si nos dan un nombre para cambiar, lo validamos
+		IF @nombre_categoria IS NOT NULL
+		BEGIN
+			IF LTRIM(RTRIM(@nombre_categoria)) = ''
+			BEGIN
+				ROLLBACK TRANSACTION;
+				SELECT 'Error' AS Resultado, 'El nombre de la categoria no puede estar vacio' AS Mensaje;
+				RETURN -2;
+			END
+
+	-- verificamos que no exista ora categoria con el nombre a cambiar (excepto si es la actual)
+			IF EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE nombre_categoria = @nombre_categoria AND id_categoria <> @id_categoria)
+			BEGIN
+				ROLLBACK TRANSACTION;
+				SELECT 'Error' AS Resultado, 'Ya existe otra categoría con ese nombre' AS Mensaje;
+				RETURN -3;
+			END
+		END
+
+		-- si nos dan costo, que no sea negativo
+		IF @costo_membrecia IS NOT NULL AND @costo_membrecia <= 0
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El costo de membresía debe ser mayor a cero' AS Mensaje;
+			RETURN -4;
+		END
+
+		UPDATE manejo_actividades.categoria
+		SET nombre_categoria = ISNULL(@nombre_categoria, nombre_categoria),
+			costo_membrecia = ISNULL(@costo_membrecia, costo_membrecia)
+		WHERE id_categoria = @id_categoria;
+
+		COMMIT TRANSACTION;
+		SELECT 'Exito' AS Resultado, 'Categoria modificada correctamente' AS Mensaje;
+		RETURN 0;
+		
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+
+END;
+GO
+
+-- No agrego sp de eliminar categoria pues complicaria mucho el manejo de edades (habria que pensarlo mejor tal vez)
+
+
+
+
+
+-------- STORED PROCEDURES PARA CLASE
+
+-- crear clase
+
+CREATE OR ALTER PROCEDURE manejo_actividades.CREARClase
+	@id_actividad INT,
+	@id_categoria INT,
+	@dia VARCHAR(9),
+	@horario TIME,
+	@id_usuario INT
+AS
+BEGIN
+
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- validar que la actividad exista
+		IF NOT EXISTS (SELECT 1 FROM manejo_actividades.actividad WHERE id_actividad = @id_actividad)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La actividad no existe' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- validar que la categoria exista
+
+		IF NOT EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La categoría no existe' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- validar que el usuario profesor exista
+		IF NOT EXISTS (SELECT 1 FROM manejo_personas.usuario WHERE id_usuario = @id_usuario)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El usuario no existe' AS Mensaje;
+			RETURN -3;
+		END
+
+		-- valdar formato del dia
+
+		SET @dia = UPPER(@dia);
+
+		IF @dia NOT IN ('LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO')
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El dia debe ser un dia de la semana valido' AS Mensaje;
+			RETURN -4;
+		END
+
+		--validar horario (entre 6am y 22pm por ejemplo)
+
+		DECLARE @hora_minima TIME = '06:00:00';
+		DECLARE @hora_maxima TIME = '22:00:00';
+
+		IF @horario < @hora_minima OR @horario > @hora_maxima
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El horario debe ser entre 06 am y 22 pm' AS Mensaje;
+			RETURN -5;
+		END
+
+		-- verficar la no existencia de otra clase con misma actividad, categoria, dia y horario
+		IF EXISTS ( SELECT 1 FROM manejo_actividades.clase WHERE id_actividad = @id_actividad AND id_categoria = @id_categoria AND dia = @dia AND horario = @horario)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ya existe uan clase con la misma activida, categoria, dia y horario', AS Mensaje;
+			RETURN -6;
+		END
+
+		-- verificar que el profesor no tenga otra clase a la misma hora
+		IF EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_usuario = @id_usuario AND dia = @dia AND horario = @horario)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El profesor ya tiene otra clase asignada en ese dia y horario' AS Mensaje;
+			RETURN -7;
+		END
+
+		-- insertar la nueva clase
+
+		INSERT INTO manejo_actividades.clase(id_actividad, id_categoria, dia, horario, id_usuario)
+		VALUES (@id_actividad, @id_categoria, @dia, @horario, @id_usuario);
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Clase creada correctamente' AS Mensaje;
+		RETURN 0;
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+GO
+
+-- modificar clase
+
+CREATE OR ALTER PROCEDURE manejo_actividades.ModificarClase
+    @id_clase INT,
+    @id_actividad INT = NULL,
+    @id_categoria INT = NULL,
+    @dia VARCHAR(9) = NULL,
+    @horario TIME = NULL,
+    @id_usuario INT = NULL
+AS
+BEGIN
+    
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+    
+    BEGIN TRY
+        -- verificamos que la clase exista
+        IF NOT EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_clase = @id_clase)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La clase no existe' AS Mensaje;
+            RETURN -1;
+        END
+        
+        -- verificamos actividad si se proporciona
+        IF @id_actividad IS NOT NULL AND NOT EXISTS (SELECT 1 FROM manejo_actividades.actividad WHERE id_actividad = @id_actividad)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La actividad no existe' AS Mensaje;
+            RETURN -2;
+        END
+        
+        -- verificamos categoría si se proporciona
+        IF @id_categoria IS NOT NULL AND NOT EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La categoría no existe' AS Mensaje;
+            RETURN -3;
+        END
+        
+        -- verificamos usuario si se proporciona
+        IF @id_usuario IS NOT NULL AND NOT EXISTS (SELECT 1 FROM manejo_personas.usuario WHERE id_usuario = @id_usuario)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El usuario no existe' AS Mensaje;
+            RETURN -4;
+        END
+        
+        -- verificamos formato del día si se proporciona y convertir a mayúsculas
+        IF @dia IS NOT NULL
+        BEGIN
+            SET @dia = UPPER(@dia);
+            IF @dia NOT IN ('LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO')
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El día debe ser un día de la semana válido' AS Mensaje;
+                RETURN -5;
+            END
+        END
+        
+        -- verificamos horario si se proporciona
+        IF @horario IS NOT NULL
+        BEGIN
+            DECLARE @hora_minima TIME = '06:00:00';
+            DECLARE @hora_maxima TIME = '22:00:00';
+          
+            IF @horario < @hora_minima OR @horario > @hora_maxima
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El horario debe estar entre 06:00 y 22:00' AS Mensaje;
+                RETURN -6;
+            END
+        END
+        
+        -- verificamos que no haya otra clase con la misma combinación (si cambiamos algun valor)
+        IF @id_actividad IS NOT NULL OR @id_categoria IS NOT NULL OR @dia IS NOT NULL OR @horario IS NOT NULL
+        BEGIN
+            IF EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_actividad = ISNULL(@id_actividad, id_actividad) 
+				AND id_categoria = ISNULL(@id_categoria, id_categoria) 
+				AND dia = ISNULL(@dia, dia) 
+				AND horario = ISNULL(@horario, horario)
+                AND id_clase <> @id_clase
+            )
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'Ya existe otra clase con la misma actividad, categoría, día y horario' AS Mensaje;
+                RETURN -7;
+            END
+        END
+        
+        -- verificamos que el profesor no tenga otra clase a la misma hora (solo si cambiamos profesor/día/hora)
+        IF @id_usuario IS NOT NULL OR @dia IS NOT NULL OR @horario IS NOT NULL
+        BEGIN
+            IF EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_usuario = ISNULL(@id_usuario, id_usuario)
+                AND dia = ISNULL(@dia, dia)
+                AND horario = ISNULL(@horario, horario)
+                AND id_clase <> @id_clase
+            )
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El profesor ya tiene otra clase asignada en ese día y horario' AS Mensaje;
+                RETURN -8;
+            END
+        END
+        
+        -- verificamos la clase
+        UPDATE manejo_actividades.clase
+        SET id_actividad = ISNULL(@id_actividad, id_actividad),
+            id_categoria = ISNULL(@id_categoria, id_categoria),
+            dia = ISNULL(@dia, dia),
+            horario = ISNULL(@horario, horario),
+            id_usuario = ISNULL(@id_usuario, id_usuario)
+        WHERE id_clase = @id_clase;
+        
+        COMMIT TRANSACTION;
+        
+        SELECT 'Éxito' AS Resultado, 'Clase modificada correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+
+    END CATCH
+
+END;
+GO
+
+-- eliminar clase -- NO FINAL --
+
+CREATE OR ALTER PROCEDURE manejo_actividades.EliminarClase
+    @id_clase INT
+AS
+BEGIN
+    
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+    
+    BEGIN TRY
+        -- verificamos que la clase exista y esté activa
+        IF NOT EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_clase = @id_clase AND activo = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La clase no existe o ya está inactiva' AS Mensaje;
+            RETURN -1;
+        END
+        
+        -- verificamos si hay socios inscritos en esta actividad y categoría
+        IF EXISTS (SELECT 1 FROM manejo_personas.socio_actividad sa
+            JOIN manejo_personas.socio s ON sa.id_socio = s.id_socio
+            JOIN manejo_actividades.clase c ON c.id_clase = @id_clase
+            WHERE sa.id_actividad = c.id_actividad
+            AND s.id_categoria = c.id_categoria
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'No se puede eliminar la clase porque hay socios inscritos en esta actividad y categoría' AS Mensaje;
+            RETURN -2;
+        END
+		-- esto casi seguro habria que cambiarlo/repensarlo porque no se eliminaria la clase aun si el socio esta inscrito en actividad y categoria pero 
+		-- en otra clase, capaz habria que unir de alguna forma socio con clase. !!!
+		-- aparte tiene que hacer joins y dudo que sea optimo
+
+        -- realizamos borrado lógico cambiando el estado a inactivo
+        UPDATE manejo_actividades.clase
+        SET activo = 0 -- agregue atributo activo a clase para hacer borrado lógico, si les parece que no deberia de haber borrado lógico lo cambiamos
+        WHERE id_clase = @id_clase;
+        
+        COMMIT TRANSACTION;
+        
+        SELECT 'Éxito' AS Resultado, 'Clase inactivada correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
 END;
 GO
