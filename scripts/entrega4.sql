@@ -39,18 +39,33 @@ Enunciado:
 */
 
 -- Creacion de la base de datos
-CREATE DATABASE Com5600G01;
+IF NOT EXISTS (SELECT name FROM master.dbo.sysdatabases WHERE name = 'Com5600G01')
+BEGIN
+    CREATE DATABASE Com5600G01;
+END
+GO
 
 -- Selecciona
 USE Com5600G01;
 
 -- Crea esquemas
-CREATE SCHEMA manejo_personas; -- Relativo a todo lo que tiene que ver con personas fisicas
+IF NOT EXISTS (SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'manejo_personas')
+BEGIN
+    EXEC('CREATE SCHEMA manejo_personas'); -- Relativo a todo lo que tiene que ver con personas fisicas
+END
+GO
 
-CREATE SCHEMA manejo_actividades; -- Relativo a las actividades del club
+IF NOT EXISTS (SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'manejo_actividades')
+BEGIN
+    EXEC('CREATE SCHEMA manejo_actividades'); -- Relativo a las actividades del club
+END
+GO
 
-CREATE SCHEMA pagos_y_facturas; -- Relativo a pagos 
-
+IF NOT EXISTS (SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'pagos_y_facturas')
+BEGIN
+    EXEC('CREATE SCHEMA pagos_y_facturas'); -- Relativo a pagos
+END
+GO
 -- Crea las tablas para el schema de personas
 
 -- PERSONA
@@ -234,8 +249,7 @@ create table pagos_y_facturas.factura_descuento (
 	CONSTRAINT FK_Factura_Descuento_Factura FOREIGN KEY (id_factura) REFERENCES pagos_y_facturas.factura(id_factura),
 	CONSTRAINT FK_Factura_Descuento_Descuento FOREIGN KEY (id_descuento) REFERENCES pagos_y_facturas.descuento(id_descuento)
 );
-
-
+GO
 
 
 -------- STORE PROCEDURES PARA PERSONAS
