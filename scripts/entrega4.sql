@@ -387,4 +387,452 @@ BEGIN
 END;
 GO
 
+-------- STORED PROCEDURES PARA OBRA SOCIALES
+-- Creacion de nueva obra social
+CREATE OR ALTER PROCEDURE manejo_personas.CreacionRol
+	@nombre VARCHAR(50)
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- Verifico que no sea nulo
+		IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que el nombre no exista ya
+		IF EXISTS (SELECT 1 FROM manejo_personas.obra_social WHERE descripcion = @nombre)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ya hay una obra social con ese nombre' AS Mensaje;
+			RETURN -2;
+		END
+
+		
+
+		INSERT INTO manejo_personas.obra_social(descripcion)
+		VALUES (@nombre);
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Obra Social Ingresada' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+GO
+
+-- Modificacion de obra social
+CREATE OR ALTER PROCEDURE manejo_personas.ModificacionRol
+	@id INT,
+	@nombre_nuevo VARCHAR(50)
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+		
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM manejo_personas.obra_social WHERE id_obra_social = @id)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que el nombre no sea nulo
+		IF @nombre_nuevo IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que el nombre no exista ya en la tabla
+		IF EXISTS (SELECT 1 FROM manejo_personas.obra_social WHERE descripcion = @nombre_nuevo)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Esa obra social ya esta registrada' AS Mensaje;
+			RETURN -1;
+		END
+
+		UPDATE manejo_personas.obra_social
+		SET descripcion = @nombre_nuevo
+		WHERE obra_social.id_obra_social = @id;
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Obra Social Ingresada' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+GO
+
+-- Eliminacion de obra social
+CREATE OR ALTER PROCEDURE manejo_personas.EliminacionRol
+	@id INT
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+		
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM manejo_personas.obra_social WHERE id_obra_social = @id)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -1;
+		END
+
+		DELETE FROM manejo_personas.obra_social
+		WHERE obra_social.id_obra_social = @id;
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Obra Social eliminada' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+GO
+
+-------- STORED PROCEDURES PARA METODO PAGO
+-- Creacion de un metodo pago
+CREATE OR ALTER PROCEDURE pagos_y_facturas.CreacionMetodoPago
+	@nombre VARCHAR(50)
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- Verifico que no sea nulo
+		IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que el nombre no exista ya
+		IF EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE nombre = @nombre)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ya hay un metodo de pago con ese nombre' AS Mensaje;
+			RETURN -2;
+		END
+
+		
+
+		INSERT INTO pagos_y_facturas.metodo_pago(nombre)
+		VALUES (@nombre);
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Nuevo metodo de pago creado' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+GO
+
+-- Modificacion metodo pago
+CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificacionMetodoPago
+	@id INT,
+	@nombre_nuevo VARCHAR(50)
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+		
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE id_metodo_pago = @id)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que el nombre no sea nulo
+		IF @nombre_nuevo IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que el nombre no exista ya en la tabla
+		IF EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE nombre = @nombre_nuevo)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ese metodo de pago ya esta registrado' AS Mensaje;
+			RETURN -1;
+		END
+
+		UPDATE pagos_y_facturas.metodo_pago
+		SET nombre = @nombre_nuevo
+		WHERE metodo_pago.id_metodo_pago = @id;
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Metodo de pago modificado' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+GO
+
+-- Eliminacion metodo de pago
+CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminacionMetodoPago
+	@id INT
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+		
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE id_metodo_pago = @id)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -1;
+		END
+
+		DELETE FROM pagos_y_facturas.metodo_pago
+		WHERE metodo_pago.id_metodo_pago = @id;
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Metodo de pago eliminado' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+GO
+
+-------- STORED PROCEDURES PARA ROL
+-- Creacion de un rol
+CREATE OR ALTER PROCEDURE manejo_personas.CreacionRol
+	@nombre VARCHAR(50)
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- Verifico que no sea nulo
+		IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que el nombre no exista ya
+		IF EXISTS (SELECT 1 FROM manejo_personas.Rol WHERE descripcion = @nombre)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ese rol ya existe' AS Mensaje;
+			RETURN -2;
+		END
+
+		
+
+		INSERT INTO manejo_personas.Rol(descripcion)
+		VALUES (@nombre);
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Nuevo rol creado' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+GO
+
+-- Modificacion rol
+CREATE OR ALTER PROCEDURE manejo_personas.ModificacionRol
+	@id INT,
+	@nombre_nuevo VARCHAR(50)
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+		
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM manejo_personas.rol WHERE id_rol = @id)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que el nombre no sea nulo
+		IF @nombre_nuevo IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que el nombre no exista ya en la tabla
+		IF EXISTS (SELECT 1 FROM manejo_personas.rol WHERE descripcion = @nombre_nuevo)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ese rol ya esta registrado' AS Mensaje;
+			RETURN -1;
+		END
+
+		UPDATE manejo_personas.Rol
+		SET descripcion = @nombre_nuevo
+		WHERE rol.id_rol = @id;
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Rol modificado' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+GO
+
+-- Eliminacion rol
+CREATE OR ALTER PROCEDURE manejo_personas.EliminacionRol
+	@id INT
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+		
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM manejo_personas.Rol WHERE id_rol = @id)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -1;
+		END
+
+		DELETE FROM manejo_personas.rol
+		WHERE Rol.id_rol = @id;
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Rol eliminado' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+GO
