@@ -1,4 +1,4 @@
--- PRUEBAS
+-- PRUEBAS Personas
 -- TEST STORED PROCEDURE CrearPersona:
 
 -- Casos normales
