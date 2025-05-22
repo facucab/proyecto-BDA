@@ -2332,4 +2332,281 @@ BEGIN
 END;
 GO
 
+-------- STORED PROCEDURES PARA ACTIVIDAD
+-- Crear Responsable
+CREATE OR ALTER PROCEDURE manejo_personas.CrearResponsable
+    @id_persona INT,
+    @parentesco VARCHAR(10),
+    @id_grupo INT
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+        -- Verifico que existe la persona en la tabla de personas
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Persona no encontrada' AS Mensaje;
+            RETURN -1;
+        END
+
+        -- Chequeo que existe el grupo familiar
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.grupo_familiar WHERE id_grupo = @id_grupo)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje;
+            RETURN -2;
+        END
+
+        -- Valido que la persona no sea ya responsable de otro grupo personal
+        IF EXISTS (SELECT 1 FROM manejo_personas.responsable WHERE id_persona = @id_persona)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La persona ya esta registrada como responsable' AS Mensaje;
+            RETURN -3;
+        END
+
+		-- Verifico el parentesco
+        IF @parentesco IS NOT NULL AND LTRIM(RTRIM(@parentesco)) = ''
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El parentesco no puede estar vacio' AS Mensaje;
+            RETURN -4;
+        END
+
+        -- Insertar responsable
+        INSERT INTO manejo_personas.responsable (id_persona, parentesco, id_grupo)
+        VALUES (@id_persona, @parentesco, @id_grupo);
+
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Responsable creado correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
+END;
+GO
+
+-- Modificar responsable
+CREATE OR ALTER PROCEDURE manejo_personas.ModificarResponsable
+    @id_grupo INT,
+    @parentesco VARCHAR(10) = NULL
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+        -- Validar existencia de responsable
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.responsable WHERE id_grupo = @id_grupo)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Responsable no encontrado' AS Mensaje;
+            RETURN -1;
+        END
+
+        -- Validar que parentesco no sea vacío si se pasa
+        IF @parentesco IS NOT NULL AND LTRIM(RTRIM(@parentesco)) = ''
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Parentesco no puede estar vacío' AS Mensaje;
+            RETURN -2;
+        END
+
+        -- Actualizar
+        UPDATE manejo_personas.responsable
+        SET parentesco = ISNULL(@parentesco, parentesco)
+        WHERE id_grupo = @id_grupo;
+
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Responsable actualizado correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
+END;
+GO
+
+-- Eliminar responsable
+CREATE OR ALTER PROCEDURE manejo_personas.EliminarResponsable
+    @id_grupo INT
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+        -- Verifico que el responsable existe en su tabla
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.responsable WHERE id_grupo = @id_grupo)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Responsable no encontrado' AS Mensaje;
+            RETURN -1;
+        END
+
+        -- Obtengo su id de persona
+        DECLARE @id_persona INT;
+        SELECT @id_persona = id_persona FROM manejo_personas.responsable WHERE id_grupo = @id_grupo;
+
+        -- Elimino ael responsable
+        DELETE FROM manejo_personas.responsable WHERE id_grupo = @id_grupo;
+
+        -- Si persona no está asociada a otro rol, inactivar
+        IF NOT EXISTS (
+            SELECT 1 FROM manejo_personas.usuario WHERE id_persona = @id_persona
+        ) AND NOT EXISTS (
+            SELECT 1 FROM manejo_personas.socio WHERE id_persona = @id_persona
+        ) AND NOT EXISTS (
+            SELECT 1 FROM manejo_personas.invitado WHERE id_persona = @id_persona
+        )
+        BEGIN
+            UPDATE manejo_personas.persona
+            SET activo = 0
+            WHERE id_persona = @id_persona;
+        END
+
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Responsable eliminado correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
+END;
+GO
+
+-------- STORED PROCEDURES PARA ACTIVIDAD
+-- Crear Grupo Familiar
+CREATE OR ALTER PROCEDURE manejo_personas.CrearGrupoFamiliar
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+        INSERT INTO manejo_personas.grupo_familiar (fecha_alta, estado)
+        VALUES (GETDATE(), 1);
+
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Grupo familiar creado correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
+END;
+GO
+
+-- Modificar Grupo Familiar
+CREATE OR ALTER PROCEDURE manejo_personas.ModificarEstadoGrupoFamiliar
+    @id_grupo INT,
+    @estado BIT = NULL
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.grupo_familiar WHERE id_grupo = @id_grupo)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje;
+            RETURN -1;
+        END
+
+        -- Verificar que el estado sea valido
+        IF @estado IS NOT NULL AND @estado NOT IN (0, 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Estado debe ser 0 (inactivo) o 1 (activo)' AS Mensaje;
+            RETURN -2;
+        END
+
+		-- Modifico el estado
+        UPDATE manejo_personas.grupo_familiar
+        SET estado = @estado
+        WHERE id_grupo = @id_grupo;
+
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Estado del Grupo familiar actualizado correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
+END;
+GO
+
+-- Eliminar grupo familiar
+CREATE OR ALTER PROCEDURE manejo_personas.EliminarGrupoFamiliar
+    @id_grupo INT
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+		-- Verifico que el grupo familiar exista en la tabla
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.grupo_familiar WHERE id_grupo = @id_grupo)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje;
+            RETURN -1;
+        END
+
+        -- Validar que no tenga responsables ni socios activos
+        IF EXISTS (SELECT 1 FROM manejo_personas.responsable WHERE id_grupo = @id_grupo)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'No se puede eliminar: grupo tiene responsables asignados' AS Mensaje;
+            RETURN -2;
+        END
+
+		-- Verificar que no tenga socios asignados al grupo
+        IF EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_grupo = @id_grupo)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'No se puede eliminar: grupo tiene socios asignados' AS Mensaje;
+            RETURN -3;
+        END
+
+        -- Borrado logico
+        UPDATE manejo_personas.grupo_familiar
+        SET estado = 0
+        WHERE id_grupo = @id_grupo;
+
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Grupo familiar inactivado correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
+END;
+GO
+
+
+
 
