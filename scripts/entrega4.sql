@@ -111,6 +111,7 @@ CREATE TABLE manejo_personas.invitado (
     id_invitado INT IDENTITY(1,1) PRIMARY KEY,
     id_persona INT NOT NULL UNIQUE, -- Conexion con su entidad padre
     id_socio INT NOT NULL, -- Conexion con la entidad fuerte
+	fecha_invitacion DATE NOT NULL DEFAULT GETDATE(),
 	-- SCHEMA PARA PERSONAS
     CONSTRAINT FK_Invitado_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
     CONSTRAINT FK_Invitado_Socio FOREIGN KEY (id_socio) REFERENCES manejo_personas.socio(id_socio)
@@ -123,6 +124,7 @@ CREATE TABLE manejo_personas.usuario (
     username VARCHAR(50) NOT NULL UNIQUE,
     password_hash VARCHAR(256) NOT NULL, -- Asumo que vamos a hashear en SHA-256
     fecha_alta_contraseña DATE NOT NULL DEFAULT GETDATE(),
+	estado BIT NOT NULL DEFAULT 1,
 	-- SCHEMA PARA PERSONAS
     CONSTRAINT FK_Usuario_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona)
 );
@@ -142,7 +144,8 @@ CREATE TABLE manejo_personas.responsable (
 CREATE TABLE manejo_actividades.actividad (
     id_actividad INT IDENTITY(1,1) PRIMARY KEY,
     nombre_actividad VARCHAR(100) NOT NULL,
-    costo_mensual DECIMAL(10, 2) NOT NULL
+    costo_mensual DECIMAL(10, 2) NOT NULL,
+	estado BIT NOT NULL DEFAULT 1
 );
 
 -- CLASE
@@ -182,6 +185,7 @@ CREATE TABLE manejo_personas.socio_actividad (
     id_socio INT NOT NULL,
     id_actividad INT NOT NULL,
     fecha_inicio DATE NOT NULL DEFAULT GETDATE(),
+	estado BIT NOT NULL DEFAULT 1,
     PRIMARY KEY (id_socio, id_actividad),
 	-- SCHEMA PARA PERSONAS
     CONSTRAINT FK_Socio_Actividad_Socio FOREIGN KEY (id_socio) REFERENCES manejo_personas.socio(id_socio),
@@ -196,7 +200,7 @@ CREATE TABLE pagos_y_facturas.metodo_pago (
 	nombre VARCHAR(50) NOT NULL
 );
 
-DROP TABLE 
+
 -- DESCUENTO
 CREATE TABLE pagos_y_facturas.descuento (
 	id_descuento INT IDENTITY(1,1) PRIMARY KEY,
@@ -212,7 +216,7 @@ CREATE TABLE pagos_y_facturas.factura (
 	estado_pago VARCHAR(10) NOT NULL, -- no le pongo bit porque asumo que puede ser: pagado, pendiente, vencido y tal vez alguna mas
 	fecha_emision DATE NOT NULL DEFAULT GETDATE(), -- que cada vez que se cree un nuevo registro tome la fecha del dia
 	monto_a_pagar DECIMAL(10, 2) NOT NULL,
-	id_persona INT NOT NULL UNIQUE,
+	id_persona INT NOT NULLE,
 	id_metodo_pago INT NOT NULL,
 	
 	CONSTRAINT FK_Factura_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
@@ -419,7 +423,7 @@ GO
 
 -------- STORED PROCEDURES PARA OBRA SOCIALES
 -- Creacion de nueva obra social
-CREATE OR ALTER PROCEDURE manejo_personas.CreacionRol
+CREATE OR ALTER PROCEDURE manejo_personas.CreacionObraSocial
 	@nombre VARCHAR(50)
 AS
 BEGIN
@@ -464,7 +468,7 @@ END;
 GO
 
 -- Modificacion de obra social
-CREATE OR ALTER PROCEDURE manejo_personas.ModificacionRol
+CREATE OR ALTER PROCEDURE manejo_personas.ModificacionObraSocial
 	@id INT,
 	@nombre_nuevo VARCHAR(50)
 AS
@@ -525,7 +529,7 @@ END;
 GO
 
 -- Eliminacion de obra social
-CREATE OR ALTER PROCEDURE manejo_personas.EliminacionRol
+CREATE OR ALTER PROCEDURE manejo_personas.EliminacionObraSocial
 	@id INT
 AS
 BEGIN
@@ -1042,7 +1046,7 @@ GO
 
 -- crear clase
 
-CREATE OR ALTER PROCEDURE manejo_actividades.CREARClase
+CREATE OR ALTER PROCEDURE manejo_actividades.CrearClase
 	@id_actividad INT,
 	@id_categoria INT,
 	@dia VARCHAR(9),
@@ -1107,7 +1111,7 @@ BEGIN
 		IF EXISTS ( SELECT 1 FROM manejo_actividades.clase WHERE id_actividad = @id_actividad AND id_categoria = @id_categoria AND dia = @dia AND horario = @horario)
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Ya existe uan clase con la misma activida, categoria, dia y horario', AS Mensaje;
+			SELECT 'Error' AS Resultado, 'Ya existe una clase con la misma actividad, categoría, día y horario' AS Mensaje;
 			RETURN -6;
 		END
 
@@ -1670,7 +1674,7 @@ GO
 
 
 -------- STORED PROCEDURES PARA ACTIVIDAD
---- Crear una factura
+--- Crear una actividad
 CREATE OR ALTER PROCEDURE manejo_actividades.CrearActividad
 	@nombre_actividad VARCHAR(100),
 	@costo_mensual DECIMAL(10,2)
@@ -1811,10 +1815,10 @@ END;
 GO
 
 -- Eliminar Actividad
--- NOTA: ME PARECE QUE NO HACE FALTA ESTE TRIGGER PORQUE SI UNA ACTIVIDAD NO ESTA ACTIVA, SIMPLEMENTE NO INSCRIBO GENTE NUEVA A ESA ACTIVIDAD
+-- NOTA: ME PARECE QUE NO HACE FALTA ESTE TRIGGER (Excepto para corregir ingresos erroneos) PORQUE SI UNA ACTIVIDAD NO ESTA ACTIVA, SIMPLEMENTE NO INSCRIBO GENTE NUEVA A ESA ACTIVIDAD
 -- EN CAMBIO, SI HUBIESE QUE HACERLO, HAY QUE MODIFICAR LA TABLA DE ACTIVIDAD PARA SOPORTAR UN BORRADO LOGICO 
 -- Y TAMBIEN A ESTE TRIGGER PARA ESO
-/*CREATE OR ALTER PROCEDURE manejo_actividades.EliminarActividad
+CREATE OR ALTER PROCEDURE manejo_actividades.EliminarActividad
 	@id INT
 AS
 BEGIN
@@ -1860,5 +1864,405 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
-GO*/
+GO
+
+-------- STORED PROCEDURES PARA ACTIVIDAD
+--- Crear un Usuario
+CREATE OR ALTER PROCEDURE manejo_personas.CrearUsuario
+    @id_persona INT,
+    @username VARCHAR(50),
+    @password_hash VARCHAR(256),
+    @fecha_alta_contraseña DATE = NULL
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        
+        -- Verifico que el id_persona no sea nulo
+        IF @id_persona IS NULL
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'id_persona nulo' AS Mensaje;
+            RETURN -1;
+        END
+        
+        -- Verifico que el username no sea nulo
+        IF @username IS NULL
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'username nulo' AS Mensaje;
+            RETURN -2;
+        END
+        
+        -- Verifico que el password_hash no sea nulo
+        IF @password_hash IS NULL
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'password_hash nulo' AS Mensaje;
+            RETURN -3;
+        END
+
+		-- Verifico que el password_hash tenga 256 caracteres
+        IF LEN(@password_hash) != 256 -- NOTA: Como dije arriba, asumo SHA-256 como metodo de hasheo
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'password_hash debe tener 256 caracteres' AS Mensaje;
+			RETURN -7;
+		END
+        
+        -- Validar que la persona existe
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La persona especificada no existe' AS Mensaje;
+            RETURN -4;
+        END
+        
+        -- Validar que la persona no tenga ya un usuario
+        IF EXISTS (SELECT 1 FROM manejo_personas.usuario WHERE id_persona = @id_persona)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La persona ya tiene un usuario asignado' AS Mensaje;
+            RETURN -5;
+        END
+        
+        -- Validar que el username no este en uso
+        IF EXISTS (SELECT 1 FROM manejo_personas.usuario WHERE username = @username)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El nombre de usuario ya esta en uso' AS Mensaje;
+            RETURN -6;
+        END
+        
+        -- Si no se proporciona fecha, usar la actual
+        IF @fecha_alta_contraseña IS NULL
+            SET @fecha_alta_contraseña = GETDATE();
+        
+        -- Insertar el nuevo usuario
+        INSERT INTO manejo_personas.usuario (id_persona, username, password_hash, fecha_alta_contraseña)
+        VALUES (@id_persona, @username, @password_hash, @fecha_alta_contraseña);
+        
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Usuario creado correctamente' AS Mensaje;
+        RETURN 0;
+        
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        SELECT 
+            'Error' AS Resultado,
+            ERROR_MESSAGE() AS Mensaje,
+            ERROR_NUMBER() AS CodigoError,
+            ERROR_LINE() AS Linea,
+            ERROR_PROCEDURE() AS Procedimiento;
+        RETURN -999;
+    END CATCH
+END
+GO
+
+-- Modificar Usuario
+CREATE OR ALTER PROCEDURE manejo_personas.ModificarUsuario
+    @id_usuario INT,
+    @username VARCHAR(50) = NULL,
+    @password_hash VARCHAR(256) = NULL,
+    @fecha_alta_contraseña DATE = NULL
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        
+        -- Verifico que el id_usuario no sea nulo
+        IF @id_usuario IS NULL
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'id_usuario nulo' AS Mensaje;
+            RETURN -1;
+        END
+        
+        -- Validar que el usuario existe
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.usuario WHERE id_usuario = @id_usuario)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El usuario especificado no existe' AS Mensaje;
+            RETURN -2;
+        END
+        
+        -- Validar username unico si se esta modificando
+		IF EXISTS (SELECT 1 FROM manejo_personas.usuario WHERE username = @username)
+		BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El nombre de usuario ya esta en uso por otro usuario' AS Mensaje;
+            RETURN -3;
+        END
+        
+        -- Actualizar solo los campos que se proporcionaron
+        UPDATE manejo_personas.usuario
+        SET 
+            username = ISNULL(@username, username),
+            password_hash = ISNULL(@password_hash, password_hash),
+            fecha_alta_contraseña = ISNULL(@fecha_alta_contraseña, fecha_alta_contraseña)
+        WHERE id_usuario = @id_usuario;
+        
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Usuario modificado correctamente' AS Mensaje;
+        RETURN 0;
+        
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+        SELECT 
+            'Error' AS Resultado,
+            ERROR_MESSAGE() AS Mensaje,
+            ERROR_NUMBER() AS CodigoError,
+            ERROR_LINE() AS Linea,
+            ERROR_PROCEDURE() AS Procedimiento;
+        RETURN -999;
+    END CATCH
+END
+GO
+
+-- Eliminar Usuario
+-- NOTA: HICE QUE NO SE PUEDA ELIMINAR A UN USUARIO QUE ESTE DANDO CLASES
+CREATE OR ALTER PROCEDURE manejo_personas.EliminarUsuario
+    @id_usuario INT
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        IF @id_usuario IS NULL
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'id_usuario nulo' AS Mensaje;
+            RETURN -1;
+        END
+
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.usuario WHERE id_usuario = @id_usuario)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El usuario especificado no existe' AS Mensaje;
+            RETURN -2;
+        END
+
+        IF EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_usuario = @id_usuario)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'No se puede eliminar el usuario porque tiene clases asignadas' AS Mensaje;
+            RETURN -3;
+        END
+
+        DELETE FROM manejo_personas.Usuario_Rol 
+        WHERE id_usuario = @id_usuario;
+
+        DELETE FROM manejo_personas.usuario 
+        WHERE id_usuario = @id_usuario;
+
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Usuario eliminado correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
+
+        SELECT 
+            'Error' AS Resultado,
+            ERROR_MESSAGE() AS Mensaje,
+            ERROR_NUMBER() AS CodigoError,
+            ERROR_LINE() AS Linea,
+            ERROR_PROCEDURE() AS Procedimiento;
+
+        RETURN -999;
+    END CATCH
+END
+GO
+
+-------- STORED PROCEDURES PARA ACTIVIDAD
+-- Crear Invitado
+CREATE OR ALTER PROCEDURE manejo_personas.CrearInvitado
+	@id_persona INT,
+	@id_socio INT
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- Valido que los ids sean validos
+		IF @id_persona IS NULL OR @id_socio IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Id de persona nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Comprueblo que ese id existe en persona
+		IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El invitado tiene que ser persona' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- Compruebo que el socio que lo invita exista
+		IF NOT EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_socio = @id_socio)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Socio no existe' AS Mensaje;
+			RETURN -3;
+		END
+
+		-- Compruebo que no se lo este invitando dos veces
+		IF EXISTS (SELECT 1 FROM manejo_personas.invitado WHERE id_persona = @id_persona)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ya existe invitado para esa persona' AS Mensaje;
+			RETURN -4;
+		END
+
+		-- Metodo los datos
+		INSERT INTO manejo_personas.invitado (id_persona, id_socio)
+		VALUES (@id_persona, @id_socio);
+
+		COMMIT TRANSACTION;
+		SELECT 'Exito' AS Resultado, 'Invitado creado' AS Mensaje;
+		RETURN 0;
+	END TRY
+
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje,
+			   ERROR_NUMBER() AS CodigoError, ERROR_LINE() AS Linea,
+			   ERROR_PROCEDURE() AS Procedimiento;
+		RETURN -999;
+	END CATCH
+END;
+GO
+
+-- Modificar Invitado
+CREATE OR ALTER PROCEDURE manejo_personas.ModificarInvitado
+	@id_invitado INT,
+	@id_socio INT
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- Compruebo que los ids que me pasaron sean validos
+		IF @id_invitado IS NULL OR @id_socio IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Parametros nulos' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Compruebo que el invitado que quiero modificar existe en la tabla
+		IF NOT EXISTS (SELECT 1 FROM manejo_personas.invitado WHERE id_invitado = @id_invitado)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Invitado no existe' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- Compruebo que el socio que lo invita existe
+		IF NOT EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_socio = @id_socio)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Socio no existe' AS Mensaje;
+			RETURN -3;
+		END
+
+		-- Inserto los datos
+		UPDATE manejo_personas.invitado
+		SET id_socio = @id_socio
+		WHERE id_invitado = @id_invitado;
+
+		COMMIT TRANSACTION;
+		SELECT 'Exito' AS Resultado, 'Invitado modificado' AS Mensaje;
+		RETURN 0;
+	END TRY
+
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje,
+			   ERROR_NUMBER() AS CodigoError, ERROR_LINE() AS Linea,
+			   ERROR_PROCEDURE() AS Procedimiento;
+		RETURN -999;
+	END CATCH
+END;
+GO
+
+-- Eliminar Invitado
+-- NOTA: Me parecio que para que fecha de alta tenga sentido en invitado, al finalizar el dia
+-- Se deberia borrar al invitado en la tabla persona, caso contrario, el invitado tendria la fecha
+-- De alta de la primera vez que lo invitaron
+CREATE OR ALTER PROCEDURE manejo_personas.EliminarInvitado
+    @id_invitado INT
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- Validaciones
+        IF @id_invitado IS NULL
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'id_invitado nulo' AS Mensaje;
+            RETURN -1;
+        END
+
+        IF NOT EXISTS (
+            SELECT 1
+            FROM manejo_personas.invitado
+            WHERE id_invitado = @id_invitado
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Invitado no existe' AS Mensaje;
+            RETURN -2;
+        END
+
+        -- Obtener id_persona asociado
+        DECLARE @id_persona INT;
+        SELECT @id_persona = id_persona
+        FROM manejo_personas.invitado
+        WHERE id_invitado = @id_invitado;
+
+        -- Eliminar de invitado
+        DELETE FROM manejo_personas.invitado
+        WHERE id_invitado = @id_invitado;
+
+        -- Eliminar de persona
+        DELETE FROM manejo_personas.persona
+        WHERE id_persona = @id_persona;
+
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Invitado y persona eliminados' AS Mensaje;
+        RETURN 0;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+
+        SELECT 
+            'Error' AS Resultado,
+            ERROR_MESSAGE() AS Mensaje,
+            ERROR_NUMBER() AS CodigoError,
+            ERROR_LINE() AS Linea,
+            ERROR_PROCEDURE() AS Procedimiento;
+        RETURN -999;
+    END CATCH
+END;
+GO
 
