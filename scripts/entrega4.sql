@@ -62,10 +62,9 @@ CREATE TABLE manejo_personas.persona(
 	email VARCHAR(320) NOT NULL UNIQUE, -- Estandar RFC 5321
 	fecha_nac DATE NOT NULL,
 	telefono VARCHAR(15) NOT NULL, -- Estandar E.164
-	fecha_alta DATE NOT NULL DEFAULT GETDATE()
+	fecha_alta DATE NOT NULL DEFAULT GETDATE(),
+	activo BIT NOT NULL DEFAULT 1
 );
-
-
 
 -- OBRA SOCIAL
 CREATE TABLE manejo_personas.obra_social (
@@ -159,7 +158,6 @@ CREATE TABLE manejo_actividades.clase (
 	-- SCHEMA PARA ACTIVIDADES
     CONSTRAINT FK_Clase_Actividad FOREIGN KEY (id_actividad) REFERENCES manejo_actividades.actividad(id_actividad),
     CONSTRAINT FK_Clase_Categoria FOREIGN KEY (id_categoria) REFERENCES manejo_actividades.categoria(id_categoria)
-    
 );
 
 -- ROL
@@ -179,7 +177,7 @@ CREATE TABLE manejo_personas.Usuario_Rol (
 );
 
 -- SOCIO <-N----N-> ACTIVIDAD
-CREATE TABLE Socio_Actividad (         -- EN QUE SCHEMA LO DEBERIAMOS PONER?
+CREATE TABLE manejo_personas.socio_actividad (  
     id_socio INT NOT NULL,
     id_actividad INT NOT NULL,
     fecha_inicio DATE NOT NULL DEFAULT GETDATE(),
@@ -192,14 +190,12 @@ CREATE TABLE Socio_Actividad (         -- EN QUE SCHEMA LO DEBERIAMOS PONER?
 
 
 -- METODO_PAGO
-
 CREATE TABLE pagos_y_facturas.metodo_pago (
 	id_metodo_pago INT IDENTITY(1,1) PRIMARY KEY,
 	nombre VARCHAR(50) NOT NULL
 );
 
 -- DESCUENTO
-
 CREATE TABLE pagos_y_facturas.descuento (
 	id_descuento INT IDENTITY(1,1) PRIMARY KEY,
 	descripcion VARCHAR(100) NOT NULL,
@@ -220,7 +216,6 @@ CREATE TABLE pagos_y_facturas.factura (
 );
 
 -- FACTURA <-N----N-> DESCUENTO
-
 create table pagos_y_facturas.factura_descuento (
 	id_factura INT NOT NULL,
 	id_descuento INT NOT NULL,
@@ -240,8 +235,7 @@ create table pagos_y_facturas.factura_descuento (
 -- SP TABLA PERSONAS INSERTAR
 
 -- Este SP valida los datos de entrada y realiza la inserción de un nuevo registro en la tabla persona.
-
-CREATE or ALTER PROCEDURE manejo.personas.CrearPersona
+CREATE or ALTER PROCEDURE manejo_personas.CrearPersona
 	@dni VARCHAR(8),
 	@nombre NVARCHAR(50),
 	@apellido NVARCHAR(50),
@@ -291,7 +285,6 @@ GO
 
 
 -- SP TABLA PERSONAS MODIFICAR
-
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarPersona
 	@id_persona int,
 	@nombre NVARCHAR(50) = NULL,
@@ -347,7 +340,6 @@ END;
 GO
 
 -- SP ELIMINAR PERSONA
-
 CREATE or ALTER PROCEDURE manejo_personas.EliminarPersona
 	@id_persona INT
 AS
@@ -394,3 +386,5 @@ BEGIN
 
 END;
 GO
+
+
