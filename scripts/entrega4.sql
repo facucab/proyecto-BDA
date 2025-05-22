@@ -156,7 +156,7 @@ CREATE TABLE manejo_actividades.clase (
     dia VARCHAR(9) NOT NULL, -- El dia de la semana con el nombre mas largo es MIE RCO LES
     horario TIME NOT NULL,
     id_usuario INT NOT NULL,
-	activo BIT NOT NULL DEFAULT 1;
+	activo BIT NOT NULL DEFAULT 1,
 	-- SCHEMA PARA PERSONAS
 	CONSTRAINT FK_Clase_Usuario FOREIGN KEY (id_usuario) REFERENCES manejo_personas.usuario(id_usuario),
 	-- SCHEMA PARA ACTIVIDADES
@@ -216,7 +216,7 @@ CREATE TABLE pagos_y_facturas.factura (
 	estado_pago VARCHAR(10) NOT NULL, -- no le pongo bit porque asumo que puede ser: pagado, pendiente, vencido y tal vez alguna mas
 	fecha_emision DATE NOT NULL DEFAULT GETDATE(), -- que cada vez que se cree un nuevo registro tome la fecha del dia
 	monto_a_pagar DECIMAL(10, 2) NOT NULL,
-	id_persona INT NOT NULLE,
+	id_persona INT NOT NULL,
 	id_metodo_pago INT NOT NULL,
 	
 	CONSTRAINT FK_Factura_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
@@ -2026,7 +2026,6 @@ END
 GO
 
 -- Eliminar Usuario
--- NOTA: HICE QUE NO SE PUEDA ELIMINAR A UN USUARIO QUE ESTE DANDO CLASES
 CREATE OR ALTER PROCEDURE manejo_personas.EliminarUsuario
     @id_usuario INT
 AS
@@ -2036,6 +2035,7 @@ BEGIN
     BEGIN TRY
         BEGIN TRANSACTION;
 
+		--Verifico que el parametro no sea null
         IF @id_usuario IS NULL
         BEGIN
             ROLLBACK TRANSACTION;
@@ -2043,6 +2043,7 @@ BEGIN
             RETURN -1;
         END
 
+		-- Verifico que el usuario exista en su tabla
         IF NOT EXISTS (SELECT 1 FROM manejo_personas.usuario WHERE id_usuario = @id_usuario)
         BEGIN
             ROLLBACK TRANSACTION;
@@ -2050,6 +2051,7 @@ BEGIN
             RETURN -2;
         END
 
+		-- Verifico que no tenga clases asignadas
         IF EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_usuario = @id_usuario)
         BEGIN
             ROLLBACK TRANSACTION;
@@ -2057,14 +2059,35 @@ BEGIN
             RETURN -3;
         END
 
+        -- Eliminar relaciones con roles
         DELETE FROM manejo_personas.Usuario_Rol 
         WHERE id_usuario = @id_usuario;
 
-        DELETE FROM manejo_personas.usuario 
+        -- Inactivar el usuario
+        UPDATE manejo_personas.usuario
+        SET estado = 0
         WHERE id_usuario = @id_usuario;
 
+        -- Incactiva a la persona si no esta en otras tablas
+        DECLARE @id_persona INT;
+        SELECT @id_persona = id_persona FROM manejo_personas.usuario WHERE id_usuario = @id_usuario;
+
+        IF NOT EXISTS (
+            SELECT 1 FROM manejo_personas.socio WHERE id_persona = @id_persona
+        ) AND NOT EXISTS (
+            SELECT 1 FROM manejo_personas.invitado WHERE id_persona = @id_persona
+        ) AND NOT EXISTS (
+            SELECT 1 FROM manejo_personas.responsable WHERE id_persona = @id_persona
+        )
+        BEGIN
+            UPDATE manejo_personas.persona
+            SET activo = 0
+            WHERE id_persona = @id_persona;
+        END
+
         COMMIT TRANSACTION;
-        SELECT 'Exito' AS Resultado, 'Usuario eliminado correctamente' AS Mensaje;
+
+        SELECT 'Exito' AS Resultado, 'Usuario borrado, persona inactivada' AS Mensaje;
         RETURN 0;
 
     END TRY
@@ -2081,8 +2104,9 @@ BEGIN
 
         RETURN -999;
     END CATCH
-END
+END;
 GO
+
 
 -------- STORED PROCEDURES PARA ACTIVIDAD
 -- Crear Invitado
@@ -2203,9 +2227,6 @@ END;
 GO
 
 -- Eliminar Invitado
--- NOTA: Me parecio que para que fecha de alta tenga sentido en invitado, al finalizar el dia
--- Se deberia borrar al invitado en la tabla persona, caso contrario, el invitado tendria la fecha
--- De alta de la primera vez que lo invitaron
 CREATE OR ALTER PROCEDURE manejo_personas.EliminarInvitado
     @id_invitado INT
 AS
