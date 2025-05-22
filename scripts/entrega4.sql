@@ -1509,3 +1509,356 @@ BEGIN
 	END CATCH
 END;
 GO
+
+-------- STORED PROCEDURES PARA CATEGORIA
+-- Creacion de facturas
+CREATE OR ALTER PROCEDURE pagos_y_facturas.CreacionFactura
+    @estado_pago VARCHAR(10),
+    @monto_a_pagar DECIMAL(10,2),
+    @id_persona INT,
+    @id_metodo_pago INT
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+		-- Verifico el parametro del estado no sea nulo
+        IF @estado_pago IS NULL OR LTRIM(RTRIM(@estado_pago)) = ''
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Estado de pago no puede ser nulo o vacio' AS Mensaje;
+            RETURN -1;
+        END
+
+		-- Verifico que que el monto a pagar no sea negativo
+        IF @monto_a_pagar IS NULL OR @monto_a_pagar <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Monto invalido' AS Mensaje;
+            RETURN -2;
+        END
+
+		-- Verifico que que la persona a quien corresponda el pago exista en la tabla de personas
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Persona no existente' AS Mensaje;
+            RETURN -3;
+        END
+
+
+		-- Verifico que que el metodo de pago elegido exista en la tabla de medios de pago
+        IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE id_metodo_pago = @id_metodo_pago)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Método de pago no valido' AS Mensaje;
+            RETURN -4;
+        END
+
+        INSERT INTO pagos_y_facturas.factura (estado_pago, monto_a_pagar, id_persona, id_metodo_pago)
+        VALUES (@estado_pago, @monto_a_pagar, @id_persona, @id_metodo_pago);
+
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Factura creada correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
+END;
+GO
+
+-- Modificacion de facturas
+CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificacionFactura
+    @id_factura INT,
+    @nuevo_estado_pago VARCHAR(10),
+    @nuevo_monto DECIMAL(10,2),
+    @nuevo_metodo_pago INT
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+		-- Verifico que la factura a modificar exista
+        IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.factura WHERE id_factura = @id_factura)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Factura no existente' AS Mensaje;
+            RETURN -1;
+        END
+
+		-- Verifico que el estado sea valido
+        IF @nuevo_estado_pago IS NULL OR LTRIM(RTRIM(@nuevo_estado_pago)) = ''
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Estado invalido' AS Mensaje;
+            RETURN -2;
+        END
+
+		-- Verifico que el monto no sea negativo
+        IF @nuevo_monto IS NULL OR @nuevo_monto <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Monto invalido' AS Mensaje;
+            RETURN -3;
+        END
+
+		-- Verifico que el metodo de pago exista en su tabla
+        IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE id_metodo_pago = @nuevo_metodo_pago)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Metodo de pago invalido' AS Mensaje;
+            RETURN -4;
+        END
+
+        UPDATE pagos_y_facturas.factura
+        SET estado_pago = @nuevo_estado_pago,
+            monto_a_pagar = @nuevo_monto,
+            id_metodo_pago = @nuevo_metodo_pago
+        WHERE id_factura = @id_factura;
+
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Factura actualizada correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
+END;
+GO
+
+-- Eliminacion facturas
+CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminacionFactura
+    @id_factura INT
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+
+    BEGIN TRY
+		-- Verifico que la factura exista
+        IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.factura WHERE id_factura = @id_factura)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La factura no existe' AS Mensaje;
+            RETURN -1;
+        END
+
+        DELETE FROM pagos_y_facturas.factura
+        WHERE id_factura = @id_factura;
+
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Factura eliminada correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
+END;
+GO
+
+
+-------- STORED PROCEDURES PARA ACTIVIDAD
+--- Crear una factura
+CREATE OR ALTER PROCEDURE manejo_actividades.CrearActividad
+	@nombre_actividad VARCHAR(100),
+	@costo_mensual DECIMAL(10,2)
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- Chequeo que el nombre no sea nulo ni vacio
+		IF @nombre_actividad IS NULL OR LTRIM(RTRIM(@nombre_actividad)) = ''
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El nombre de actividad no puede ser nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que no exista ya en la tabla
+		IF EXISTS (SELECT 1 FROM manejo_actividades.actividad WHERE nombre_actividad = @nombre_actividad)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ya existe una actividad con ese nombre' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- Verifico que el costo sea valido (>0)
+		IF @costo_mensual IS NULL OR @costo_mensual <= 0
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El costo mensual debe ser mayor a cero' AS Mensaje;
+			RETURN -3;
+		END
+
+		INSERT INTO manejo_actividades.actividad(nombre_actividad, costo_mensual)
+		VALUES (@nombre_actividad, @costo_mensual);
+
+		COMMIT TRANSACTION;
+		SELECT 'Exito' AS Resultado, 'Actividad creada correctamente' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0
+			ROLLBACK TRANSACTION;
+
+		SELECT 
+			'Error' AS Resultado,
+			ERROR_MESSAGE() AS Mensaje,
+			ERROR_NUMBER() AS CodigoError,
+			ERROR_LINE() AS Linea,
+			ERROR_PROCEDURE() AS Procedimiento;
+		RETURN -999;
+	END CATCH
+END;
+GO
+
+-- Modificar Actividad
+CREATE OR ALTER PROCEDURE manejo_actividades.ModificarActividad
+	@id INT,
+	@nombre_actividad VARCHAR(100),
+	@costo_mensual DECIMAL(10,2)
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM manejo_actividades.actividad WHERE id_actividad = @id)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- Chequeo que el nombre no sea nulo ni vacio
+		IF @nombre_actividad IS NULL OR LTRIM(RTRIM(@nombre_actividad)) = ''
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El nombre de actividad no puede ser nulo o vacio' AS Mensaje;
+			RETURN -3;
+		END
+
+		-- Verifico que no exista ya en la tabla otro registro con mismo nombre
+		IF EXISTS (
+			SELECT 1 FROM manejo_actividades.actividad
+			WHERE nombre_actividad = @nombre_actividad AND id_actividad <> @id
+		)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ya existe una actividad con ese nombre' AS Mensaje;
+			RETURN -4;
+		END
+
+		-- Verifico que el costo sea valido (>0)
+		IF @costo_mensual IS NULL OR @costo_mensual <= 0
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El costo mensual debe ser mayor a cero' AS Mensaje;
+			RETURN -5;
+		END
+
+		UPDATE manejo_actividades.actividad
+		SET nombre_actividad = @nombre_actividad,
+			costo_mensual = @costo_mensual
+		WHERE id_actividad = @id;
+
+		COMMIT TRANSACTION;
+		SELECT 'Exito' AS Resultado, 'Actividad modificada correctamente' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0
+			ROLLBACK TRANSACTION;
+
+		SELECT 
+			'Error' AS Resultado,
+			ERROR_MESSAGE() AS Mensaje,
+			ERROR_NUMBER() AS CodigoError,
+			ERROR_LINE() AS Linea,
+			ERROR_PROCEDURE() AS Procedimiento;
+		RETURN -999;
+	END CATCH
+END;
+GO
+
+-- Eliminar Actividad
+-- NOTA: ME PARECE QUE NO HACE FALTA ESTE TRIGGER PORQUE SI UNA ACTIVIDAD NO ESTA ACTIVA, SIMPLEMENTE NO INSCRIBO GENTE NUEVA A ESA ACTIVIDAD
+-- EN CAMBIO, SI HUBIESE QUE HACERLO, HAY QUE MODIFICAR LA TABLA DE ACTIVIDAD PARA SOPORTAR UN BORRADO LOGICO 
+-- Y TAMBIEN A ESTE TRIGGER PARA ESO
+/*CREATE OR ALTER PROCEDURE manejo_actividades.EliminarActividad
+	@id INT
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM manejo_actividades.actividad WHERE id_actividad = @id)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- Elimino la actividad
+		DELETE FROM manejo_actividades.actividad WHERE id_actividad = @id;
+
+		COMMIT TRANSACTION;
+		SELECT 'Exito' AS Resultado, 'Actividad eliminada correctamente' AS Mensaje;
+		RETURN 0;
+	END TRY
+
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0
+			ROLLBACK TRANSACTION;
+
+		SELECT 
+			'Error' AS Resultado,
+			ERROR_MESSAGE() AS Mensaje,
+			ERROR_NUMBER() AS CodigoError,
+			ERROR_LINE() AS Linea,
+			ERROR_PROCEDURE() AS Procedimiento;
+		RETURN -999;
+	END CATCH
+END;
+GO*/
+
