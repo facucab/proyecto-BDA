@@ -1,278 +1,23 @@
-/*
-Entrega 4 - Documento de instalación y configuración
-Fecha de entrega: 23/05/2025
-Grupo: 01
-Materia: Bases de Datos Aplicadas (3641)
-Integrantes:
-	43990422 | Aguirre, Alex Rubén 
-	45234709 | Gauto, Gastón Santiago 
-	44363498 | Caballero, Facundo 
-	40993965 | Cornara Perez, Tomás Andrés
-
-Enunciado:
-	Luego de decidirse por un motor de base de datos relacional, llegó el momento de generar la
-	base de datos. En esta oportunidad utilizarán SQL Server.
-	Deberá instalar el DMBS y documentar el proceso. No incluya capturas de pantalla. Detalle
-	las configuraciones aplicadas (ubicación de archivos, memoria asignada, seguridad, puertos,
-	etc.) en un documento como el que le entregaría al DBA.
-	Cree la base de datos, entidades y relaciones. Incluya restricciones y claves. Deberá entregar
-	un archivo .sql con el script completo de creación (debe funcionar si se lo ejecuta “tal cual” es
-	entregado en una sola ejecución). Incluya comentarios para indicar qué hace cada módulo
-	de código.
-	Genere store procedures para manejar la inserción, modificado, borrado (si corresponde,
-	también debe decidir si determinadas entidades solo admitirán borrado lógico) de cada tabla.
-	Los nombres de los store procedures NO deben comenzar con “SP”.
-	Algunas operaciones implicarán store procedures que involucran varias tablas, uso de
-	transacciones, etc. Puede que incluso realicen ciertas operaciones mediante varios SPs.
-	Asegúrense de que los comentarios que acompañen al código lo expliquen.
-	Genere esquemas para organizar de forma lógica los componentes del sistema y aplique esto
-	en la creación de objetos. NO use el esquema “dbo”.
-	Todos los SP creados deben estar acompañados de juegos de prueba. Se espera que
-	realicen validaciones básicas en los SP (p/e cantidad mayor a cero, CUIT válido, etc.) y que
-	en los juegos de prueba demuestren la correcta aplicación de las validaciones.
-	Las pruebas deben realizarse en un script separado, donde con comentarios se indique en
-	cada caso el resultado esperado
-	El archivo .sql con el script debe incluir comentarios donde consten este enunciado, la fecha
-	de entrega, número de grupo, nombre de la materia, nombres y DNI de los alumnos.
-	Entregar todo en un zip (observar las pautas para nomenclatura antes expuestas) mediante
-	la sección de prácticas de MIEL. Solo uno de los miembros del grupo debe hacer la entrega.
-*/
-
--- Creacion de la base de datos
-IF NOT EXISTS (SELECT name FROM master.dbo.sysdatabases WHERE name = 'Com5600G01')
-BEGIN
-    CREATE DATABASE Com5600G01;
-END
-GO
-
--- Selecciona
 USE Com5600G01;
 
--- Crea esquemas
-IF NOT EXISTS (SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'manejo_personas')
-BEGIN
-    EXEC('CREATE SCHEMA manejo_personas'); -- Relativo a todo lo que tiene que ver con personas fisicas
-END
+/*
+* Nombre: CrearPersona
+* Descripcion: Inserta una nueva persona en la tabla persona, validando su informacion. 
+* Parametros:
+*	@dni  VARCHAR(8) - DNI de la persona.
+*	@nombre NVARCHAR(50) - Nombre de la persona. 
+*	@apellido NVARCHAR(50) - Apellido de la persona. 
+* 	@email VARCHAR(320) - Email de la persona. 
+* 	@fecha_nac DATE - Fecha de nacimiento.
+*	@telefono VARCHAR(15) - Telefono de la persona
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: DNI Invalido. 
+*	-2: Formato de email incorrecto.
+*	-3: Fecha de nacimienta invalida.
+*	-99: Error desconocido.
+*/
 GO
-
-IF NOT EXISTS (SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'manejo_actividades')
-BEGIN
-    EXEC('CREATE SCHEMA manejo_actividades'); -- Relativo a las actividades del club
-END
-GO
-
-IF NOT EXISTS (SELECT schema_name FROM information_schema.schemata WHERE schema_name = 'pagos_y_facturas')
-BEGIN
-    EXEC('CREATE SCHEMA pagos_y_facturas'); -- Relativo a pagos
-END
-GO
--- Crea las tablas para el schema de personas
-
--- PERSONA
-CREATE TABLE manejo_personas.persona(
-	id_persona INT IDENTITY(1,1) PRIMARY KEY,
-	dni VARCHAR(8) NOT NULL UNIQUE,
-	nombre NVARCHAR(50) NOT NULL, -- Son Nvarchar porque considero que puedo tener nombres extranjeros
-	apellido NVARCHAR(50) NOT NULL,
-	email VARCHAR(320) NOT NULL UNIQUE, -- Estandar RFC 5321
-	fecha_nac DATE NOT NULL,
-	telefono VARCHAR(15) NOT NULL, -- Estandar E.164
-	fecha_alta DATE NOT NULL DEFAULT GETDATE(),
-	activo BIT NOT NULL DEFAULT 1
-);
-GO
-
--- OBRA SOCIAL
-CREATE TABLE manejo_personas.obra_social (
-    id_obra_social INT IDENTITY(1,1) PRIMARY KEY,
-    descripcion VARCHAR(50) NOT NULL
-);
-GO
-
-
--- GRUPO FAMILIAR
-CREATE TABLE manejo_personas.grupo_familiar (
-    id_grupo INT IDENTITY(1,1) PRIMARY KEY,
-    fecha_alta DATE NOT NULL DEFAULT GETDATE(),
-    estado BIT NOT NULL DEFAULT 1 -- 1 significa activo y 0 inactivo
-);
-GO
-
--- CATEGORIA
-CREATE TABLE manejo_actividades.categoria (
-    id_categoria INT IDENTITY(1,1) PRIMARY KEY,
-    nombre_categoria VARCHAR(50) NOT NULL,
-    costo_membrecia DECIMAL(10, 2) NOT NULL,
-    edad_maxima INT NOT NULL
-);
-GO
-
--- SOCIO
-CREATE TABLE manejo_personas.socio (
-	--Atributos propios
-    id_socio INT IDENTITY(1,1) PRIMARY KEY,
-    id_persona INT NOT NULL UNIQUE, -- Enlace con su identidad padre
-    telefono_emergencia VARCHAR(15) NOT NULL,
-    obra_nro_socio VARCHAR(20) NULL,
-	--Atributos que vienen de otras entidades o relaciones
-    id_obra_social INT NULL,
-    id_categoria INT NOT NULL,
-    id_grupo INT NULL,
-	--SCHEMA PARA PERSONAS
-    CONSTRAINT FK_Socio_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
-    CONSTRAINT FK_Socio_Obra_social FOREIGN KEY (id_obra_social) REFERENCES manejo_personas.obra_social(id_obra_social),
-    CONSTRAINT FK_Socio_Grupo_Familiar FOREIGN KEY (id_grupo) REFERENCES manejo_personas.grupo_familiar(id_grupo),
-	-- SCHEMA PARA ACTIVIDADES
-	CONSTRAINT FK_Socio_Categoria FOREIGN KEY (id_categoria) REFERENCES manejo_actividades.categoria(id_categoria)
-);
-GO
-
--- INVITADO
-CREATE TABLE manejo_personas.invitado (
-    id_invitado INT IDENTITY(1,1) PRIMARY KEY,
-    id_persona INT NOT NULL UNIQUE, -- Conexion con su entidad padre
-    id_socio INT NOT NULL, -- Conexion con la entidad fuerte
-	fecha_invitacion DATE NOT NULL DEFAULT GETDATE(),
-	-- SCHEMA PARA PERSONAS
-    CONSTRAINT FK_Invitado_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
-    CONSTRAINT FK_Invitado_Socio FOREIGN KEY (id_socio) REFERENCES manejo_personas.socio(id_socio)
-);
-GO
-
--- USUARIO
-CREATE TABLE manejo_personas.usuario (
-    id_usuario INT IDENTITY(1,1) PRIMARY KEY,
-    id_persona INT NOT NULL UNIQUE, -- Conexion identidad padre
-    username VARCHAR(50) NOT NULL UNIQUE,
-    password_hash VARCHAR(256) NOT NULL, -- Asumo que vamos a hashear en SHA-256
-    fecha_alta_contraseña DATE NOT NULL DEFAULT GETDATE(),
-	estado BIT NOT NULL DEFAULT 1,
-	-- SCHEMA PARA PERSONAS
-    CONSTRAINT FK_Usuario_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona)
-);
-GO
-
--- RESPONSABLE
-CREATE TABLE manejo_personas.responsable (
-    id_grupo INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
-    id_responsable INT UNIQUE,
-    id_persona INT NOT NULL UNIQUE,
-    parentesco VARCHAR(10) NOT NULL, -- Todos los roles que dice el TP Pone 5 digitos, le doy 10 por la dudas
-	-- SCHEMA PARA PERSONAS
-    CONSTRAINT FK_Responsable_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
-    CONSTRAINT FK_Responsable_Grupo_Familiar FOREIGN KEY (id_grupo) REFERENCES manejo_personas.grupo_familiar(id_grupo)
-);
-GO
-
--- ACTIVIDAD
-CREATE TABLE manejo_actividades.actividad (
-    id_actividad INT IDENTITY(1,1) PRIMARY KEY,
-    nombre_actividad VARCHAR(100) NOT NULL,
-    costo_mensual DECIMAL(10, 2) NOT NULL,
-	estado BIT NOT NULL DEFAULT 1
-);
-GO
-
--- CLASE
-CREATE TABLE manejo_actividades.clase (
-    id_clase INT IDENTITY(1,1) PRIMARY KEY,
-    id_actividad INT NOT NULL,
-    id_categoria INT NOT NULL,
-    dia VARCHAR(9) NOT NULL, -- El dia de la semana con el nombre mas largo es MIE RCO LES
-    horario TIME NOT NULL,
-    id_usuario INT NOT NULL,
-	activo BIT NOT NULL DEFAULT 1,
-	-- SCHEMA PARA PERSONAS
-	CONSTRAINT FK_Clase_Usuario FOREIGN KEY (id_usuario) REFERENCES manejo_personas.usuario(id_usuario),
-	-- SCHEMA PARA ACTIVIDADES
-    CONSTRAINT FK_Clase_Actividad FOREIGN KEY (id_actividad) REFERENCES manejo_actividades.actividad(id_actividad),
-    CONSTRAINT FK_Clase_Categoria FOREIGN KEY (id_categoria) REFERENCES manejo_actividades.categoria(id_categoria)
-);
-GO
-
--- ROL
-CREATE TABLE manejo_personas.rol (
-    id_rol INT IDENTITY(1,1) PRIMARY KEY,
-    descripcion VARCHAR(100) NOT NULL
-);
-GO
-
--- USUARIO <-N----N-> ROL
-CREATE TABLE manejo_personas.Usuario_Rol (
-    id_usuario INT NOT NULL,
-    id_rol INT NOT NULL,
-    PRIMARY KEY (id_usuario, id_rol),
-	-- SCHEMA PARA PERSONAS
-    CONSTRAINT FK_Usuario_Rol_Usuario FOREIGN KEY (id_usuario) REFERENCES manejo_personas.usuario(id_usuario),
-    CONSTRAINT FK_Usuario_Rol_Rol FOREIGN KEY (id_rol) REFERENCES manejo_personas.rol(id_rol)
-);
-GO
-
--- SOCIO <-N----N-> ACTIVIDAD
-CREATE TABLE manejo_personas.socio_actividad (  
-    id_socio INT NOT NULL,
-    id_actividad INT NOT NULL,
-    fecha_inicio DATE NOT NULL DEFAULT GETDATE(),
-	estado BIT NOT NULL DEFAULT 1,
-    PRIMARY KEY (id_socio, id_actividad),
-	-- SCHEMA PARA PERSONAS
-    CONSTRAINT FK_Socio_Actividad_Socio FOREIGN KEY (id_socio) REFERENCES manejo_personas.socio(id_socio),
-	-- SCHEMA PARA ACTIVIDADES
-    CONSTRAINT FK_Socio_Actividad_Actividad FOREIGN KEY (id_actividad) REFERENCES manejo_actividades.actividad(id_actividad)
-);
-GO
-
-
--- METODO_PAGO
-CREATE TABLE pagos_y_facturas.metodo_pago (
-	id_metodo_pago INT IDENTITY(1,1) PRIMARY KEY,
-	nombre VARCHAR(50) NOT NULL
-);
-GO
-
-
--- DESCUENTO
-CREATE TABLE pagos_y_facturas.descuento (
-	id_descuento INT IDENTITY(1,1) PRIMARY KEY,
-	descripcion VARCHAR(100) NOT NULL,
-	valor DECIMAL(4,3) NOT NULL -- esto era cantidad pero lo vole y puse valor porque no veo mucho sentido en el atributo cantidad, capaz me equivoco.
-);								 -- RTA: Creo que tenes razon, solo que no se si hacian falta 8 digitos adelante. Si vos guardas descuentos porcentuales como
-GO								 -- 50%, guardas 0.5, asi que realmente solo necesitarias 1 digito adelante y 2 o 3 atras. Mi opinion. 
-								 -- Si te parece, lo cambio por ahora y de ultima volvemos para atras ATT: Tomas
-
--- FACTURA
-CREATE TABLE pagos_y_facturas.factura (
-	id_factura INT IDENTITY(1,1) PRIMARY KEY,
-	estado_pago VARCHAR(10) NOT NULL, -- no le pongo bit porque asumo que puede ser: pagado, pendiente, vencido y tal vez alguna mas
-	fecha_emision DATE NOT NULL DEFAULT GETDATE(), -- que cada vez que se cree un nuevo registro tome la fecha del dia
-	monto_a_pagar DECIMAL(10, 2) NOT NULL,
-	id_persona INT NOT NULL,
-	id_metodo_pago INT NOT NULL,
-	
-	CONSTRAINT FK_Factura_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
-	CONSTRAINT FK_Factura_Metodo_Pago FOREIGN KEY (id_metodo_pago) REFERENCES pagos_y_facturas.metodo_pago(id_metodo_pago)
-);
-GO
-
--- FACTURA <-N----N-> DESCUENTO
-create table pagos_y_facturas.factura_descuento (
-	id_factura INT NOT NULL,
-	id_descuento INT NOT NULL,
-	monto_aplicado DECIMAL(10, 2) NOT NULL, -- guardar que cantidad se desconto del importe total dependiendo el porcentaje. La podriamos sacar
-
-	PRIMARY KEY (id_factura, id_descuento),
-
-	CONSTRAINT FK_Factura_Descuento_Factura FOREIGN KEY (id_factura) REFERENCES pagos_y_facturas.factura(id_factura),
-	CONSTRAINT FK_Factura_Descuento_Descuento FOREIGN KEY (id_descuento) REFERENCES pagos_y_facturas.descuento(id_descuento)
-);
-GO
-
-
--------- STORE PROCEDURES PARA PERSONAS
-
--- SP TABLA PERSONAS INSERTAR
-
--- Este SP valida los datos de entrada y realiza la inserción de un nuevo registro en la tabla persona.
 CREATE or ALTER PROCEDURE manejo_personas.CrearPersona
 	@dni VARCHAR(8),
 	@nombre NVARCHAR(50),
@@ -291,7 +36,7 @@ BEGIN
 		IF LEN(@dni) < 7 OR LEN(@dni) > 8 or ISNUMERIC(@dni) = 0 -- dni es numero y entre 1.000.000 y 99.999.999
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'DNI Invalido. Debe contener entre 7 y 8 digitos númericos.' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'DNI Invalido. Debe contener entre 7 y 8 digitos numericos.' AS Mensaje;
 			RETURN -1;
 		END
 
@@ -304,7 +49,7 @@ BEGIN
 		END
 
 		--validar fecha de nacimiento
-		IF DATEDIFF(YEAR, @fecha_nac, GETDATE()) < 0 OR DATEDIFF(YEAR, @fecha_nac, GETDATE()) > 120 -- que la fecha de nacimiento no sea en el futuro ni la persona tenga mas de 120 años (se podria bajar a 90 por ejemplo)
+		IF DATEDIFF(YEAR, @fecha_nac, GETDATE()) < 0 OR DATEDIFF(YEAR, @fecha_nac, GETDATE()) > 120 -- que la fecha de nacimiento no sea en el futuro ni la persona tenga mas de 120 a?os (se podria bajar a 90 por ejemplo)
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'La fecha de nacimiento no es valida.' AS Mensaje;
@@ -329,12 +74,26 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+
+/*
+* Nombre: ModificarPersona
+* Descripcion: Permite modificar de una persona los campos: nombre, apellido, email y telefono.
+* Parametros:
+*	@id_persona  INT - ID de persona. 
+*	@nombre NVARCHAR(50) - Nombre nuevo para la persona. (Parametro opcional)
+*	@apellido NVARCHAR(50) - Apellido nuevo para la persona. (Parametro opcional)
+* 	@email VARCHAR(320) - Nuevo email para la persona. (Parametro opcional) 
+*	@telefono VARCHAR(15) - Nuevo telefono para la persona
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: Persona no encontrada. 
+*	-2: Formato de email incorrecto.
+*	-3: El email ya esta en uso. 
+*	-99: Error desconocido.
+*/
 GO
-
-
--- SP TABLA PERSONAS MODIFICAR
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarPersona
-	@id_persona int,
+	@id_persona INT,
 	@nombre NVARCHAR(50) = NULL,
 	@apellido NVARCHAR(50) = NULL,
 	@email VARCHAR(320) = NULL,
@@ -392,20 +151,29 @@ BEGIN
 		RETURN -99;
 	END CATCH
 
-	
-END;
-GO
+END; 
 
--- SP ELIMINAR PERSONA
-CREATE or ALTER PROCEDURE manejo_personas.EliminarPersona
+/*
+* Nombre: EliminarPersona
+* Descripcion: Realiza una eliminacion logica de una persona.
+* Parametros:
+*	@id_persona  INT - ID de persona a eliminar. 
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: Persona no encontrada. 
+*	-99: Error desconocido.
+*/
+GO
+CREATE OR ALTER PROCEDURE manejo_personas.EliminarPersona
 	@id_persona INT
 AS
 BEGIN
-	SET TRANSACTION ISOLATION LEVEL REPEATABLE READ; -- no estoy seguro de si deberia ser este lvl, hace q no se puedan leer datos modificados pero no confirmados, y que ninguna transac pueda modificar los datos leidos por la actual
+
+	SET TRANSACTION ISOLATION LEVEL REPEATABLE READ;
 	BEGIN TRANSACTION;
-	
+
 	BEGIN TRY
-		-- Validar existencia persona
+		-- Valido si existe la persona: 
 		IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona)
 		BEGIN
 			ROLLBACK TRANSACTION;
@@ -413,33 +181,14 @@ BEGIN
 			RETURN -1;
 		END
 
-			--verificamos si la persona tiene alguna relacion en ora tabla aun
-		IF EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_persona = @id_persona) OR
-		EXISTS (SELECT 1 FROM manejo_personas.usuario WHERE id_persona = @id_persona) OR
-		EXISTS (SELECT 1 FROM manejo_personas.invitado WHERE id_persona = @id_persona) OR
-		EXISTS (SELECT 1 FROM manejo_personas.responsable WHERE id_persona = @id_persona)
+		-- Elimacion logica: 
+		UPDATE manejo_personas.persona
+		SET activo = 0
+		WHERE id_persona = @id_persona;
 
-		BEGIN -- si tiene relaciones, hacemos borrado logico, pero necesitariamos agregar un atributo a persona (no estoy seguro de q esto se haga asi, si coinciden lo agregamos a la tabla persona)
+		COMMIT TRANSACTION;
 
-			UPDATE manejo_personas.persona
-			SET activo = 0
-			WHERE id_persona = @id_persona
-		
-			COMMIT TRANSACTION;
-
-			SELECT 'Exito' AS Resultado, 'Persona inactivada correctamente (borrado logico ya que tiene registros relacionados)' AS Mensaje;
-		END
-		ELSE
-		BEGIN
-				-- si no tiene relaciones hacemos borrado fisico
-			DELETE FROM manejo_personas.persona
-			WHERE id_persona = @id_persona;			
-		
-			COMMIT TRANSACTION;
-	
-			SELECT 'Exito' as Resultado, 'Persona eliminada completamente.' AS Mensaje;
-		
-		END
+		SELECT 'Exito' AS Resultado, 'Persona inactivada correctamente (borrado lÃ³gico)' AS Mensaje;
 		RETURN 0;
 	END TRY
 	BEGIN CATCH
@@ -447,12 +196,20 @@ BEGIN
 		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
 		RETURN -99;
 	END CATCH
-
 END;
-GO
 
--------- STORED PROCEDURES PARA OBRA SOCIALES
--- Creacion de nueva obra social
+/*
+* Nombre: CreacionObraSocial
+* Descripcion: Realiza una eliminacion logica de una persona.
+* Parametros:
+*	@nombre VARCHAR(50) - Nombre de la obra social. 
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: @nombre es nulo. 
+*	-2: El nombre ya esta en uso.
+*	-99: Error desconocido.
+*/
+GO
 CREATE OR ALTER PROCEDURE manejo_personas.CreacionObraSocial
 	@nombre VARCHAR(50)
 AS
@@ -478,8 +235,7 @@ BEGIN
 			RETURN -2;
 		END
 
-		
-
+	
 		INSERT INTO manejo_personas.obra_social(descripcion)
 		VALUES (@nombre);
 
@@ -495,9 +251,21 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-GO
 
--- Modificacion de obra social
+/*
+* Nombre: ModificacionObraSocial
+* Descripcion: Permite modificar el nombre de una obra social.
+* Parametros:
+*	@id INT - id de la obra social. (DEBE SER NO NULO)
+*	@nombre_nuevo VARCHAR(50) - Nuevo nombre de la obra social.
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: @id o @nombre_nuevo son nulo. 
+*	-2: Obra social no encontrada.
+*	-3: Nombre esta en uso. 
+*	-99: Error desconocido.
+*/
+GO
 CREATE OR ALTER PROCEDURE manejo_personas.ModificacionObraSocial
 	@id INT,
 	@nombre_nuevo VARCHAR(50)
@@ -521,7 +289,7 @@ BEGIN
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
-			RETURN -1;
+			RETURN -2;
 		END
 
 		-- Verifico que el nombre no sea nulo
@@ -537,7 +305,7 @@ BEGIN
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'Esa obra social ya esta registrada' AS Mensaje;
-			RETURN -1;
+			RETURN -3;
 		END
 
 		UPDATE manejo_personas.obra_social
@@ -556,13 +324,21 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-GO
 
--- Eliminacion de obra social
+/*
+* Nombre: ModificacionObraSocial
+* Descripcion: Elimina una obra social. (Eliminacion fisica)
+* Parametros:
+*	@id INT - id de la obra social. (DEBE SER NO NULO)
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: @id no existente.
+*	-99: Error desconocido.
+*/
+GO
 CREATE OR ALTER PROCEDURE manejo_personas.EliminacionObraSocial
 	@id INT
-AS
-BEGIN
+AS BEGIN
 	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 
 	BEGIN TRANSACTION;
@@ -599,10 +375,19 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-GO
 
--------- STORED PROCEDURES PARA METODO PAGO
--- Creacion de un metodo pago
+/*
+* Nombre: CreacionMetodoPago
+* Descripcion: Crea un metodo de pago. 
+* Parametros:
+*	@nombre VARCHAR(50) - Nombre del metodo de pago. 
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: @nombre no puede ser nulo.
+*	-2: El nombre ya esta en uso.
+*	-99: Error desconocido.
+*/
+GO
 CREATE OR ALTER PROCEDURE pagos_y_facturas.CreacionMetodoPago
 	@nombre VARCHAR(50)
 AS
@@ -645,9 +430,19 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-GO
 
--- Modificacion metodo pago
+/*
+* Nombre: ModificacionMetodoPago
+* Descripcion: Modifica el nombre de un metodo de pago.
+* Parametros:
+*	@id INT - id del metodo de pago a modificar. 
+*	@nombre VARCHAR(50) - Nombre del metodo de pago. 
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: Parametros incorrectos.
+*	-99: Error desconocido.
+*/
+GO
 CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificacionMetodoPago
 	@id INT,
 	@nombre_nuevo VARCHAR(50)
@@ -706,9 +501,19 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-GO
 
--- Eliminacion metodo de pago
+/*
+* Nombre: ModificacionMetodoPago
+* Descripcion: Modifica el nombre de un metodo de pago.
+* Parametros:
+*	@id INT - id del metodo de pago a modificar. 
+*	@nombre VARCHAR(50) - Nombre del metodo de pago. 
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: Parametros incorrectos.
+*	-99: Error desconocido.
+*/
+GO
 CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminacionMetodoPago
 	@id INT
 AS
@@ -749,10 +554,71 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-GO
 
--------- STORED PROCEDURES PARA ROL
--- Creacion de un rol
+/*
+* Nombre: EliminacionMetodoPago
+* Descripcion: Realiza una eliminacion fisica de metodo pago
+* Parametros:
+*	@id INT - id del metodo de pago a eliminar. 
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: @id Parametros incorrectos.
+*	-99: Error desconocido.
+* Observacion: Revisar la restriccion referencial. 
+*/
+GO
+CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminacionMetodoPago
+	@id INT
+AS
+BEGIN
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+		
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE id_metodo_pago = @id)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -1;
+		END
+
+		DELETE FROM pagos_y_facturas.metodo_pago
+		WHERE metodo_pago.id_metodo_pago = @id;
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Metodo de pago eliminado' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+
+/*
+* Nombre: CreacionRol
+* Descripcion: Crea un rol. 
+* Parametros:
+*	@nombre VARCHAR(50) - Nombre del rol. 
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: @nombre Parametro incorrecto.
+*	-99: Error desconocido.
+*/
+GO
 CREATE OR ALTER PROCEDURE manejo_personas.CreacionRol
 	@nombre VARCHAR(50)
 AS
@@ -775,7 +641,7 @@ BEGIN
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'Ese rol ya existe' AS Mensaje;
-			RETURN -2;
+			RETURN -1;
 		END
 
 		
@@ -795,9 +661,19 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-GO
 
--- Modificacion rol
+/*
+* Nombre: ModificacionRol
+* Descripcion: Modifica el nombre de un rol
+* Parametros:
+*	@id INT - ID del rol a modificar.
+*	@nombre_nuevo VARCHAR(50) - Nombre nuevo del rol. 
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: Parametros incorrectos.
+*	-99: Error desconocido.
+*/
+GO
 CREATE OR ALTER PROCEDURE manejo_personas.ModificacionRol
 	@id INT,
 	@nombre_nuevo VARCHAR(50)
@@ -856,9 +732,18 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-GO
 
--- Eliminacion rol
+/*
+* Nombre: EliminacionRol
+* Descripcion: Elimina un rol. 
+* Parametros:
+*	@id INT - ID del rol a eliminar.
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: Parametros incorrectos.
+*	-99: Error desconocido.
+*/
+GO
 CREATE OR ALTER PROCEDURE manejo_personas.EliminacionRol
 	@id INT
 AS
@@ -899,12 +784,22 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+
+/*
+* Nombre: CrearCategoria
+* Descripcion: Crea una nueva categoria, valida la informacion ingresada.
+* Parametros:
+*	@nombre_categoria VARCHAR(50) - Nombre de la categoria.
+*	@costo_membrecia DECIMAL(10, 2) -  Costo de la membresia. 
+*	@edad_maxima INT - Edad maxima para la categoria. 
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: Parametros incorrectos.
+*	-2: Costo negativo.
+*	-3: Edad negativa. 	 
+*	-99: Error desconocido.
+*/
 GO
-
--------- STORED PROCEDURES PARA CATEGORIA
-
--- Creación categoria
-
 CREATE OR ALTER PROCEDURE manejo_actividades.CrearCategoria
 	@nombre_categoria VARCHAR(50),
 	@costo_membrecia DECIMAL(10, 2),
@@ -919,15 +814,15 @@ BEGIN
 		IF @nombre_categoria IS NULL OR LTRIM(RTRIM(@nombre_categoria)) = '' -- que no sea null ni vacio
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'El nombre de la categoría no puede estar vacío' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'El nombre de la categorÃ­a no puede estar vacÃ­o' AS Mensaje;
 			RETURN -1;
 		END
 
-		-- validar costo de membresía
+		-- validar costo de membresÃ­a
 		IF @costo_membrecia <= 0
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'El costo de membresía debe ser mayor a cero' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'El costo de membresÃ­a debe ser mayor a cero' AS Mensaje;
 			RETURN -2;
 		END
 
@@ -944,7 +839,7 @@ BEGIN
 		IF EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE nombre_categoria = @nombre_categoria)
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Ya existe una categoría con ese nombre' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'Ya existe una categorÃ­a con ese nombre' AS Mensaje;
 			RETURN -4;
 		END
 
@@ -988,7 +883,7 @@ BEGIN
 
 		COMMIT TRANSACTION;
 
-		SELECT 'Exito' AS Resultado, 'Categoria crada correctamente' AS Mensaje;
+		SELECT 'Exito' AS Resultado, 'Categoria creada correctamente' AS Mensaje;
 		RETURN 0;
 	END TRY
 	BEGIN CATCH
@@ -997,10 +892,22 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+
+/*
+* Nombre: ModificarCategoria
+* Descripcion: Modifica los campos nombre y costo de una categoria. 
+* Parametros:
+* 	@id_categoria INT - ID de la categoria a modificar. (Parametro obligatorio)
+*	@nombre_categoria VARCHAR(50) - Nombre nuevo para la categoria. (Parametro opcional)
+*	@costo_membrecia DECIMAL(10, 2) -  Nuevo costo de la membresia (Parametro opcional). 
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: @nombre_categoria incorrecto.
+*	-2: El nombre de la categoria esta en uso.
+*	-3: El costo de la membresia debe ser mayor a cero. 	 
+*	-99: Error desconocido.
+*/
 GO
-
--- Modificar categoria
-
 CREATE OR ALTER PROCEDURE manejo_actividades.ModificarCategoria
 	@id_categoria INT,
 	@nombre_categoria VARCHAR(50) = NULL,
@@ -1027,15 +934,15 @@ BEGIN
 			BEGIN
 				ROLLBACK TRANSACTION;
 				SELECT 'Error' AS Resultado, 'El nombre de la categoria no puede estar vacio' AS Mensaje;
-				RETURN -2;
+				RETURN -1;
 			END
 
 	-- verificamos que no exista ora categoria con el nombre a cambiar (excepto si es la actual)
 			IF EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE nombre_categoria = @nombre_categoria AND id_categoria <> @id_categoria)
 			BEGIN
 				ROLLBACK TRANSACTION;
-				SELECT 'Error' AS Resultado, 'Ya existe otra categoría con ese nombre' AS Mensaje;
-				RETURN -3;
+				SELECT 'Error' AS Resultado, 'Ya existe otra categorÃ­a con ese nombre' AS Mensaje;
+				RETURN -2;
 			END
 		END
 
@@ -1043,8 +950,8 @@ BEGIN
 		IF @costo_membrecia IS NOT NULL AND @costo_membrecia <= 0
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'El costo de membresía debe ser mayor a cero' AS Mensaje;
-			RETURN -4;
+			SELECT 'Error' AS Resultado, 'El costo de membresÃ­a debe ser mayor a cero' AS Mensaje;
+			RETURN -3;
 		END
 
 		UPDATE manejo_actividades.categoria
@@ -1064,18 +971,29 @@ BEGIN
 	END CATCH
 
 END;
+
+/*
+* Nombre: CrearClase
+* Descripcion: Modifica los campos nombre y costo de una categoria. 
+* Parametros:
+* 	@id_actividad INT - ID de la actividad que se realiza en la clase.
+*	@id_categoria INT - ID de la categoria. 
+*	@dia VARCHAR(9) - Dia que se realiza la actividad. 
+*	@horario TIME - Horario de la clase. 
+* 	@id_usuario INT - ID del usuario que es responsable de la clase.
+*	
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: Actividad no existe.
+*	-2: Categoria no existe.
+*	-3: El usuario no existe. 
+*	-4: Dia invalido. 
+*	-5: Horario invalido. 
+*	-6: 'Ya existe una clase con la misma actividad, categorÃ­a, dÃ­a y horario.
+*	-7: El profesor ya tiene otra clase asignada en ese dia y horario
+*	-99: Error desconocido.
+*/
 GO
-
--- No agrego sp de eliminar categoria pues complicaria mucho el manejo de edades (habria que pensarlo mejor tal vez)
-
-
-
-
-
--------- STORED PROCEDURES PARA CLASE
-
--- crear clase
-
 CREATE OR ALTER PROCEDURE manejo_actividades.CrearClase
 	@id_actividad INT,
 	@id_categoria INT,
@@ -1102,7 +1020,7 @@ BEGIN
 		IF NOT EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria)
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'La categoría no existe' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'La categorÃ­a no existe' AS Mensaje;
 			RETURN -2;
 		END
 
@@ -1141,7 +1059,7 @@ BEGIN
 		IF EXISTS ( SELECT 1 FROM manejo_actividades.clase WHERE id_actividad = @id_actividad AND id_categoria = @id_categoria AND dia = @dia AND horario = @horario)
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Ya existe una clase con la misma actividad, categoría, día y horario' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'Ya existe una clase con la misma actividad, categorÃ­a, dÃ­a y horario' AS Mensaje;
 			RETURN -6;
 		END
 
@@ -1169,10 +1087,8 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+
 GO
-
--- modificar clase
-
 CREATE OR ALTER PROCEDURE manejo_actividades.ModificarClase
     @id_clase INT,
     @id_actividad INT = NULL,
@@ -1203,11 +1119,11 @@ BEGIN
             RETURN -2;
         END
         
-        -- verificamos categoría si se proporciona
+        -- verificamos categorÃ­a si se proporciona
         IF @id_categoria IS NOT NULL AND NOT EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria)
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'La categoría no existe' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'La categorÃ­a no existe' AS Mensaje;
             RETURN -3;
         END
         
@@ -1219,14 +1135,14 @@ BEGIN
             RETURN -4;
         END
         
-        -- verificamos formato del día si se proporciona y convertir a mayúsculas
+        -- verificamos formato del dÃ­a si se proporciona y convertir a mayÃºsculas
         IF @dia IS NOT NULL
         BEGIN
             SET @dia = UPPER(@dia);
             IF @dia NOT IN ('LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO')
             BEGIN
                 ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'El día debe ser un día de la semana válido' AS Mensaje;
+                SELECT 'Error' AS Resultado, 'El dÃ­a debe ser un dÃ­a de la semana vÃ¡lido' AS Mensaje;
                 RETURN -5;
             END
         END
@@ -1245,7 +1161,7 @@ BEGIN
             END
         END
         
-        -- verificamos que no haya otra clase con la misma combinación (si cambiamos algun valor)
+        -- verificamos que no haya otra clase con la misma combinaciÃ³n (si cambiamos algun valor)
         IF @id_actividad IS NOT NULL OR @id_categoria IS NOT NULL OR @dia IS NOT NULL OR @horario IS NOT NULL
         BEGIN
             IF EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_actividad = ISNULL(@id_actividad, id_actividad) 
@@ -1256,12 +1172,12 @@ BEGIN
             )
             BEGIN
                 ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'Ya existe otra clase con la misma actividad, categoría, día y horario' AS Mensaje;
+                SELECT 'Error' AS Resultado, 'Ya existe otra clase con la misma actividad, categorÃ­a, dÃ­a y horario' AS Mensaje;
                 RETURN -7;
             END
         END
         
-        -- verificamos que el profesor no tenga otra clase a la misma hora (solo si cambiamos profesor/día/hora)
+        -- verificamos que el profesor no tenga otra clase a la misma hora (solo si cambiamos profesor/dÃ­a/hora)
         IF @id_usuario IS NOT NULL OR @dia IS NOT NULL OR @horario IS NOT NULL
         BEGIN
             IF EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_usuario = ISNULL(@id_usuario, id_usuario)
@@ -1271,7 +1187,7 @@ BEGIN
             )
             BEGIN
                 ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'El profesor ya tiene otra clase asignada en ese día y horario' AS Mensaje;
+                SELECT 'Error' AS Resultado, 'El profesor ya tiene otra clase asignada en ese dÃ­a y horario' AS Mensaje;
                 RETURN -8;
             END
         END
@@ -1287,7 +1203,7 @@ BEGIN
         
         COMMIT TRANSACTION;
         
-        SELECT 'Éxito' AS Resultado, 'Clase modificada correctamente' AS Mensaje;
+        SELECT 'Ã‰xito' AS Resultado, 'Clase modificada correctamente' AS Mensaje;
         RETURN 0;
 
     END TRY
@@ -1299,10 +1215,8 @@ BEGIN
     END CATCH
 
 END;
+
 GO
-
--- eliminar clase -- NO FINAL --
-
 CREATE OR ALTER PROCEDURE manejo_actividades.EliminarClase
     @id_clase INT
 AS
@@ -1312,15 +1226,15 @@ BEGIN
     BEGIN TRANSACTION;
     
     BEGIN TRY
-        -- verificamos que la clase exista y esté activa
+        -- verificamos que la clase exista y estÃ© activa
         IF NOT EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_clase = @id_clase AND activo = 1)
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'La clase no existe o ya está inactiva' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'La clase no existe o ya estÃ¡ inactiva' AS Mensaje;
             RETURN -1;
         END
         
-        -- verificamos si hay socios inscritos en esta actividad y categoría
+        -- verificamos si hay socios inscritos en esta actividad y categorÃ­a
         IF EXISTS (SELECT 1 FROM manejo_personas.socio_actividad sa
             JOIN manejo_personas.socio s ON sa.id_socio = s.id_socio
             JOIN manejo_actividades.clase c ON c.id_clase = @id_clase
@@ -1329,21 +1243,21 @@ BEGIN
         )
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'No se puede eliminar la clase porque hay socios inscritos en esta actividad y categoría' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'No se puede eliminar la clase porque hay socios inscritos en esta actividad y categorÃ­a' AS Mensaje;
             RETURN -2;
         END
 		-- esto casi seguro habria que cambiarlo/repensarlo porque no se eliminaria la clase aun si el socio esta inscrito en actividad y categoria pero 
 		-- en otra clase, capaz habria que unir de alguna forma socio con clase. !!!
 		-- aparte tiene que hacer joins y dudo que sea optimo
 
-        -- realizamos borrado lógico cambiando el estado a inactivo
+        -- realizamos borrado lÃ³gico cambiando el estado a inactivo
         UPDATE manejo_actividades.clase
-        SET activo = 0 -- agregue atributo activo a clase para hacer borrado lógico, si les parece que no deberia de haber borrado lógico lo cambiamos
+        SET activo = 0 -- agregue atributo activo a clase para hacer borrado lÃ³gico, si les parece que no deberia de haber borrado lÃ³gico lo cambiamos
         WHERE id_clase = @id_clase;
         
         COMMIT TRANSACTION;
         
-        SELECT 'Éxito' AS Resultado, 'Clase inactivada correctamente' AS Mensaje;
+        SELECT 'Ã‰xito' AS Resultado, 'Clase inactivada correctamente' AS Mensaje;
         RETURN 0;
 
     END TRY
@@ -1354,10 +1268,9 @@ BEGIN
         RETURN -99;
     END CATCH
 END;
-GO
 
--------- STORED PROCEDURES PARA CATEGORIA
---- Crear descuento
+
+GO
 CREATE OR ALTER PROCEDURE pagos_y_facturas.CrearDescuento
 	@descripcion VARCHAR(50),
 	@cantidad DECIMAL(4,3)
@@ -1413,10 +1326,8 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
+
 GO
-
-
---- Modificar descuento
 CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificarDescuento
 	@id INT,
 	@descripcion VARCHAR(50),
@@ -1493,9 +1404,8 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
-GO
 
--- Eliminas un descuento
+GO
 CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminarDescuento
 	@id INT
 AS
@@ -1542,10 +1452,8 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
-GO
 
--------- STORED PROCEDURES PARA CATEGORIA
--- Creacion de facturas
+GO
 CREATE OR ALTER PROCEDURE pagos_y_facturas.CreacionFactura
     @estado_pago VARCHAR(10),
     @monto_a_pagar DECIMAL(10,2),
@@ -1586,7 +1494,7 @@ BEGIN
         IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE id_metodo_pago = @id_metodo_pago)
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Método de pago no valido' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'MÃ©todo de pago no valido' AS Mensaje;
             RETURN -4;
         END
 
@@ -1604,8 +1512,8 @@ BEGIN
         RETURN -99;
     END CATCH
 END;
-GO
 
+GO
 -- Modificacion de facturas
 CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificacionFactura
     @id_factura INT,
@@ -1667,9 +1575,8 @@ BEGIN
         RETURN -99;
     END CATCH
 END;
-GO
 
--- Eliminacion facturas
+GO
 CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminacionFactura
     @id_factura INT
 AS
@@ -1700,11 +1607,9 @@ BEGIN
         RETURN -99;
     END CATCH
 END;
+
+
 GO
-
-
--------- STORED PROCEDURES PARA ACTIVIDAD
---- Crear una actividad
 CREATE OR ALTER PROCEDURE manejo_actividades.CrearActividad
 	@nombre_actividad VARCHAR(100),
 	@costo_mensual DECIMAL(10,2)
@@ -1761,9 +1666,8 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
-GO
 
--- Modificar Actividad
+GO
 CREATE OR ALTER PROCEDURE manejo_actividades.ModificarActividad
 	@id INT,
 	@nombre_actividad VARCHAR(100),
@@ -1842,12 +1746,8 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
-GO
 
--- Eliminar Actividad
--- NOTA: ME PARECE QUE NO HACE FALTA ESTE TRIGGER (Excepto para corregir ingresos erroneos) PORQUE SI UNA ACTIVIDAD NO ESTA ACTIVA, SIMPLEMENTE NO INSCRIBO GENTE NUEVA A ESA ACTIVIDAD
--- EN CAMBIO, SI HUBIESE QUE HACERLO, HAY QUE MODIFICAR LA TABLA DE ACTIVIDAD PARA SOPORTAR UN BORRADO LOGICO 
--- Y TAMBIEN A ESTE TRIGGER PARA ESO
+GO
 CREATE OR ALTER PROCEDURE manejo_actividades.EliminarActividad
 	@id INT
 AS
@@ -1894,15 +1794,13 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
-GO
 
--------- STORED PROCEDURES PARA ACTIVIDAD
---- Crear un Usuario
+GO
 CREATE OR ALTER PROCEDURE manejo_personas.CrearUsuario
     @id_persona INT,
     @username VARCHAR(50),
     @password_hash VARCHAR(256),
-    @fecha_alta_contraseña DATE = NULL
+    @fecha_alta_contra DATE = NULL
 AS
 BEGIN
     SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
@@ -1966,12 +1864,13 @@ BEGIN
         END
         
         -- Si no se proporciona fecha, usar la actual
-        IF @fecha_alta_contraseña IS NULL
-            SET @fecha_alta_contraseña = GETDATE();
+        IF @fecha_alta_contra IS NULL
+            SET @fecha_alta_contra = GETDATE();
         
         -- Insertar el nuevo usuario
-        INSERT INTO manejo_personas.usuario (id_persona, username, password_hash, fecha_alta_contraseña)
-        VALUES (@id_persona, @username, @password_hash, @fecha_alta_contraseña);
+        INSERT INTO manejo_personas.usuario (id_persona, username, password_hash, fecha_alta_contra
+)
+        VALUES (@id_persona, @username, @password_hash, @fecha_alta_contra);
         
         COMMIT TRANSACTION;
         SELECT 'Exito' AS Resultado, 'Usuario creado correctamente' AS Mensaje;
@@ -1990,14 +1889,14 @@ BEGIN
         RETURN -999;
     END CATCH
 END
-GO
 
--- Modificar Usuario
+
+GO
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarUsuario
     @id_usuario INT,
     @username VARCHAR(50) = NULL,
     @password_hash VARCHAR(256) = NULL,
-    @fecha_alta_contraseña DATE = NULL
+    @fecha_alta_contra DATE = NULL
 AS
 BEGIN
     SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
@@ -2033,7 +1932,7 @@ BEGIN
         SET 
             username = ISNULL(@username, username),
             password_hash = ISNULL(@password_hash, password_hash),
-            fecha_alta_contraseña = ISNULL(@fecha_alta_contraseña, fecha_alta_contraseña)
+            fecha_alta_contra = ISNULL(@fecha_alta_contra, @fecha_alta_contra)
         WHERE id_usuario = @id_usuario;
         
         COMMIT TRANSACTION;
@@ -2052,10 +1951,9 @@ BEGIN
             ERROR_PROCEDURE() AS Procedimiento;
         RETURN -999;
     END CATCH
-END
-GO
+END;
 
--- Eliminar Usuario
+GO
 CREATE OR ALTER PROCEDURE manejo_personas.EliminarUsuario
     @id_usuario INT
 AS
@@ -2135,6 +2033,7 @@ BEGIN
         RETURN -999;
     END CATCH
 END;
+
 GO
 
 
@@ -2292,7 +2191,7 @@ BEGIN
         DELETE FROM manejo_personas.invitado
         WHERE id_invitado = @id_invitado;
 
-        -- Intentar eliminar persona si no está referenciada en otras tablas
+        -- Intentar eliminar persona si no estÃ¡ referenciada en otras tablas
 		-- NOTA: Agregue esto porque si bien creo que un usuario o socio no deberian ser invitados
 		-- el DER plantea que si porque son una jerarquia de subconjuntos.
         IF NOT EXISTS (
@@ -2411,11 +2310,11 @@ BEGIN
             RETURN -1;
         END
 
-        -- Validar que parentesco no sea vacío si se pasa
+        -- Validar que parentesco no sea vacÃ­o si se pasa
         IF @parentesco IS NOT NULL AND LTRIM(RTRIM(@parentesco)) = ''
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Parentesco no puede estar vacío' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'Parentesco no puede estar vacÃ­o' AS Mensaje;
             RETURN -2;
         END
 
@@ -2461,7 +2360,7 @@ BEGIN
         -- Elimino ael responsable
         DELETE FROM manejo_personas.responsable WHERE id_grupo = @id_grupo;
 
-        -- Si persona no está asociada a otro rol, inactivar
+        -- Si persona no estÃ¡ asociada a otro rol, inactivar
         IF NOT EXISTS (
             SELECT 1 FROM manejo_personas.usuario WHERE id_persona = @id_persona
         ) AND NOT EXISTS (
@@ -2605,13 +2504,10 @@ BEGIN
         RETURN -99;
     END CATCH
 END;
+
 GO
-
-
 ------ STORED PROCEDURES PARA SOCIO
-
 -- crear socio
-
 CREATE OR ALTER PROCEDURE manejo_personas.CrearSocio
     @id_persona INT,
     @telefono_emergencia VARCHAR(15),
@@ -2626,11 +2522,11 @@ BEGIN
     BEGIN TRANSACTION;
     
     BEGIN TRY
-        -- verificamos que la persona exista y esté activa
+        -- verificamos que la persona exista y estÃ© activa
         IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona AND activo = 1)
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'La persona no existe o está inactiva' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'La persona no existe o estÃ¡ inactiva' AS Mensaje;
             RETURN -1;
         END
         
@@ -2638,15 +2534,15 @@ BEGIN
         IF EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_persona = @id_persona)
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'La persona ya está registrada como socio' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'La persona ya estÃ¡ registrada como socio' AS Mensaje;
             RETURN -2;
         END
         
-        -- verificamos que la categoría exista
+        -- verificamos que la categorÃ­a exista
         IF NOT EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria)
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'La categoría especificada no existe' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'La categorÃ­a especificada no existe' AS Mensaje;
             RETURN -3;
         END
         
@@ -2658,41 +2554,41 @@ BEGIN
             RETURN -4;
         END
         
-        -- verificamos que el grupo familiar exista y esté activo (si se proporciona)
+        -- verificamos que el grupo familiar exista y estÃ© activo (si se proporciona)
         IF @id_grupo IS NOT NULL AND NOT EXISTS (SELECT 1 FROM manejo_personas.grupo_familiar WHERE id_grupo = @id_grupo AND estado = 1)
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'El grupo familiar especificado no existe o está inactivo' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'El grupo familiar especificado no existe o estÃ¡ inactivo' AS Mensaje;
             RETURN -5;
         END
         
-        -- verificamos que la edad de la persona corresponda con la categoría
+        -- verificamos que la edad de la persona corresponda con la categorÃ­a
         DECLARE @edad INT, @edad_maxima INT
         SELECT @edad = DATEDIFF(YEAR, fecha_nac, GETDATE()) FROM manejo_personas.persona WHERE id_persona = @id_persona
         SELECT @edad_maxima = edad_maxima FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria
         
-        -- verificamos por tipo de categoría (Menor, Cadete, Mayor)
+        -- verificamos por tipo de categorÃ­a (Menor, Cadete, Mayor)
         DECLARE @nombre_categoria VARCHAR(50)
         SELECT @nombre_categoria = nombre_categoria FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria
         
         IF @nombre_categoria = 'Menor' AND (@edad < 0 OR @edad > 12)
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'La categoría Menor es solo para personas hasta 12 años' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'La categorÃ­a Menor es solo para personas hasta 12 aÃ±os' AS Mensaje;
             RETURN -6;
         END
         
         IF @nombre_categoria = 'Cadete' AND (@edad < 13 OR @edad > 17)
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'La categoría Cadete es solo para personas entre 13 y 17 años' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'La categorÃ­a Cadete es solo para personas entre 13 y 17 aÃ±os' AS Mensaje;
             RETURN -7;
         END
         
         IF @nombre_categoria = 'Mayor' AND @edad < 18
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'La categoría Mayor es solo para personas a partir de 18 años' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'La categorÃ­a Mayor es solo para personas a partir de 18 aÃ±os' AS Mensaje;
             RETURN -8;
         END
         
@@ -2702,7 +2598,7 @@ BEGIN
 
         
         COMMIT TRANSACTION;
-        SELECT 'Éxito' AS Resultado, 'Socio registrado correctamente' AS Mensaje;
+        SELECT 'Ã‰xito' AS Resultado, 'Socio registrado correctamente' AS Mensaje;
         RETURN 0;
     END TRY
 
@@ -2713,10 +2609,9 @@ BEGIN
     END CATCH
 
 END;
+
 GO
-
 -- modificar socio
-
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarSocio
     @id_socio INT,
     @telefono_emergencia VARCHAR(15) = NULL,
@@ -2745,40 +2640,40 @@ BEGIN
         FROM manejo_personas.socio 
         WHERE id_socio = @id_socio;
         
-        -- verificamos que la categoría exista (si se proporciona)
+        -- verificamos que la categorÃ­a exista (si se proporciona)
         IF @id_categoria IS NOT NULL
         BEGIN
             IF NOT EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria)
             BEGIN
                 ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'La categoría especificada no existe' AS Mensaje;
+                SELECT 'Error' AS Resultado, 'La categorÃ­a especificada no existe' AS Mensaje;
                 RETURN -2;
             END
             
-            -- verificamos que la edad de la persona corresponda con la nueva categoría
+            -- verificamos que la edad de la persona corresponda con la nueva categorÃ­a
             DECLARE @edad INT, @nombre_categoria VARCHAR(50)
             SELECT @edad = DATEDIFF(YEAR, fecha_nac, GETDATE()) FROM manejo_personas.persona WHERE id_persona = @id_persona
             SELECT @nombre_categoria = nombre_categoria FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria
             
-            -- Validaciones específicas por categoría
+            -- Validaciones especÃ­ficas por categorÃ­a
             IF @nombre_categoria = 'Menor' AND (@edad < 0 OR @edad > 12)
             BEGIN
                 ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'La categoría Menor es solo para personas hasta 12 años' AS Mensaje;
+                SELECT 'Error' AS Resultado, 'La categorÃ­a Menor es solo para personas hasta 12 aÃ±os' AS Mensaje;
                 RETURN -3;
             END
             
             IF @nombre_categoria = 'Cadete' AND (@edad < 13 OR @edad > 17)
             BEGIN
                 ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'La categoría Cadete es solo para personas entre 13 y 17 años' AS Mensaje;
+                SELECT 'Error' AS Resultado, 'La categorÃ­a Cadete es solo para personas entre 13 y 17 aÃ±os' AS Mensaje;
                 RETURN -4;
             END
             
             IF @nombre_categoria = 'Mayor' AND @edad < 18
             BEGIN
                 ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'La categoría Mayor es solo para personas a partir de 18 años' AS Mensaje;
+                SELECT 'Error' AS Resultado, 'La categorÃ­a Mayor es solo para personas a partir de 18 aÃ±os' AS Mensaje;
                 RETURN -5;
             END
         END
@@ -2791,11 +2686,11 @@ BEGIN
             RETURN -6;
         END
         
-        -- verificamos que el grupo familiar exista y esté activo (si se proporciona)
+        -- verificamos que el grupo familiar exista y estÃ© activo (si se proporciona)
         IF @id_grupo IS NOT NULL AND NOT EXISTS (SELECT 1 FROM manejo_personas.grupo_familiar WHERE id_grupo = @id_grupo AND estado = 1)
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'El grupo familiar especificado no existe o está inactivo' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'El grupo familiar especificado no existe o estÃ¡ inactivo' AS Mensaje;
             RETURN -7;
         END
         
@@ -2809,7 +2704,7 @@ BEGIN
         WHERE id_socio = @id_socio;
         
         COMMIT TRANSACTION;
-        SELECT 'Éxito' AS Resultado, 'Datos del socio actualizados correctamente' AS Mensaje;
+        SELECT 'Ã‰xito' AS Resultado, 'Datos del socio actualizados correctamente' AS Mensaje;
         RETURN 0;
     END TRY
 
@@ -2820,10 +2715,9 @@ BEGIN
     END CATCH
 
 END;
+
 GO
-
 -- eliminar socio
-
 CREATE OR ALTER PROCEDURE manejo_personas.EliminarSocio
     @id_socio INT
 AS
@@ -2882,7 +2776,7 @@ BEGIN
         
         
         COMMIT TRANSACTION;
-        SELECT 'Éxito' AS Resultado, 'Socio y todas sus relaciones eliminados completamente del sistema' AS Mensaje;
+        SELECT 'Ã‰xito' AS Resultado, 'Socio y todas sus relaciones eliminados completamente del sistema' AS Mensaje;
         RETURN 0;
     END TRY
 
@@ -2893,4 +2787,5 @@ BEGIN
     END CATCH
 
 END;
+
 GO
