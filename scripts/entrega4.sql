@@ -2608,5 +2608,289 @@ END;
 GO
 
 
+------ STORED PROCEDURES PARA SOCIO
 
+-- crear socio
 
+CREATE OR ALTER PROCEDURE manejo_personas.CrearSocio
+    @id_persona INT,
+    @telefono_emergencia VARCHAR(15),
+    @obra_nro_socio VARCHAR(20) = NULL,
+    @id_obra_social INT = NULL,
+    @id_categoria INT,
+    @id_grupo INT = NULL
+AS
+BEGIN
+    
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+    
+    BEGIN TRY
+        -- verificamos que la persona exista y esté activa
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona AND activo = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La persona no existe o está inactiva' AS Mensaje;
+            RETURN -1;
+        END
+        
+        -- verificamos que la persona no sea ya un socio
+        IF EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_persona = @id_persona)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La persona ya está registrada como socio' AS Mensaje;
+            RETURN -2;
+        END
+        
+        -- verificamos que la categoría exista
+        IF NOT EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La categoría especificada no existe' AS Mensaje;
+            RETURN -3;
+        END
+        
+        -- verificamos que la obra social exista (si se proporciona)
+        IF @id_obra_social IS NOT NULL AND NOT EXISTS (SELECT 1 FROM manejo_personas.obra_social WHERE id_obra_social = @id_obra_social)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La obra social especificada no existe' AS Mensaje;
+            RETURN -4;
+        END
+        
+        -- verificamos que el grupo familiar exista y esté activo (si se proporciona)
+        IF @id_grupo IS NOT NULL AND NOT EXISTS (SELECT 1 FROM manejo_personas.grupo_familiar WHERE id_grupo = @id_grupo AND estado = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El grupo familiar especificado no existe o está inactivo' AS Mensaje;
+            RETURN -5;
+        END
+        
+        -- verificamos que la edad de la persona corresponda con la categoría
+        DECLARE @edad INT, @edad_maxima INT
+        SELECT @edad = DATEDIFF(YEAR, fecha_nac, GETDATE()) FROM manejo_personas.persona WHERE id_persona = @id_persona
+        SELECT @edad_maxima = edad_maxima FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria
+        
+        -- verificamos por tipo de categoría (Menor, Cadete, Mayor)
+        DECLARE @nombre_categoria VARCHAR(50)
+        SELECT @nombre_categoria = nombre_categoria FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria
+        
+        IF @nombre_categoria = 'Menor' AND (@edad < 0 OR @edad > 12)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La categoría Menor es solo para personas hasta 12 años' AS Mensaje;
+            RETURN -6;
+        END
+        
+        IF @nombre_categoria = 'Cadete' AND (@edad < 13 OR @edad > 17)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La categoría Cadete es solo para personas entre 13 y 17 años' AS Mensaje;
+            RETURN -7;
+        END
+        
+        IF @nombre_categoria = 'Mayor' AND @edad < 18
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La categoría Mayor es solo para personas a partir de 18 años' AS Mensaje;
+            RETURN -8;
+        END
+        
+        -- insertamos el nuevo socio
+        INSERT INTO manejo_personas.socio ( id_persona, telefono_emergencia, obra_nro_socio, id_obra_social, id_categoria, id_grupo)
+        VALUES ( @id_persona, @telefono_emergencia, @obra_nro_socio, @id_obra_social, @id_categoria, @id_grupo);
+
+        
+        COMMIT TRANSACTION;
+        SELECT 'Éxito' AS Resultado, 'Socio registrado correctamente' AS Mensaje;
+        RETURN 0;
+    END TRY
+
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
+
+END;
+GO
+
+-- modificar socio
+
+CREATE OR ALTER PROCEDURE manejo_personas.ModificarSocio
+    @id_socio INT,
+    @telefono_emergencia VARCHAR(15) = NULL,
+    @obra_nro_socio VARCHAR(20) = NULL,
+    @id_obra_social INT = NULL,
+    @id_categoria INT = NULL,
+    @id_grupo INT = NULL
+AS
+BEGIN
+    
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+    
+    BEGIN TRY
+        -- verificamos que el socio exista
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_socio = @id_socio)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El socio no existe' AS Mensaje;
+            RETURN -1;
+        END
+        
+        -- obtenemos el ID de persona para hacer validaciones
+        DECLARE @id_persona INT, @categoria_actual INT
+        SELECT @id_persona = id_persona, @categoria_actual = id_categoria 
+        FROM manejo_personas.socio 
+        WHERE id_socio = @id_socio;
+        
+        -- verificamos que la categoría exista (si se proporciona)
+        IF @id_categoria IS NOT NULL
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria)
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'La categoría especificada no existe' AS Mensaje;
+                RETURN -2;
+            END
+            
+            -- verificamos que la edad de la persona corresponda con la nueva categoría
+            DECLARE @edad INT, @nombre_categoria VARCHAR(50)
+            SELECT @edad = DATEDIFF(YEAR, fecha_nac, GETDATE()) FROM manejo_personas.persona WHERE id_persona = @id_persona
+            SELECT @nombre_categoria = nombre_categoria FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria
+            
+            -- Validaciones específicas por categoría
+            IF @nombre_categoria = 'Menor' AND (@edad < 0 OR @edad > 12)
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'La categoría Menor es solo para personas hasta 12 años' AS Mensaje;
+                RETURN -3;
+            END
+            
+            IF @nombre_categoria = 'Cadete' AND (@edad < 13 OR @edad > 17)
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'La categoría Cadete es solo para personas entre 13 y 17 años' AS Mensaje;
+                RETURN -4;
+            END
+            
+            IF @nombre_categoria = 'Mayor' AND @edad < 18
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'La categoría Mayor es solo para personas a partir de 18 años' AS Mensaje;
+                RETURN -5;
+            END
+        END
+        
+        -- verificamos que la obra social exista (si se proporciona)
+        IF @id_obra_social IS NOT NULL AND NOT EXISTS (SELECT 1 FROM manejo_personas.obra_social WHERE id_obra_social = @id_obra_social)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La obra social especificada no existe' AS Mensaje;
+            RETURN -6;
+        END
+        
+        -- verificamos que el grupo familiar exista y esté activo (si se proporciona)
+        IF @id_grupo IS NOT NULL AND NOT EXISTS (SELECT 1 FROM manejo_personas.grupo_familiar WHERE id_grupo = @id_grupo AND estado = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El grupo familiar especificado no existe o está inactivo' AS Mensaje;
+            RETURN -7;
+        END
+        
+        -- si pasa todas las verificaciones, actualizamos los datos del socio
+        UPDATE manejo_personas.socio
+        SET telefono_emergencia = ISNULL(@telefono_emergencia, telefono_emergencia),
+            obra_nro_socio = ISNULL(@obra_nro_socio, obra_nro_socio),
+            id_obra_social = ISNULL(@id_obra_social, id_obra_social),
+            id_categoria = ISNULL(@id_categoria, id_categoria),
+            id_grupo = ISNULL(@id_grupo, id_grupo)
+        WHERE id_socio = @id_socio;
+        
+        COMMIT TRANSACTION;
+        SELECT 'Éxito' AS Resultado, 'Datos del socio actualizados correctamente' AS Mensaje;
+        RETURN 0;
+    END TRY
+
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
+
+END;
+GO
+
+-- eliminar socio
+
+CREATE OR ALTER PROCEDURE manejo_personas.EliminarSocio
+    @id_socio INT
+AS
+BEGIN
+    
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+    
+    BEGIN TRY
+        -- verificamos que el socio exista
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_socio = @id_socio)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El socio no existe' AS Mensaje;
+            RETURN -1;
+        END
+        
+        -- verificamos si el socio es responsable de un grupo familiar
+        IF EXISTS (
+            SELECT 1 FROM manejo_personas.responsable
+            WHERE id_responsable = @id_socio
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'No se puede eliminar el socio porque es responsable de un grupo familiar' AS Mensaje;
+            RETURN -2;
+        END
+        
+        -- verificamos si hay facturas asociadas al socio
+        DECLARE @id_persona INT
+        SELECT @id_persona = id_persona FROM manejo_personas.socio WHERE id_socio = @id_socio
+        
+        IF EXISTS (
+            SELECT 1 FROM pagos_y_facturas.factura
+            WHERE id_persona = @id_persona
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'No se puede eliminar el socio porque tiene facturas asociadas' AS Mensaje;
+            RETURN -3;
+        END
+        
+        -- eliminamos primero las relaciones dependientes
+        
+        -- primero eliminmaos relaciones con actividades
+        DELETE FROM manejo_personas.socio_actividad
+        WHERE id_socio = @id_socio;
+        
+        -- segundo eliminamos invitados asociados
+        DELETE FROM manejo_personas.invitado
+        WHERE id_socio = @id_socio;
+        
+        -- por ultimo eliminamos el socio
+        DELETE FROM manejo_personas.socio
+        WHERE id_socio = @id_socio;
+        
+        
+        COMMIT TRANSACTION;
+        SELECT 'Éxito' AS Resultado, 'Socio y todas sus relaciones eliminados completamente del sistema' AS Mensaje;
+        RETURN 0;
+    END TRY
+
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
+
+END;
+GO
