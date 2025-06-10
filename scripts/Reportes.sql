@@ -2,8 +2,8 @@ USE Com5600G01;
 
 --Reporte1
 
-DECLARE @fecha_inicio DATE = '2024-01-01';  -- Parámetro de fecha inicio
-DECLARE @fecha_fin DATE = '2024-12-31';     -- Parámetro de fecha fin
+DECLARE @fecha_inicio DATE = '2024-01-01';
+DECLARE @fecha_fin DATE = '2024-12-31';
 
 WITH MorososDetalle AS (
     SELECT 
@@ -12,8 +12,7 @@ WITH MorososDetalle AS (
         p.apellido,
         CONCAT(DATENAME(MONTH, f.fecha_emision), ' ', YEAR(f.fecha_emision)) as mes_incumplido,
         f.fecha_emision,
-        COUNT(*) OVER (PARTITION BY s.id_socio) as total_incumplimientos,
-        ROW_NUMBER() OVER (PARTITION BY s.id_socio ORDER BY f.fecha_emision) as nro_incumplimiento
+        COUNT(*) OVER (PARTITION BY s.id_socio) as total_incumplimientos
     FROM manejo_personas.socio s
     INNER JOIN manejo_personas.persona p ON s.id_persona = p.id_persona
     INNER JOIN pagos_y_facturas.factura f ON p.id_persona = f.id_persona
@@ -34,29 +33,15 @@ MorososRecurrentes AS (
     WHERE total_incumplimientos > 2
 )
 
--- ENCABEZADO DEL REPORTE
 SELECT 
-    'Morosos Recurrentes' as 'Nombre del Reporte',
-    CONCAT(FORMAT(@fecha_inicio, 'dd/MM/yyyy'), ' - ', FORMAT(@fecha_fin, 'dd/MM/yyyy')) as 'Período',
-    '' as 'Nro de Socio',
-    '' as 'Nombre y Apellido',
-    '' as 'Mes Incumplido',
-    '' as 'Ranking Morosidad'
-
-UNION ALL
-
--- DATOS DEL REPORTE
-SELECT 
-    '' as 'Nombre del Reporte',
-    '' as 'Período',
-    CAST(id_socio AS VARCHAR(10)) as 'Nro de Socio',
-    CONCAT(nombre, ' ', apellido) as 'Nombre y Apellido',
-    mes_incumplido as 'Mes Incumplido',
-    CAST(ranking_morosidad AS VARCHAR(10)) as 'Ranking Morosidad'
+    'Morosos Recurrentes' as nombre_reporte,
+    CONCAT(FORMAT(@fecha_inicio, 'dd/MM/yyyy'), ' - ', FORMAT(@fecha_fin, 'dd/MM/yyyy')) as periodo,
+    id_socio as nro_socio,
+    CONCAT(nombre, ' ', apellido) as nombre_apellido,
+    mes_incumplido,
+    ranking_morosidad
 FROM MorososRecurrentes
-ORDER BY 
-    CASE WHEN 'Nombre del Reporte' = 'Morosos Recurrentes' THEN 0 ELSE 1 END,
-    CAST(CASE WHEN 'Ranking Morosidad' = '' THEN '999' ELSE 'Ranking Morosidad' END AS INT);
+ORDER BY ranking_morosidad;
 --Reporte 2
 
 WITH IngresosMensuales AS (
