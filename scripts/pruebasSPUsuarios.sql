@@ -46,7 +46,7 @@ EXEC manejo_personas.CrearUsuario
 	@id_persona = 1,
 	@username = 'usuario1',
 	@password_hash = 'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3',
-	@fecha_alta_contraseña = '2024-01-15';
+	@fecha_alta_contra = '2024-01-15';
 EXEC manejo_personas.CrearUsuario 
 	@id_persona = 2,
 	@username = 'usuario2',
@@ -122,13 +122,13 @@ EXEC manejo_personas.ModificarUsuario
 
 EXEC manejo_personas.ModificarUsuario 
 	@id_usuario = 1,
-	@fecha_alta_contraseña = '2024-02-15';
+	@fecha_alta_contra = '2024-02-15';
 
 EXEC manejo_personas.ModificarUsuario 
 	@id_usuario = 2,
 	@username = 'usuario_completo',
 	@password_hash = 'b775a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3b775a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3b775a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3b775a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3',
-	@fecha_alta_contraseña = '2024-03-10';
+	@fecha_alta_contra = '2024-03-10';
 -- Resultado: Usuario modificado correctamente
 
 -- ID usuario nulo
