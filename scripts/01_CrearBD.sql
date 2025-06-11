@@ -36,19 +36,34 @@
 	la sección de prácticas de MIEL. Solo uno de los miembros del grupo debe hacer la entrega.
 */
 -- Crear la base de datos
-CREATE DATABASE Com5600G01;
+-- Crear base de datos
+IF DB_ID('Com5600G01') IS NULL
+    CREATE DATABASE Com5600G01;
 GO
 
--- Seleccionar la base de datos
+-- Usar la base
 USE Com5600G01;
 GO
 
--- Crear esquemas (cada uno en su propio lote)
-CREATE SCHEMA manejo_personas; -- Relativo a personas físicas
+-- Crear esquema: manejo_personas
+IF NOT EXISTS (
+    SELECT * FROM sys.schemas WHERE name = 'manejo_personas'
+)
+    EXEC('CREATE SCHEMA manejo_personas');
 GO
 
-CREATE SCHEMA manejo_actividades; -- Relativo a actividades del club
+-- Crear esquema: manejo_actividades
+IF NOT EXISTS (
+    SELECT * FROM sys.schemas WHERE name = 'manejo_actividades'
+)
+    EXEC('CREATE SCHEMA manejo_actividades');
 GO
 
-CREATE SCHEMA pagos_y_facturas; -- Relativo a pagos y facturación
+-- Crear esquema: pagos_y_facturas
+IF NOT EXISTS (
+    SELECT * FROM sys.schemas WHERE name = 'pagos_y_facturas'
+)
+    EXEC('CREATE SCHEMA pagos_y_facturas');
 GO
+
+

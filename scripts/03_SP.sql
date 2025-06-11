@@ -14,17 +14,17 @@
 	las configuraciones aplicadas (ubicación de archivos, memoria asignada, seguridad, puertos,
 	etc.) en un documento como el que le entregaría al DBA.
 	Cree la base de datos, entidades y relaciones. Incluya restricciones y claves. Deberá entregar
-	un archivo .sql con el script completo de creación (debe funcionar si se lo ejecuta “tal cual” es
+	un archivo .sql con el script completo de creación (debe funcionar si se lo ejecuta "tal cual" es
 	entregado en una sola ejecución). Incluya comentarios para indicar qué hace cada módulo
 	de código.
 	Genere store procedures para manejar la inserción, modificado, borrado (si corresponde,
 	también debe decidir si determinadas entidades solo admitirán borrado lógico) de cada tabla.
-	Los nombres de los store procedures NO deben comenzar con “SP”.
+	Los nombres de los store procedures NO deben comenzar con "SP".
 	Algunas operaciones implicarán store procedures que involucran varias tablas, uso de
 	transacciones, etc. Puede que incluso realicen ciertas operaciones mediante varios SPs.
 	Asegúrense de que los comentarios que acompañen al código lo expliquen.
 	Genere esquemas para organizar de forma lógica los componentes del sistema y aplique esto
-	en la creación de objetos. NO use el esquema “dbo”.
+	en la creación de objetos. NO use el esquema "dbo".
 	Todos los SP creados deben estar acompañados de juegos de prueba. Se espera que
 	realicen validaciones básicas en los SP (p/e cantidad mayor a cero, CUIT válido, etc.) y que
 	en los juegos de prueba demuestren la correcta aplicación de las validaciones.
@@ -37,6 +37,7 @@
 */
 
 USE Com5600G01;
+GO
 
 /*
 * Nombre: CrearPersona
@@ -112,7 +113,6 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-
 /*
 * Nombre: ModificarPersona
 * Descripcion: Permite modificar de una persona los campos: nombre, apellido, email y telefono.
@@ -130,6 +130,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarPersona
 	@id_persona INT,
 	@nombre NVARCHAR(50) = NULL,
@@ -190,7 +192,6 @@ BEGIN
 	END CATCH
 
 END; 
-
 /*
 * Nombre: EliminarPersona
 * Descripcion: Realiza una eliminacion logica de una persona.
@@ -202,6 +203,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_personas.EliminarPersona
 	@id_persona INT
 AS
@@ -235,7 +238,6 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-
 /*
 * Nombre: CreacionObraSocial
 * Descripcion: Realiza una eliminacion logica de una persona.
@@ -248,6 +250,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_personas.CreacionObraSocial
 	@nombre VARCHAR(50)
 AS
@@ -289,7 +293,6 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-
 /*
 * Nombre: ModificacionObraSocial
 * Descripcion: Permite modificar el nombre de una obra social.
@@ -304,6 +307,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_personas.ModificacionObraSocial
 	@id INT,
 	@nombre_nuevo VARCHAR(50)
@@ -362,7 +367,6 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-
 /*
 * Nombre: ModificacionObraSocial
 * Descripcion: Elimina una obra social. (Eliminacion fisica)
@@ -374,6 +378,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_personas.EliminacionObraSocial
 	@id INT
 AS BEGIN
@@ -413,7 +419,6 @@ AS BEGIN
 		RETURN -99;
 	END CATCH
 END;
-
 /*
 * Nombre: CreacionMetodoPago
 * Descripcion: Crea un metodo de pago. 
@@ -426,6 +431,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE pagos_y_facturas.CreacionMetodoPago
 	@nombre VARCHAR(50)
 AS
@@ -468,7 +475,6 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-
 /*
 * Nombre: ModificacionMetodoPago
 * Descripcion: Modifica el nombre de un metodo de pago.
@@ -481,6 +487,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificacionMetodoPago
 	@id INT,
 	@nombre_nuevo VARCHAR(50)
@@ -552,6 +560,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminacionMetodoPago
 	@id INT
 AS
@@ -592,7 +602,6 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-
 /*
 * Nombre: EliminacionMetodoPago
 * Descripcion: Realiza una eliminacion fisica de metodo pago
@@ -605,6 +614,8 @@ END;
 * Observacion: Revisar la restriccion referencial. 
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminacionMetodoPago
 	@id INT
 AS
@@ -645,7 +656,6 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-
 /*
 * Nombre: CreacionRol
 * Descripcion: Crea un rol. 
@@ -657,6 +667,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_personas.CreacionRol
 	@nombre VARCHAR(50)
 AS
@@ -712,6 +724,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_personas.ModificacionRol
 	@id INT,
 	@nombre_nuevo VARCHAR(50)
@@ -770,7 +784,6 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-
 /*
 * Nombre: EliminacionRol
 * Descripcion: Elimina un rol. 
@@ -782,6 +795,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_personas.EliminacionRol
 	@id INT
 AS
@@ -822,7 +837,6 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-
 /*
 * Nombre: CrearCategoria
 * Descripcion: Crea una nueva categoria, valida la informacion ingresada.
@@ -838,6 +852,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_actividades.CrearCategoria
 	@nombre_categoria VARCHAR(50),
 	@costo_membrecia DECIMAL(10, 2),
@@ -930,7 +946,6 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-
 /*
 * Nombre: ModificarCategoria
 * Descripcion: Modifica los campos nombre y costo de una categoria. 
@@ -946,6 +961,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_actividades.ModificarCategoria
 	@id_categoria INT,
 	@nombre_categoria VARCHAR(50) = NULL,
@@ -1009,7 +1026,6 @@ BEGIN
 	END CATCH
 
 END;
-
 /*
 * Nombre: CrearClase
 * Descripcion: Modifica los campos nombre y costo de una categoria. 
@@ -1032,6 +1048,8 @@ END;
 *	-99: Error desconocido.
 */
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_actividades.CrearClase
 	@id_actividad INT,
 	@id_categoria INT,
@@ -1127,6 +1145,8 @@ BEGIN
 END;
 
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_actividades.ModificarClase
     @id_clase INT,
     @id_actividad INT = NULL,
@@ -1253,8 +1273,9 @@ BEGIN
     END CATCH
 
 END;
-
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_actividades.EliminarClase
     @id_clase INT
 AS
@@ -1306,9 +1327,9 @@ BEGIN
         RETURN -99;
     END CATCH
 END;
-
-
 GO
+
+
 CREATE OR ALTER PROCEDURE pagos_y_facturas.CrearDescuento
 	@descripcion VARCHAR(50),
 	@cantidad DECIMAL(4,3)
@@ -1364,8 +1385,9 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
-
 GO
+
+
 CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificarDescuento
 	@id INT,
 	@descripcion VARCHAR(50),
@@ -1442,8 +1464,9 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
-
 GO
+
+
 CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminarDescuento
 	@id INT
 AS
@@ -1490,8 +1513,9 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
-
 GO
+
+
 CREATE OR ALTER PROCEDURE pagos_y_facturas.CreacionFactura
     @estado_pago VARCHAR(10),
     @monto_a_pagar DECIMAL(10,2),
@@ -1550,8 +1574,9 @@ BEGIN
         RETURN -99;
     END CATCH
 END;
-
 GO
+
+
 -- Modificacion de facturas
 CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificacionFactura
     @id_factura INT,
@@ -1613,8 +1638,9 @@ BEGIN
         RETURN -99;
     END CATCH
 END;
-
 GO
+
+
 CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminacionFactura
     @id_factura INT
 AS
@@ -1645,9 +1671,9 @@ BEGIN
         RETURN -99;
     END CATCH
 END;
-
-
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_actividades.CrearActividad
 	@nombre_actividad VARCHAR(100),
 	@costo_mensual DECIMAL(10,2)
@@ -1784,8 +1810,9 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
-
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_actividades.EliminarActividad
 	@id INT
 AS
@@ -1832,8 +1859,9 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
-
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_personas.CrearUsuario
     @id_persona INT,
     @username VARCHAR(50),
@@ -1906,8 +1934,7 @@ BEGIN
             SET @fecha_alta_contra = GETDATE();
         
         -- Insertar el nuevo usuario
-        INSERT INTO manejo_personas.usuario (id_persona, username, password_hash, fecha_alta_contra
-)
+        INSERT INTO manejo_personas.usuario (id_persona, username, password_hash, fecha_alta_contra)
         VALUES (@id_persona, @username, @password_hash, @fecha_alta_contra);
         
         COMMIT TRANSACTION;
@@ -1927,9 +1954,9 @@ BEGIN
         RETURN -999;
     END CATCH
 END
-
-
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarUsuario
     @id_usuario INT,
     @username VARCHAR(50) = NULL,
@@ -1990,8 +2017,9 @@ BEGIN
         RETURN -999;
     END CATCH
 END;
-
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_personas.EliminarUsuario
     @id_usuario INT
 AS
