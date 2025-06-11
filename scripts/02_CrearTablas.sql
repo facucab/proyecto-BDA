@@ -8,6 +8,7 @@
 	44363498 | Caballero, Facundo 
 	40993965 | Cornara Perez, Tomás Andrés
 
+	CONSIGNA:
 		Luego de decidirse por un motor de base de datos relacional, llegó el momento de generar la
 	base de datos. En esta oportunidad utilizarán SQL Server.
 	Deberá instalar el DMBS y documentar el proceso. No incluya capturas de pantalla. Detalle
@@ -203,7 +204,7 @@ CREATE TABLE pagos_y_facturas.factura (
 	monto_a_pagar DECIMAL(10, 2) NOT NULL,
 	id_persona INT NOT NULL,
 	id_metodo_pago INT NOT NULL,
-	
+	detalle VARCHAR(255),
 	CONSTRAINT FK_Factura_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
 	CONSTRAINT FK_Factura_Metodo_Pago FOREIGN KEY (id_metodo_pago) REFERENCES pagos_y_facturas.metodo_pago(id_metodo_pago)
 );
