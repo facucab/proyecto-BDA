@@ -14,17 +14,17 @@
 	las configuraciones aplicadas (ubicación de archivos, memoria asignada, seguridad, puertos,
 	etc.) en un documento como el que le entregaría al DBA.
 	Cree la base de datos, entidades y relaciones. Incluya restricciones y claves. Deberá entregar
-	un archivo .sql con el script completo de creación (debe funcionar si se lo ejecuta "tal cual" es
+	un archivo .sql con el script completo de creación (debe funcionar si se lo ejecuta “tal cual” es
 	entregado en una sola ejecución). Incluya comentarios para indicar qué hace cada módulo
 	de código.
 	Genere store procedures para manejar la inserción, modificado, borrado (si corresponde,
 	también debe decidir si determinadas entidades solo admitirán borrado lógico) de cada tabla.
-	Los nombres de los store procedures NO deben comenzar con "SP".
+	Los nombres de los store procedures NO deben comenzar con “SP”.
 	Algunas operaciones implicarán store procedures que involucran varias tablas, uso de
 	transacciones, etc. Puede que incluso realicen ciertas operaciones mediante varios SPs.
 	Asegúrense de que los comentarios que acompañen al código lo expliquen.
 	Genere esquemas para organizar de forma lógica los componentes del sistema y aplique esto
-	en la creación de objetos. NO use el esquema "dbo".
+	en la creación de objetos. NO use el esquema “dbo”.
 	Todos los SP creados deben estar acompañados de juegos de prueba. Se espera que
 	realicen validaciones básicas en los SP (p/e cantidad mayor a cero, CUIT válido, etc.) y que
 	en los juegos de prueba demuestren la correcta aplicación de las validaciones.
@@ -1935,6 +1935,7 @@ BEGIN
         
         -- Insertar el nuevo usuario
         INSERT INTO manejo_personas.usuario (id_persona, username, password_hash, fecha_alta_contra)
+)
         VALUES (@id_persona, @username, @password_hash, @fecha_alta_contra);
         
         COMMIT TRANSACTION;
