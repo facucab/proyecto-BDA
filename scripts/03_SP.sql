@@ -56,7 +56,6 @@ GO
 *	-3: Fecha de nacimienta invalida.
 *	-99: Error desconocido.
 */
-GO
 CREATE or ALTER PROCEDURE manejo_personas.CrearPersona
 	@dni VARCHAR(8),
 	@nombre NVARCHAR(50),
@@ -1935,7 +1934,6 @@ BEGIN
         
         -- Insertar el nuevo usuario
         INSERT INTO manejo_personas.usuario (id_persona, username, password_hash, fecha_alta_contra)
-)
         VALUES (@id_persona, @username, @password_hash, @fecha_alta_contra);
         
         COMMIT TRANSACTION;
@@ -2577,6 +2575,7 @@ GO
 -- crear socio
 CREATE OR ALTER PROCEDURE manejo_personas.CrearSocio
     @id_persona INT,
+	@nro_socio VARCHAR(7),
     @telefono_emergencia VARCHAR(15),
     @obra_nro_socio VARCHAR(20) = NULL,
     @id_obra_social INT = NULL,
@@ -2658,10 +2657,32 @@ BEGIN
             SELECT 'Error' AS Resultado, 'La categoría Mayor es solo para personas a partir de 18 años' AS Mensaje;
             RETURN -8;
         END
+
+		-- validaciones nro_socio
+        IF @nro_socio IS NULL OR LTRIM(RTRIM(@nro_socio)) = ''
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El número de socio no puede ser nulo o vacío' AS Mensaje;
+            RETURN -9;
+        END
+
+        IF @nro_socio NOT LIKE 'SN-[0-9][0-9][0-9][0-9]'
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El número de socio debe tener el formato SN-####' AS Mensaje;
+            RETURN -10;
+        END
+
+        IF EXISTS (SELECT 1 FROM manejo_personas.socio WHERE numero_socio = @nro_socio)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El número de socio ya está en uso' AS Mensaje;
+            RETURN -11;
+        END
         
         -- insertamos el nuevo socio
-        INSERT INTO manejo_personas.socio ( id_persona, telefono_emergencia, obra_nro_socio, id_obra_social, id_categoria, id_grupo)
-        VALUES ( @id_persona, @telefono_emergencia, @obra_nro_socio, @id_obra_social, @id_categoria, @id_grupo);
+        INSERT INTO manejo_personas.socio ( id_persona, numero_socio, telefono_emergencia, obra_nro_socio, id_obra_social, id_categoria, id_grupo)
+        VALUES ( @id_persona,@nro_socio, @telefono_emergencia, @obra_nro_socio, @id_obra_social, @id_categoria, @id_grupo);
 
         
         COMMIT TRANSACTION;
@@ -2676,8 +2697,8 @@ BEGIN
     END CATCH
 
 END;
-
 GO
+
 -- modificar socio
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarSocio
     @id_socio INT,

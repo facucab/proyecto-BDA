@@ -82,6 +82,7 @@ GO
 CREATE TABLE manejo_personas.socio (
 	--Atributos propios
     id_socio INT IDENTITY(1,1) PRIMARY KEY,
+	numero_socio VARCHAR(7), 
     id_persona INT NOT NULL UNIQUE, -- Enlace con su identidad padre
     telefono_emergencia VARCHAR(15) NOT NULL,
     obra_nro_socio VARCHAR(20) NULL,

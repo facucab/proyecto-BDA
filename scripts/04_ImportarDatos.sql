@@ -1,7 +1,7 @@
 USE Com5600G01;
 GO
 
--- Habilitar Ad Hoc Distributed Queries (necesario para OPENROWSET)
+-- CONFIGURACIONES NECESARIAS PARA PODER LA IMPORTACION
 EXEC sp_configure 'Show Advanced Options', 1
 GO
 RECONFIGURE
@@ -22,381 +22,345 @@ GO
 RECONFIGURE
 GO
 
-EXEC ImportarPagos 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
-EXEC ImportarTodosLosDatos
+-- NOTA: Aca faltaria el SP de traer la hoja de tarifas, pero necesito estos exec para probar el otro que estoy haciendo
+EXEC manejo_actividades.CrearCategoria 
+    @nombre_categoria = 'Menor', 
+    @costo_membrecia = 10000.00, 
+    @edad_maxima = 12;
 
-SELECT * from manejo_actividades.actividad
+EXEC manejo_actividades.CrearCategoria 
+    @nombre_categoria = 'Cadete', 
+    @costo_membrecia = 15000.00, 
+    @edad_maxima = 17;
+
+EXEC manejo_actividades.CrearCategoria 
+    @nombre_categoria = 'Mayor', 
+    @costo_membrecia = 25000.00, 
+    @edad_maxima = 50;
 
 
--- Procedimiento para importar responsables de pago (primera hoja)
+EXEC ImportarResponsablesPago 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
+select * from manejo_personas.socio
+select * from manejo_personas.persona
+
+
+
+-- Version actual insertando directamente
 CREATE OR ALTER PROCEDURE ImportarResponsablesPago
     @RutaArchivo NVARCHAR(260)
 AS
 BEGIN
     SET NOCOUNT ON;
-    BEGIN TRY
-        BEGIN TRANSACTION;
-        
-        -- Crea un SQL dinamico
-        DECLARE @SQL NVARCHAR(MAX);
-        SET @SQL = 'SELECT 
-            [Nro de Socio],
-            TRIM([Nombre]),
-            TRIM([apellido]),
-            [DNI],
-            TRIM([email personal]),
-            CONVERT(DATE, [fecha de nacimiento], 103),
-            [teléfono de contacto],
-            [teléfono de contacto emergencia],
-            TRIM([Nombre de la obra social o prepaga]),
-            [nro. de socio obra social/prepaga],
-            [teléfono de contacto de emergencia]
-        FROM OPENROWSET(
-            ''Microsoft.ACE.OLEDB.12.0'',
-            ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
-            ''SELECT * FROM [Responsables de Pago$]'')';
 
-        -- Crear tabla temporal para almacenar los datos del Excel
+    BEGIN TRY
+        -- DECLARATIVAS
+        DECLARE @SQL NVARCHAR(MAX);
+        DECLARE @id_persona INT;
+        DECLARE @id_socio INT;
+
+        -- Tabla temporal de datos
         CREATE TABLE #TempDatos (
-            NroSocio VARCHAR(20),
-            Nombre NVARCHAR(50),
-            Apellido NVARCHAR(50),
-            DNI VARCHAR(8),
-            Email VARCHAR(320),
-            FechaNacimiento DATE,
-            TelefonoContacto VARCHAR(15),
-            TelefonoEmergencia VARCHAR(15),
-            ObraSocial VARCHAR(50),
-            NroSocioObra VARCHAR(50),
-            TelefonoObra VARCHAR(15)
+            [Nro de Socio] VARCHAR(20),
+            [Nombre] NVARCHAR(50),
+            [ apellido] NVARCHAR(50),
+            [ DNI] VARCHAR(20),
+            [ email personal] VARCHAR(320),
+            [ fecha de nacimiento] DATE,
+            [ teléfono de contacto] VARCHAR(30),
+            [ teléfono de contacto emergencia] VARCHAR(30),
+            [ Nombre de la obra social o prepaga] NVARCHAR(100),
+            [nro# de socio obra social/prepaga ] VARCHAR(50),
+            [telefono obra social] VARCHAR(30)
         );
 
-        -- Importar datos del Excel a la tabla temporal
-        INSERT INTO #TempDatos
+        -- Tabla temporal de errores
+        CREATE TABLE #ErroresImportacion (
+            DNI VARCHAR(20),
+            NroSocio VARCHAR(20),
+            MensajeError NVARCHAR(MAX)
+        );
+
+        -- Leer datos desde Excel
+        SET @SQL = N'
+            INSERT INTO #TempDatos (
+                [Nro de Socio], [Nombre], [ apellido], [ DNI], [ email personal],
+                [ fecha de nacimiento], [ teléfono de contacto], [ teléfono de contacto emergencia],
+                [ Nombre de la obra social o prepaga], [nro# de socio obra social/prepaga ], [telefono obra social]
+            )
+            SELECT *
+            FROM OPENROWSET(
+                ''Microsoft.ACE.OLEDB.12.0'',
+                ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
+                ''SELECT * FROM [Responsables de Pago$]'')';
         EXEC sp_executesql @SQL;
 
-        -- Procesar cada registro
+        -- Variables para cursor
         DECLARE @dni VARCHAR(8), @nombre NVARCHAR(50), @apellido NVARCHAR(50),
                 @email VARCHAR(320), @fechaNac DATE, @telefono VARCHAR(15),
-                @obraSocial VARCHAR(50), @nroSocioObra VARCHAR(50);
+                @telefonoEmergencia VARCHAR(15), @obraSocial VARCHAR(100),
+                @nroSocioObra VARCHAR(50), @nroSocio VARCHAR(20);
 
         DECLARE cur CURSOR FOR 
-        SELECT DNI, Nombre, Apellido, Email, FechaNacimiento, TelefonoContacto,
-               ObraSocial, NroSocioObra
+        SELECT [Nro de Socio], [ DNI], [Nombre], [ apellido], [ email personal],
+               [ fecha de nacimiento], [ teléfono de contacto], [ teléfono de contacto emergencia],
+               [ Nombre de la obra social o prepaga], [nro# de socio obra social/prepaga ]
         FROM #TempDatos;
 
         OPEN cur;
-        FETCH NEXT FROM cur INTO @dni, @nombre, @apellido, @email, @fechaNac,
-                                @telefono, @obraSocial, @nroSocioObra;
+        FETCH NEXT FROM cur INTO @nroSocio, @dni, @nombre, @apellido, @email, @fechaNac,
+                                 @telefono, @telefonoEmergencia, @obraSocial, @nroSocioObra;
 
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            -- Crear la persona usando el SP existente
-            EXEC manejo_personas.CrearPersona 
-                @dni = @dni,
-                @nombre = @nombre,
-                @apellido = @apellido,
-                @email = @email,
-                @fecha_nac = @fechaNac,
-                @telefono = @telefono;
+            BEGIN TRY
+                IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE dni = @dni)
+                BEGIN
+                    EXEC manejo_personas.CrearPersona 
+                        @dni = @dni,
+                        @nombre = @nombre,
+                        @apellido = @apellido,
+                        @email = @email,
+                        @fecha_nac = @fechaNac,
+                        @telefono = @telefono;
 
-            -- Si hay obra social, crearla si no existe
-            IF @obraSocial IS NOT NULL AND LTRIM(RTRIM(@obraSocial)) <> ''
-            BEGIN
-                EXEC manejo_personas.CreacionObraSocial @nombre = @obraSocial;
-            END
+                    SELECT @id_persona = id_persona 
+                    FROM manejo_personas.persona 
+                    WHERE dni = @dni;
+                END
+                ELSE
+                BEGIN
+                    SELECT @id_persona = id_persona 
+                    FROM manejo_personas.persona 
+                    WHERE dni = @dni;
+                END
 
-            FETCH NEXT FROM cur INTO @dni, @nombre, @apellido, @email, @fechaNac,
-                                    @telefono, @obraSocial, @nroSocioObra;
+                IF NOT EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_persona = @id_persona)
+                BEGIN
+                    EXEC manejo_personas.CrearSocio
+                        @id_persona = @id_persona,
+                        @nro_socio = @nroSocio,
+                        @telefono_emergencia = @telefonoEmergencia,
+                        @id_categoria = 3;
+                END
+
+                -- Obra social
+                IF @obraSocial IS NOT NULL AND TRIM(@obraSocial) <> ''
+                BEGIN
+                    DECLARE @id_obra_social INT;
+                    EXEC manejo_personas.CreacionObraSocial @nombre = @obraSocial;
+
+                    SELECT @id_obra_social = id_obra_social 
+                    FROM manejo_personas.obra_social 
+                    WHERE descripcion = @obraSocial;
+
+                    IF @id_obra_social IS NOT NULL
+                    BEGIN
+                        UPDATE manejo_personas.socio
+                        SET id_obra_social = @id_obra_social,
+                            obra_nro_socio = @nroSocioObra
+                        WHERE id_persona = @id_persona;
+                    END
+                END
+            END TRY
+            BEGIN CATCH
+                INSERT INTO #ErroresImportacion (DNI, NroSocio, MensajeError)
+                VALUES (@dni, @nroSocio, ERROR_MESSAGE());
+            END CATCH
+
+            FETCH NEXT FROM cur INTO @nroSocio, @dni, @nombre, @apellido, @email, @fechaNac,
+                                         @telefono, @telefonoEmergencia, @obraSocial, @nroSocioObra;
         END
 
         CLOSE cur;
         DEALLOCATE cur;
-
-        -- Limpiar
         DROP TABLE #TempDatos;
 
-        COMMIT TRANSACTION;
-        SELECT 'Éxito' AS Resultado, 'Datos importados correctamente' AS Mensaje;
+        IF EXISTS (SELECT 1 FROM #ErroresImportacion)
+        BEGIN
+            SELECT 'Parcial' AS Resultado, 'Algunos registros no se pudieron importar' AS Mensaje;
+            SELECT * FROM #ErroresImportacion;
+        END
+        ELSE
+        BEGIN
+            SELECT 'Exito' AS Resultado, 'Datos importados correctamente' AS Mensaje;
+        END
+
+        DROP TABLE #ErroresImportacion;
         RETURN 0;
+
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-        
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        IF CURSOR_STATUS('local', 'cur') >= 0
+        BEGIN
+            CLOSE cur;
+            DEALLOCATE cur;
+        END
+
+        IF OBJECT_ID('tempdb..#ErroresImportacion') IS NOT NULL
+        BEGIN
+            SELECT 'Error parcial' AS Resultado, 'Se detectaron errores durante la importación.' AS Mensaje;
+            SELECT * FROM #ErroresImportacion;
+            DROP TABLE #ErroresImportacion;
+        END
+
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
+            DROP TABLE #TempDatos;
+
+        SELECT 'Error' AS Resultado, 
+               ERROR_MESSAGE() AS Mensaje,
+               ERROR_LINE() AS Linea,
+               ERROR_PROCEDURE() AS Procedimiento;
         RETURN -1;
     END CATCH
-END;
+END
 GO
 
--- Procedimiento para importar grupo familiar (segunda hoja)
-CREATE OR ALTER PROCEDURE ImportarGrupoFamiliar
+
+-- VERSION VIEJA CON SPS (No anda)
+CREATE OR ALTER PROCEDURE ImportarResponsablesPago
     @RutaArchivo NVARCHAR(260)
 AS
 BEGIN
     SET NOCOUNT ON;
-    BEGIN TRY
-        BEGIN TRANSACTION;
 
-        DECLARE @SQL NVARCHAR(MAX);
-        SET @SQL = 'SELECT 
-            [Nro de Socio],
-            [Nro de socio RP],
-            TRIM([Nombre]),
-            TRIM([apellido]),
-            [DNI],
-            NULLIF(TRIM([email personal]), ''''),
-            CONVERT(DATE, [fecha de nacimiento], 103),
-            NULLIF([teléfono de contacto], ''''),
-            NULLIF([teléfono de contacto emergencia], ''''),
-            NULLIF(TRIM([Nombre de la obra social o prepaga]), ''''),
-            NULLIF([nro. de socio obra social/prepaga], ''''),
-            NULLIF([teléfono de contacto de emergencia], '''')
-        FROM OPENROWSET(
-            ''Microsoft.ACE.OLEDB.12.0'',
-            ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
-            ''SELECT * FROM [Grupo Familiar$]'')';
+    BEGIN TRANSACTION;
+        -- BLOQUE DECLARATIVO
+        DECLARE @SQL NVARCHAR(MAX); -- Aca se almacena el SQL dinamico
+        DECLARE @id_persona INT; -- Para almacenar el ID de la persona creada
+        DECLARE @id_socio INT; -- Para almacenar el ID del socio creado
 
         -- Crear tabla temporal para almacenar los datos del Excel
         CREATE TABLE #TempDatos (
-            NroSocio VARCHAR(20),
-            NroSocioRP VARCHAR(20),
-            Nombre NVARCHAR(50),
-            Apellido NVARCHAR(50),
-            DNI VARCHAR(8),
-            Email VARCHAR(320),
-            FechaNacimiento DATE,
-            TelefonoContacto VARCHAR(15),
-            TelefonoEmergencia VARCHAR(15),
-            ObraSocial VARCHAR(50),
-            NroSocioObra VARCHAR(50),
-            TelefonoObra VARCHAR(15)
+            [Nro de Socio] VARCHAR(20),
+            [Nombre] NVARCHAR(50),
+            [ apellido] NVARCHAR(50),
+            [ DNI] VARCHAR(20),
+            [ email personal] VARCHAR(320),
+            [ fecha de nacimiento] DATE,
+            [ teléfono de contacto] VARCHAR(30),
+            [ teléfono de contacto emergencia] VARCHAR(30),
+            [ Nombre de la obra social o prepaga] NVARCHAR(100),
+            [nro# de socio obra social/prepaga ] VARCHAR(50),
+            [telefono obra social] VARCHAR(30)
         );
 
-        -- Importar datos del Excel a la tabla temporal
-        INSERT INTO #TempDatos
+        -- BLOQUE PROCESO
+        -- SQL dinamico para leer el archivo Excel
+        SET @SQL = N'INSERT INTO #TempDatos (
+                        [Nro de Socio], [Nombre], [ apellido], [ DNI], [ email personal],
+                        [ fecha de nacimiento], [ teléfono de contacto], [ teléfono de contacto emergencia],
+                        [ Nombre de la obra social o prepaga], [nro# de socio obra social/prepaga ], [telefono obra social]
+                    )
+                    SELECT *
+                    FROM OPENROWSET(
+                        ''Microsoft.ACE.OLEDB.12.0'',
+                        ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
+                        ''SELECT * FROM [Responsables de Pago$]'')';
+
+        -- Carga la tabla temporal con los registros que vienen del EXCEL
         EXEC sp_executesql @SQL;
 
-        -- Procesar cada registro
-        DECLARE @dni VARCHAR(8), @nombre NVARCHAR(50), @apellido NVARCHAR(50),
-                @email VARCHAR(320), @fechaNac DATE, @telefono VARCHAR(15),
-                @obraSocial VARCHAR(50);
+        -- Crea variables para procesar registros
+        DECLARE @dni VARCHAR(8), 
+                @nombre NVARCHAR(50), 
+                @apellido NVARCHAR(50),
+                @email VARCHAR(320), 
+                @fechaNac DATE, 
+                @telefono VARCHAR(15),
+                @telefonoEmergencia VARCHAR(15),
+                @obraSocial VARCHAR(50), 
+                @nroSocioObra VARCHAR(50),
+                @nroSocio VARCHAR(20);
 
+        -- Declaracion cursor
         DECLARE cur CURSOR FOR 
-        SELECT DNI, Nombre, Apellido, Email, FechaNacimiento, TelefonoContacto, ObraSocial
+        SELECT [Nro de Socio],
+               [ DNI], 
+               [Nombre], 
+               [ apellido], 
+               [ email personal], 
+               [ fecha de nacimiento], 
+               [ teléfono de contacto],
+               [ teléfono de contacto emergencia],
+               [ Nombre de la obra social o prepaga], 
+               [nro# de socio obra social/prepaga ]
         FROM #TempDatos;
 
+        -- Abre el cursor y lo usa para cargar las variables
         OPEN cur;
-        FETCH NEXT FROM cur INTO @dni, @nombre, @apellido, @email, @fechaNac, @telefono, @obraSocial;
+        FETCH NEXT FROM cur INTO @nroSocio, @dni, @nombre, @apellido, @email, @fechaNac,
+                                 @telefono, @telefonoEmergencia, @obraSocial, @nroSocioObra;
 
+        -- Mientras haya algo, sigue procesando.
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            DECLARE @emailTemp VARCHAR(320);
-            DECLARE @telefonoTemp VARCHAR(15);
-            
-            SET @emailTemp = ISNULL(@email, @dni + '_temp@club.com');
-            SET @telefonoTemp = ISNULL(@telefono, '');
-
-            -- Crear la persona usando el SP existente
-            EXEC manejo_personas.CrearPersona 
-                @dni = @dni,
-                @nombre = @nombre,
-                @apellido = @apellido,
-                @email = @emailTemp,
-                @fecha_nac = @fechaNac,
-                @telefono = @telefonoTemp;
-
-            -- Si hay obra social, crearla si no existe
-            IF @obraSocial IS NOT NULL
+            -- Validar que el DNI no exista ya
+            IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE dni = TRIM(@dni))
             BEGIN
-                EXEC manejo_personas.CreacionObraSocial @nombre = @obraSocial;
+                -- Insertar directamente en la tabla persona
+                INSERT INTO manejo_personas.persona (
+                    dni, nombre, apellido, email, fecha_nac, telefono, fecha_alta, activo
+                )
+                VALUES (
+                    TRIM(@dni), TRIM(@nombre), TRIM(@apellido), TRIM(@email), @fechaNac, TRIM(@telefono), GETDATE(), 1
+                );
+
+                -- Obtener el ID de la persona recién creada
+                SELECT @id_persona = id_persona 
+                FROM manejo_personas.persona 
+                WHERE dni = TRIM(@dni);
+
+                -- Insertar directamente en la tabla socio
+                INSERT INTO manejo_personas.socio (
+                    numero_socio, id_persona, telefono_emergencia, id_categoria
+                )
+                VALUES (
+                    TRIM(@nroSocio), @id_persona, TRIM(@telefonoEmergencia), 3
+                );
+
+                -- Si hay obra social, crearla si no existe y asociarla al socio
+                IF @obraSocial IS NOT NULL AND TRIM(@obraSocial) <> ''
+                BEGIN
+                    DECLARE @id_obra_social INT;
+                    
+                    -- Verificar si la obra social ya existe
+                    SELECT @id_obra_social = id_obra_social 
+                    FROM manejo_personas.obra_social 
+                    WHERE descripcion = TRIM(@obraSocial);
+
+                    -- Si no existe, crearla
+                    IF @id_obra_social IS NULL
+                    BEGIN
+                        INSERT INTO manejo_personas.obra_social (descripcion)
+                        VALUES (TRIM(@obraSocial));
+
+                        SELECT @id_obra_social = id_obra_social 
+                        FROM manejo_personas.obra_social 
+                        WHERE descripcion = TRIM(@obraSocial);
+                    END
+                    
+                    -- Asociar la obra social al socio
+                    IF @id_obra_social IS NOT NULL
+                    BEGIN
+                        UPDATE manejo_personas.socio
+                        SET id_obra_social = @id_obra_social,
+                            obra_nro_socio = TRIM(@nroSocioObra)
+                        WHERE id_persona = @id_persona;
+                    END
+                END
             END
 
-            FETCH NEXT FROM cur INTO @dni, @nombre, @apellido, @email, @fechaNac, @telefono, @obraSocial;
+            FETCH NEXT FROM cur INTO @nroSocio, @dni, @nombre, @apellido, @email, @fechaNac,
+                                     @telefono, @telefonoEmergencia, @obraSocial, @nroSocioObra;
         END
 
+        -- BLOQUE DEVOLUCIONES Y LIMPIEZA
         CLOSE cur;
         DEALLOCATE cur;
 
-        -- Limpiar
         DROP TABLE #TempDatos;
 
         COMMIT TRANSACTION;
-        SELECT 'Éxito' AS Resultado, 'Datos del grupo familiar importados correctamente' AS Mensaje;
-        RETURN 0;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-        
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
-        RETURN -1;
-    END CATCH
-END;
-GO
-
--- Procedimiento para importar pagos (tercera hoja)
-CREATE OR ALTER PROCEDURE ImportarPagos
-    @RutaArchivo NVARCHAR(260)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        DECLARE @SQL NVARCHAR(MAX);
-        
-        -- Primero insertamos los métodos de pago si no existen
-        SET @SQL = 'INSERT INTO pagos_y_facturas.metodo_pago (nombre)
-        SELECT DISTINCT TRIM(datos.[Medio de pago])
-        FROM OPENROWSET(
-            ''Microsoft.ACE.OLEDB.12.0'',
-            ''Excel 12.0;HDR=YES;Database=' + @RutaArchivo + ''',
-            ''SELECT * FROM [pago cuotas$]'') AS datos
-        WHERE NOT EXISTS (
-            SELECT 1 FROM pagos_y_facturas.metodo_pago mp 
-            WHERE mp.nombre = TRIM(datos.[Medio de pago])
-        )';
-
-        EXEC sp_executesql @SQL;
-
-        -- Luego insertamos las facturas
-        SET @SQL = 'INSERT INTO pagos_y_facturas.factura (
-            estado_pago,
-            fecha_emision,
-            monto_a_pagar,
-            id_persona,
-            id_metodo_pago
-        )
-        SELECT 
-            ''PAGADO'',
-            CONVERT(DATE, datos.fecha, 103),
-            datos.Valor,
-            p.id_persona,
-            mp.id_metodo_pago
-        FROM OPENROWSET(
-            ''Microsoft.ACE.OLEDB.12.0'',
-            ''Excel 12.0;HDR=YES;Database=' + @RutaArchivo + ''',
-            ''SELECT * FROM [pago cuotas$]'') AS datos
-        INNER JOIN manejo_personas.socio s ON RIGHT(s.id_socio, 4) = RIGHT(datos.[Responsable de pago], 4)
-        INNER JOIN manejo_personas.persona p ON p.id_persona = s.id_persona
-        INNER JOIN pagos_y_facturas.metodo_pago mp ON mp.nombre = TRIM(datos.[Medio de pago])
-        WHERE NOT EXISTS (
-            SELECT 1 FROM pagos_y_facturas.factura f 
-            WHERE f.id_persona = p.id_persona 
-            AND f.fecha_emision = CONVERT(DATE, datos.fecha, 103)
-        )';
-
-        EXEC sp_executesql @SQL;
-
-        COMMIT TRANSACTION;
-        SELECT 'Éxito' AS Resultado, 'Datos de pagos importados correctamente' AS Mensaje;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-        
-        SELECT 
-            'Error' AS Resultado,
-            ERROR_MESSAGE() AS Mensaje,
-            ERROR_LINE() AS Linea;
-        
-        THROW;
-    END CATCH
-END;
-GO
-
--- Procedimiento para importar asistencias (quinta hoja)
-CREATE OR ALTER PROCEDURE ImportarAsistencias
-    @RutaArchivo NVARCHAR(260)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        DECLARE @SQL NVARCHAR(MAX);
-        
-        -- Primero insertamos las actividades si no existen
-        SET @SQL = 'INSERT INTO manejo_actividades.actividad (nombre_actividad, costo_mensual)
-        SELECT DISTINCT 
-            TRIM(datos.Actividad),
-            0 -- El costo mensual deberá ser actualizado posteriormente
-        FROM OPENROWSET(
-            ''Microsoft.ACE.OLEDB.12.0'',
-            ''Excel 12.0;HDR=YES;Database=' + @RutaArchivo + ''',
-            ''SELECT * FROM [presentismo_actividades$]'') AS datos
-        WHERE NOT EXISTS (
-            SELECT 1 FROM manejo_actividades.actividad a 
-            WHERE a.nombre_actividad = TRIM(datos.Actividad)
-        )';
-
-        EXEC sp_executesql @SQL;
-
-        -- Luego insertamos las relaciones socio-actividad
-        SET @SQL = 'INSERT INTO manejo_personas.socio_actividad (
-            id_socio,
-            id_actividad,
-            fecha_inicio
-        )
-        SELECT DISTINCT
-            s.id_socio,
-            a.id_actividad,
-            CONVERT(DATE, datos.[fecha de asistencia], 103)
-        FROM OPENROWSET(
-            ''Microsoft.ACE.OLEDB.12.0'',
-            ''Excel 12.0;HDR=YES;Database=' + @RutaArchivo + ''',
-            ''SELECT * FROM [presentismo_actividades$]'') AS datos
-        INNER JOIN manejo_personas.socio s ON RIGHT(s.id_socio, 4) = RIGHT(datos.[Nro de Socio], 4)
-        INNER JOIN manejo_actividades.actividad a ON a.nombre_actividad = TRIM(datos.Actividad)
-        WHERE NOT EXISTS (
-            SELECT 1 FROM manejo_personas.socio_actividad sa 
-            WHERE sa.id_socio = s.id_socio 
-            AND sa.id_actividad = a.id_actividad
-        )';
-
-        EXEC sp_executesql @SQL;
-
-        COMMIT TRANSACTION;
-        SELECT 'Éxito' AS Resultado, 'Datos de asistencias importados correctamente' AS Mensaje;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-        
-        SELECT 
-            'Error' AS Resultado,
-            ERROR_MESSAGE() AS Mensaje,
-            ERROR_LINE() AS Linea;
-        
-        THROW;
-    END CATCH
-END;
-GO
-
--- Procedimiento maestro para importar todos los datos
-CREATE OR ALTER PROCEDURE ImportarTodosLosDatos
-AS
-BEGIN
-    DECLARE @RutaArchivo NVARCHAR(260) = N'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx';
-    
-    BEGIN TRY
-        -- Importar en orden para mantener integridad referencial
-        EXEC ImportarResponsablesPago @RutaArchivo;
-        EXEC ImportarGrupoFamiliar @RutaArchivo;
-        EXEC ImportarPagos @RutaArchivo;
-        EXEC ImportarAsistencias @RutaArchivo;
-        
-        SELECT 'Éxito' AS Resultado, 'Todos los datos fueron importados correctamente' AS Mensaje;
-    END TRY
-    BEGIN CATCH
-        SELECT 
-            'Error' AS Resultado,
-            ERROR_MESSAGE() AS Mensaje,
-            ERROR_LINE() AS Linea;
-        
-        THROW;
-    END CATCH
-END;
+        SELECT 'Exito' AS Resultado, 'Datos importados correctamente' AS Mensaje;
+END
 GO
