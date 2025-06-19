@@ -3,12 +3,12 @@
   "WorkspaceRootPath": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\02_CrearTablas.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
-      "RelativeMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|solutionrelative:02_CrearTablas.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
-    },
-    {
       "AbsoluteMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\04_ImportarDatos.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
       "RelativeMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|solutionrelative:04_ImportarDatos.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\03_SP.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|solutionrelative:03_SP.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
     }
   ],
   "DocumentGroupContainers": [
@@ -23,24 +23,24 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "02_CrearTablas.sql - localhost.master (tPcWin\\tomas (61))",
-              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\02_CrearTablas.sql",
-              "RelativeDocumentMoniker": "02_CrearTablas.sql",
-              "ToolTip": "02_CrearTablas.sql - localhost.master (tPcWin\\tomas (61))",
+              "Title": "04_ImportarDatos.sql - localhost.Com5600G01 (tPcWin\\tomas (58))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\04_ImportarDatos.sql",
+              "RelativeDocumentMoniker": "04_ImportarDatos.sql",
+              "ToolTip": "04_ImportarDatos.sql - localhost.Com5600G01 (tPcWin\\tomas (58))",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
-              "WhenOpened": "2025-06-17T16:57:47.844Z",
-              "EditorCaption": " - localhost.master (tPcWin\\tomas (61))"
+              "WhenOpened": "2025-06-19T02:28:53.612Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (58))"
             },
             {
               "$type": "Document",
               "DocumentIndex": 1,
-              "Title": "04_ImportarDatos.sql - localhost.master (tPcWin\\tomas (57))",
-              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\04_ImportarDatos.sql",
-              "RelativeDocumentMoniker": "04_ImportarDatos.sql",
-              "ToolTip": "04_ImportarDatos.sql - localhost.master (tPcWin\\tomas (57))",
+              "Title": "03_SP.sql - localhost.Com5600G01 (tPcWin\\tomas (52))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\03_SP.sql",
+              "RelativeDocumentMoniker": "03_SP.sql",
+              "ToolTip": "03_SP.sql - localhost.Com5600G01 (tPcWin\\tomas (52))",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
-              "WhenOpened": "2025-06-17T16:35:30.672Z",
-              "EditorCaption": " - localhost.master (tPcWin\\tomas (57))"
+              "WhenOpened": "2025-06-19T02:28:19.191Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (52))"
             }
           ]
         }

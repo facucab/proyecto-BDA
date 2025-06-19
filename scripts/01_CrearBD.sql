@@ -35,7 +35,7 @@
 	Entregar todo en un zip (observar las pautas para nomenclatura antes expuestas) mediante
 	la sección de prácticas de MIEL. Solo uno de los miembros del grupo debe hacer la entrega.
 */
--- Crear la base de datos
+
 -- Crear base de datos
 IF DB_ID('Com5600G01') IS NULL
     CREATE DATABASE Com5600G01;
