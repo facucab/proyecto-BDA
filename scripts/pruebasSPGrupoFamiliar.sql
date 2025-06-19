@@ -38,6 +38,9 @@
 
 --Pruebas Grupo Familiar
 
+USE Com5600G01;
+GO
+
 --Modificacion 
 
 --Casos Normales

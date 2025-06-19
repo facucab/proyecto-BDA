@@ -38,6 +38,9 @@
 
 -- Pruebas Facturas
 
+USE Com5600G01;
+GO
+
 --Creacion
 
 --Caso normal

@@ -14,17 +14,17 @@
 	las configuraciones aplicadas (ubicación de archivos, memoria asignada, seguridad, puertos,
 	etc.) en un documento como el que le entregaría al DBA.
 	Cree la base de datos, entidades y relaciones. Incluya restricciones y claves. Deberá entregar
-	un archivo .sql con el script completo de creación (debe funcionar si se lo ejecuta “tal cual” es
+	un archivo .sql con el script completo de creación (debe funcionar si se lo ejecuta "tal cual" es
 	entregado en una sola ejecución). Incluya comentarios para indicar qué hace cada módulo
 	de código.
 	Genere store procedures para manejar la inserción, modificado, borrado (si corresponde,
 	también debe decidir si determinadas entidades solo admitirán borrado lógico) de cada tabla.
-	Los nombres de los store procedures NO deben comenzar con “SP”.
+	Los nombres de los store procedures NO deben comenzar con "SP".
 	Algunas operaciones implicarán store procedures que involucran varias tablas, uso de
 	transacciones, etc. Puede que incluso realicen ciertas operaciones mediante varios SPs.
 	Asegúrense de que los comentarios que acompañen al código lo expliquen.
 	Genere esquemas para organizar de forma lógica los componentes del sistema y aplique esto
-	en la creación de objetos. NO use el esquema “dbo”.
+	en la creación de objetos. NO use el esquema "dbo".
 	Todos los SP creados deben estar acompañados de juegos de prueba. Se espera que
 	realicen validaciones básicas en los SP (p/e cantidad mayor a cero, CUIT válido, etc.) y que
 	en los juegos de prueba demuestren la correcta aplicación de las validaciones.
@@ -842,7 +842,7 @@ END;
 * Parametros:
 *	@nombre_categoria VARCHAR(50) - Nombre de la categoria.
 *	@costo_membrecia DECIMAL(10, 2) -  Costo de la membresia. 
-*	@edad_maxima INT - Edad maxima para la categoria. 
+*	@vigencia DATE - Vigencia de la categoria.
 * Valores de retorno:
 *	 0: Exito. 
 *	-1: Parametros incorrectos.
@@ -856,7 +856,7 @@ GO
 CREATE OR ALTER PROCEDURE manejo_actividades.CrearCategoria
 	@nombre_categoria VARCHAR(50),
 	@costo_membrecia DECIMAL(10, 2),
-	@edad_maxima INT
+	@vigencia DATE
 AS
 BEGIN
 	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
@@ -879,16 +879,7 @@ BEGIN
 			RETURN -2;
 		END
 
-		-- validamos edad maxima
-		IF @edad_maxima <= 0
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'La edad maxima debe ser mayor a cero' AS Mensaje;
-			RETURN -3;
-		END
-
 		-- validamos categoria unica
-
 		IF EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE nombre_categoria = @nombre_categoria)
 		BEGIN
 			ROLLBACK TRANSACTION;
@@ -896,43 +887,9 @@ BEGIN
 			RETURN -4;
 		END
 
-		-- calculamos edad minima para esta categoria
-		DECLARE @edad_minima INT = 0;
-
-		-- si EXISTE una categoria con la edad maxima MENOR a la que queremos agregar, nuestra "edad minima" sera la edad maxima existente + 1
-		IF EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE edad_maxima < @edad_maxima)
-		BEGIN
-			SELECT @edad_minima = MAX(edad_maxima) + 1
-			FROM manejo_actividades.categoria
-			WHERE edad_maxima < @edad_maxima;
-		END
-
-		-- verificamos que no haya solapamiento de edades (que ninguna categoria tenga edad_maxima dentro de nuestro rango)
-		IF EXISTS ( SELECT 1 FROM manejo_actividades.categoria WHERE edad_maxima BETWEEN @edad_minima AND @edad_maxima AND edad_maxima <> @edad_maxima) -- se busca si existe alguna categoria donde la edad maxima este entre nuestra edad minima y maxima actuales (excluyendo las que tienen nuestra misma maxima)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'El rango de edad se solapa con otra categoria existente' AS Mensaje;
-			RETURN -5;
-		END
-
-		-- verificamos ademas que no haya "huecos" entre los rangos (por ejemplo, que no haya categoria de 14-16 y otra de 20-22 dejando 17-19)
-		IF EXISTS ( 
-			SELECT 1 FROM manejo_actividades.categoria WHERE edad_maxima > @edad_maxima)
-		AND NOT EXISTS ( 
-			SELECT 1 FROM manejo_actividades.categoria WHERE edad_maxima = @edad_maxima + 1)
-	
-		-- este if lo que hace es buscar primero si hay categorias con edades maximas superiores a la nuestra, y si falta la categoria que tiene que empezar luego de la actual
-
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Hay un hueco en el rango de edades entre esta categoria y la siguiente' AS Mensaje;
-			RETURN -6;
-		END
-
 		-- luego de las validaciones insertamos
-
-		INSERT INTO manejo_actividades.categoria (nombre_categoria, costo_membrecia, edad_maxima)
-		VALUES (@nombre_categoria, @costo_membrecia, @edad_maxima);
+		INSERT INTO manejo_actividades.categoria (nombre_categoria, costo_membrecia, vigencia)
+		VALUES (@nombre_categoria, @costo_membrecia, @vigencia);
 
 		COMMIT TRANSACTION;
 
@@ -1674,189 +1631,195 @@ GO
 
 
 CREATE OR ALTER PROCEDURE manejo_actividades.CrearActividad
-	@nombre_actividad VARCHAR(100),
-	@costo_mensual DECIMAL(10,2)
+    @nombre_actividad VARCHAR(100),
+    @costo_mensual DECIMAL(10,2),
+    @vigencia DATE
 AS
 BEGIN
-	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRY
+        BEGIN TRANSACTION;
 
-	BEGIN TRY
-		BEGIN TRANSACTION;
+        IF @nombre_actividad IS NULL OR LTRIM(RTRIM(@nombre_actividad)) = ''
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El nombre de actividad no puede ser nulo' AS Mensaje;
+            RETURN -1;
+        END
 
-		-- Chequeo que el nombre no sea nulo ni vacio
-		IF @nombre_actividad IS NULL OR LTRIM(RTRIM(@nombre_actividad)) = ''
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'El nombre de actividad no puede ser nulo' AS Mensaje;
-			RETURN -1;
-		END
+        IF EXISTS (SELECT 1 FROM manejo_actividades.actividad WHERE nombre_actividad = @nombre_actividad)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Ya existe una actividad con ese nombre' AS Mensaje;
+            RETURN -2;
+        END
 
-		-- Verifico que no exista ya en la tabla
-		IF EXISTS (SELECT 1 FROM manejo_actividades.actividad WHERE nombre_actividad = @nombre_actividad)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Ya existe una actividad con ese nombre' AS Mensaje;
-			RETURN -2;
-		END
+        IF @costo_mensual IS NULL OR @costo_mensual <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El costo mensual debe ser mayor a cero' AS Mensaje;
+            RETURN -3;
+        END
 
-		-- Verifico que el costo sea valido (>0)
-		IF @costo_mensual IS NULL OR @costo_mensual <= 0
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'El costo mensual debe ser mayor a cero' AS Mensaje;
-			RETURN -3;
-		END
+        IF @vigencia IS NULL
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La vigencia no puede ser nula' AS Mensaje;
+            RETURN -4;
+        END
 
-		INSERT INTO manejo_actividades.actividad(nombre_actividad, costo_mensual)
-		VALUES (@nombre_actividad, @costo_mensual);
+        INSERT INTO manejo_actividades.actividad(nombre_actividad, costo_mensual, vigencia)
+        VALUES (@nombre_actividad, @costo_mensual, @vigencia);
 
-		COMMIT TRANSACTION;
-		SELECT 'Exito' AS Resultado, 'Actividad creada correctamente' AS Mensaje;
-		RETURN 0;
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Actividad creada correctamente' AS Mensaje;
+        RETURN 0;
 
-	END TRY
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
 
-	BEGIN CATCH
-		IF @@TRANCOUNT > 0
-			ROLLBACK TRANSACTION;
-
-		SELECT 
-			'Error' AS Resultado,
-			ERROR_MESSAGE() AS Mensaje,
-			ERROR_NUMBER() AS CodigoError,
-			ERROR_LINE() AS Linea,
-			ERROR_PROCEDURE() AS Procedimiento;
-		RETURN -999;
-	END CATCH
+        SELECT 
+            'Error' AS Resultado,
+            ERROR_MESSAGE() AS Mensaje,
+            ERROR_NUMBER() AS CodigoError,
+            ERROR_LINE() AS Linea,
+            ERROR_PROCEDURE() AS Procedimiento;
+        RETURN -999;
+    END CATCH
 END;
-
 GO
+
+
 CREATE OR ALTER PROCEDURE manejo_actividades.ModificarActividad
-	@id INT,
-	@nombre_actividad VARCHAR(100),
-	@costo_mensual DECIMAL(10,2)
+    @id INT,
+    @nombre_actividad VARCHAR(100) = NULL,
+    @costo_mensual DECIMAL(10,2) = NULL,
+    @vigencia DATE = NULL,
+    @estado BIT = NULL
 AS
 BEGIN
-	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRY
+        BEGIN TRANSACTION;
 
-	BEGIN TRY
-		BEGIN TRANSACTION;
+        IF @id IS NULL
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+            RETURN -1;
+        END
 
-		-- Verifico que el ID no sea nulo
-		IF @id IS NULL
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
-			RETURN -1;
-		END
+        IF NOT EXISTS (SELECT 1 FROM manejo_actividades.actividad WHERE id_actividad = @id)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+            RETURN -2;
+        END
 
-		-- Verifico que exista en la tabla
-		IF NOT EXISTS (SELECT 1 FROM manejo_actividades.actividad WHERE id_actividad = @id)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
-			RETURN -2;
-		END
+        IF @nombre_actividad IS NOT NULL AND LTRIM(RTRIM(@nombre_actividad)) = ''
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El nombre de actividad no puede ser nulo o vacio' AS Mensaje;
+            RETURN -3;
+        END
 
-		-- Chequeo que el nombre no sea nulo ni vacio
-		IF @nombre_actividad IS NULL OR LTRIM(RTRIM(@nombre_actividad)) = ''
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'El nombre de actividad no puede ser nulo o vacio' AS Mensaje;
-			RETURN -3;
-		END
+        IF @nombre_actividad IS NOT NULL AND EXISTS (
+            SELECT 1 FROM manejo_actividades.actividad
+            WHERE nombre_actividad = @nombre_actividad AND id_actividad <> @id
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Ya existe una actividad con ese nombre' AS Mensaje;
+            RETURN -4;
+        END
 
-		-- Verifico que no exista ya en la tabla otro registro con mismo nombre
-		IF EXISTS (
-			SELECT 1 FROM manejo_actividades.actividad
-			WHERE nombre_actividad = @nombre_actividad AND id_actividad <> @id
-		)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Ya existe una actividad con ese nombre' AS Mensaje;
-			RETURN -4;
-		END
+        IF @costo_mensual IS NOT NULL AND @costo_mensual <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El costo mensual debe ser mayor a cero' AS Mensaje;
+            RETURN -5;
+        END
 
-		-- Verifico que el costo sea valido (>0)
-		IF @costo_mensual IS NULL OR @costo_mensual <= 0
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'El costo mensual debe ser mayor a cero' AS Mensaje;
-			RETURN -5;
-		END
+        IF @estado IS NOT NULL AND @estado NOT IN (0, 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El estado debe ser 0 o 1' AS Mensaje;
+            RETURN -6;
+        END
 
-		UPDATE manejo_actividades.actividad
-		SET nombre_actividad = @nombre_actividad,
-			costo_mensual = @costo_mensual
-		WHERE id_actividad = @id;
+        UPDATE manejo_actividades.actividad
+        SET nombre_actividad = ISNULL(@nombre_actividad, nombre_actividad),
+            costo_mensual = ISNULL(@costo_mensual, costo_mensual),
+            vigencia = ISNULL(@vigencia, vigencia),
+            estado = ISNULL(@estado, estado)
+        WHERE id_actividad = @id;
 
-		COMMIT TRANSACTION;
-		SELECT 'Exito' AS Resultado, 'Actividad modificada correctamente' AS Mensaje;
-		RETURN 0;
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Actividad modificada correctamente' AS Mensaje;
+        RETURN 0;
 
-	END TRY
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
 
-	BEGIN CATCH
-		IF @@TRANCOUNT > 0
-			ROLLBACK TRANSACTION;
-
-		SELECT 
-			'Error' AS Resultado,
-			ERROR_MESSAGE() AS Mensaje,
-			ERROR_NUMBER() AS CodigoError,
-			ERROR_LINE() AS Linea,
-			ERROR_PROCEDURE() AS Procedimiento;
-		RETURN -999;
-	END CATCH
+        SELECT 
+            'Error' AS Resultado,
+            ERROR_MESSAGE() AS Mensaje,
+            ERROR_NUMBER() AS CodigoError,
+            ERROR_LINE() AS Linea,
+            ERROR_PROCEDURE() AS Procedimiento;
+        RETURN -999;
+    END CATCH
 END;
 GO
 
 
 CREATE OR ALTER PROCEDURE manejo_actividades.EliminarActividad
-	@id INT
+    @id INT
 AS
 BEGIN
-	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRY
+        BEGIN TRANSACTION;
 
-	BEGIN TRY
-		BEGIN TRANSACTION;
+        IF @id IS NULL
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+            RETURN -1;
+        END
 
-		-- Verifico que el ID no sea nulo
-		IF @id IS NULL
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
-			RETURN -1;
-		END
+        IF NOT EXISTS (SELECT 1 FROM manejo_actividades.actividad WHERE id_actividad = @id)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+            RETURN -2;
+        END
 
-		-- Verifico que exista en la tabla
-		IF NOT EXISTS (SELECT 1 FROM manejo_actividades.actividad WHERE id_actividad = @id)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
-			RETURN -2;
-		END
+        UPDATE manejo_actividades.actividad
+        SET estado = 0
+        WHERE id_actividad = @id;
 
-		-- Elimino la actividad
-		DELETE FROM manejo_actividades.actividad WHERE id_actividad = @id;
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Actividad eliminada correctamente' AS Mensaje;
+        RETURN 0;
 
-		COMMIT TRANSACTION;
-		SELECT 'Exito' AS Resultado, 'Actividad eliminada correctamente' AS Mensaje;
-		RETURN 0;
-	END TRY
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0
+            ROLLBACK TRANSACTION;
 
-	BEGIN CATCH
-		IF @@TRANCOUNT > 0
-			ROLLBACK TRANSACTION;
-
-		SELECT 
-			'Error' AS Resultado,
-			ERROR_MESSAGE() AS Mensaje,
-			ERROR_NUMBER() AS CodigoError,
-			ERROR_LINE() AS Linea,
-			ERROR_PROCEDURE() AS Procedimiento;
-		RETURN -999;
-	END CATCH
+        SELECT 
+            'Error' AS Resultado,
+            ERROR_MESSAGE() AS Mensaje,
+            ERROR_NUMBER() AS CodigoError,
+            ERROR_LINE() AS Linea,
+            ERROR_PROCEDURE() AS Procedimiento;
+        RETURN -999;
+    END CATCH
 END;
 GO
 
@@ -2629,9 +2592,8 @@ BEGIN
         END
         
         -- verificamos que la edad de la persona corresponda con la categoría
-        DECLARE @edad INT, @edad_maxima INT
+        DECLARE @edad INT
         SELECT @edad = DATEDIFF(YEAR, fecha_nac, GETDATE()) FROM manejo_personas.persona WHERE id_persona = @id_persona
-        SELECT @edad_maxima = edad_maxima FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria
         
         -- verificamos por tipo de categoría (Menor, Cadete, Mayor)
         DECLARE @nombre_categoria VARCHAR(50)
