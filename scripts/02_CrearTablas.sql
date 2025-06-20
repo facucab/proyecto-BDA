@@ -7,12 +7,12 @@ GO
 -- Persona
 CREATE TABLE manejo_personas.persona(
 	id_persona INT IDENTITY(1,1) PRIMARY KEY,
-	dni VARCHAR(8) NOT NULL UNIQUE,
+	dni VARCHAR(9) NOT NULL UNIQUE,
 	nombre NVARCHAR(50) NOT NULL, -- Son Nvarchar porque considero que puedo tener nombres extranjeros
 	apellido NVARCHAR(50) NOT NULL,
 	email VARCHAR(320) NOT NULL UNIQUE, -- Estandar RFC 5321
 	fecha_nac DATE NOT NULL,
-	telefono VARCHAR(15) NOT NULL, -- Estandar E.164
+	telefono NVARCHAR(20) NOT NULL, -- Cambiado a NVARCHAR para evitar notación científica
 	fecha_alta DATE NOT NULL DEFAULT GETDATE(),
 	activo BIT NOT NULL DEFAULT 1
 );
@@ -48,7 +48,7 @@ CREATE TABLE manejo_personas.socio (
     id_socio INT IDENTITY(1,1) PRIMARY KEY,
 	numero_socio VARCHAR(7), 
     id_persona INT NOT NULL UNIQUE, -- Enlace con su identidad padre
-    telefono_emergencia VARCHAR(15) NOT NULL,
+    telefono_emergencia NVARCHAR(20) NULL,
     obra_nro_socio VARCHAR(20) NULL,
 	--Atributos que vienen de otras entidades o relaciones
     id_obra_social INT NULL,

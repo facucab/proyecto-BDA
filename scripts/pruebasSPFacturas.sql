@@ -1,41 +1,3 @@
-/*
-	Entrega 4 - Documento de instalación y configuración
-
-	Trabajo Practico DDBBA Entrega 3 - Grupo 1
-	Comision 5600 - Viernes Tarde 
-	43990422 | Aguirre, Alex Rubén 
-	45234709 | Gauto, Gastón Santiago 
-	44363498 | Caballero, Facundo 
-	40993965 | Cornara Perez, Tomás Andrés
-
-		Luego de decidirse por un motor de base de datos relacional, llegó el momento de generar la
-	base de datos. En esta oportunidad utilizarán SQL Server.
-	Deberá instalar el DMBS y documentar el proceso. No incluya capturas de pantalla. Detalle
-	las configuraciones aplicadas (ubicación de archivos, memoria asignada, seguridad, puertos,
-	etc.) en un documento como el que le entregaría al DBA.
-	Cree la base de datos, entidades y relaciones. Incluya restricciones y claves. Deberá entregar
-	un archivo .sql con el script completo de creación (debe funcionar si se lo ejecuta “tal cual” es
-	entregado en una sola ejecución). Incluya comentarios para indicar qué hace cada módulo
-	de código.
-	Genere store procedures para manejar la inserción, modificado, borrado (si corresponde,
-	también debe decidir si determinadas entidades solo admitirán borrado lógico) de cada tabla.
-	Los nombres de los store procedures NO deben comenzar con “SP”.
-	Algunas operaciones implicarán store procedures que involucran varias tablas, uso de
-	transacciones, etc. Puede que incluso realicen ciertas operaciones mediante varios SPs.
-	Asegúrense de que los comentarios que acompañen al código lo expliquen.
-	Genere esquemas para organizar de forma lógica los componentes del sistema y aplique esto
-	en la creación de objetos. NO use el esquema “dbo”.
-	Todos los SP creados deben estar acompañados de juegos de prueba. Se espera que
-	realicen validaciones básicas en los SP (p/e cantidad mayor a cero, CUIT válido, etc.) y que
-	en los juegos de prueba demuestren la correcta aplicación de las validaciones.
-	Las pruebas deben realizarse en un script separado, donde con comentarios se indique en
-	cada caso el resultado esperado
-	El archivo .sql con el script debe incluir comentarios donde consten este enunciado, la fecha
-	de entrega, número de grupo, nombre de la materia, nombres y DNI de los alumnos.
-	Entregar todo en un zip (observar las pautas para nomenclatura antes expuestas) mediante
-	la sección de prácticas de MIEL. Solo uno de los miembros del grupo debe hacer la entrega.
-*/
-
 -- Pruebas Facturas
 
 USE Com5600G01;
@@ -67,7 +29,7 @@ EXEC pagos_y_facturas.CreacionFactura
     @monto_a_pagar = 750.25, 
     @id_persona = 3, 
     @id_metodo_pago = 99999;
---Resultado: Método de pago no valido
+--Resultado: MÃ©todo de pago no valido
 
 --Persona inexistente
 EXEC pagos_y_facturas.CreacionFactura 
@@ -156,3 +118,137 @@ EXEC pagos_y_facturas.EliminacionFactura @id_factura =2;
 --Id invalido
 EXEC pagos_y_facturas.EliminacionFactura @id_factura =99999;
 --Resultado: La factura no existe
+
+CREATE OR ALTER PROCEDURE ImportarFacturas
+    @RutaArchivo NVARCHAR(260)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @ErrorOcurrido BIT = 0;
+    DECLARE @MensajeError NVARCHAR(MAX) = '';
+
+    BEGIN TRY
+        -- 1. Crear tabla temporal para los datos
+        CREATE TABLE #TempDatos (
+            [fecha] DATE,
+            [Responsable de pago] VARCHAR(20),
+            [Valor] DECIMAL(10,2),
+            [Medio de pago] VARCHAR(50)
+        );
+
+        -- 2. Leer los datos desde la hoja "pago cuotas"
+        DECLARE @SQL NVARCHAR(MAX);
+        SET @SQL = N'
+            INSERT INTO #TempDatos ([fecha], [Responsable de pago], [Valor], [Medio de pago])
+            SELECT [fecha], [Responsable de pago], [Valor], [Medio de pago]
+            FROM OPENROWSET(
+                ''Microsoft.ACE.OLEDB.12.0'',
+                ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
+                ''SELECT * FROM [pago cuotas$A2:E10000]'')';
+        EXEC sp_executesql @SQL;
+
+        -- 3. Recorrer los datos e insertar en factura
+        DECLARE @fecha DATE, @numero_socio VARCHAR(20), @valor DECIMAL(10,2), @medio_pago VARCHAR(50);
+        DECLARE @id_persona INT, @id_metodo_pago INT;
+        DECLARE @ContadorExitosos INT = 0;
+        DECLARE @ContadorErrores INT = 0;
+
+        DECLARE cur CURSOR FOR
+            SELECT [fecha], [Responsable de pago], [Valor], [Medio de pago]
+            FROM #TempDatos
+            WHERE [Responsable de pago] IS NOT NULL;
+
+        OPEN cur;
+        FETCH NEXT FROM cur INTO @fecha, @numero_socio, @valor, @medio_pago;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            BEGIN TRY
+                -- Buscar id_persona a partir del numero_socio
+                SELECT @id_persona = s.id_persona
+                FROM manejo_personas.socio s
+                WHERE s.numero_socio = @numero_socio;
+
+                IF @id_persona IS NULL
+                BEGIN
+                    SET @ContadorErrores = @ContadorErrores + 1;
+                    SET @ErrorOcurrido = 1;
+                    SET @MensajeError = @MensajeError + 
+                        'No se encontrÃ³ persona para socio "' + ISNULL(@numero_socio, 'NULL') + '".' + CHAR(13) + CHAR(10);
+                    GOTO SIGUIENTE;
+                END
+
+                -- Buscar id_metodo_pago a partir del nombre
+                SELECT @id_metodo_pago = id_metodo_pago
+                FROM pagos_y_facturas.metodo_pago
+                WHERE LOWER(nombre) = LOWER(@medio_pago);
+
+                IF @id_metodo_pago IS NULL
+                BEGIN
+                    SET @ContadorErrores = @ContadorErrores + 1;
+                    SET @ErrorOcurrido = 1;
+                    SET @MensajeError = @MensajeError + 
+                        'No se encontrÃ³ mÃ©todo de pago "' + ISNULL(@medio_pago, 'NULL') + '".' + CHAR(13) + CHAR(10);
+                    GOTO SIGUIENTE;
+                END
+
+                -- Insertar la factura (estado por defecto: 'Pendiente')
+                EXEC pagos_y_facturas.CreacionFactura
+                    @estado_pago = 'Pendiente',
+                    @monto_a_pagar = @valor,
+                    @id_persona = @id_persona,
+                    @id_metodo_pago = @id_metodo_pago;
+
+                SET @ContadorExitosos = @ContadorExitosos + 1;
+            END TRY
+            BEGIN CATCH
+                SET @ContadorErrores = @ContadorErrores + 1;
+                SET @ErrorOcurrido = 1;
+                SET @MensajeError = @MensajeError + 
+                    'Error en socio "' + ISNULL(@numero_socio, 'NULL') + '": ' + 
+                    ERROR_MESSAGE() + CHAR(13) + CHAR(10);
+            END CATCH
+
+            SIGUIENTE:
+            FETCH NEXT FROM cur INTO @fecha, @numero_socio, @valor, @medio_pago;
+        END
+
+        CLOSE cur;
+        DEALLOCATE cur;
+        DROP TABLE #TempDatos;
+
+        -- Generar reporte final
+        IF @ErrorOcurrido = 0
+        BEGIN
+            SELECT 'Exito' AS Resultado, 
+                   'Todas las facturas importadas correctamente (' + 
+                   CAST(@ContadorExitosos AS VARCHAR(10)) + ' registros)' AS Mensaje;
+            RETURN 0;
+        END
+        ELSE
+        BEGIN
+            SELECT 'Parcial' AS Resultado, 
+                   'Proceso completado con errores. Exitosos: ' + 
+                   CAST(@ContadorExitosos AS VARCHAR(10)) + 
+                   ', Errores: ' + CAST(@ContadorErrores AS VARCHAR(10)) + 
+                   CHAR(13) + CHAR(10) + @MensajeError AS Mensaje;
+            RETURN 1;
+        END
+
+    END TRY
+    BEGIN CATCH
+        IF CURSOR_STATUS('local', 'cur') >= 0
+        BEGIN
+            CLOSE cur;
+            DEALLOCATE cur;
+        END
+
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
+            DROP TABLE #TempDatos;
+
+        SELECT 'Error' AS Resultado, 
+               'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
+        RETURN -1;
+    END CATCH
+END

@@ -46,11 +46,17 @@
           <AssociatedConnUserName />
           <FullPath>04_ImportarDatos.sql</FullPath>
         </FileNode>
-        <FileNode Name="1_pruebasSPPersonas.sql">
+        <FileNode Name="05_vistas.sql">
           <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:localhost:True</AssociatedConnectionMoniker>
           <AssociatedConnSrvName>localhost</AssociatedConnSrvName>
           <AssociatedConnUserName />
-          <FullPath>1_pruebasSPPersonas.sql</FullPath>
+          <FullPath>05_vistas.sql</FullPath>
+        </FileNode>
+        <FileNode Name="generarDatos.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:localhost:True</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>localhost</AssociatedConnSrvName>
+          <AssociatedConnUserName />
+          <FullPath>generarDatos.sql</FullPath>
         </FileNode>
         <FileNode Name="pruebasSpActividad.sql">
           <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:localhost:True</AssociatedConnectionMoniker>
@@ -94,6 +100,12 @@
           <AssociatedConnUserName />
           <FullPath>pruebasSPInvitado.sql</FullPath>
         </FileNode>
+        <FileNode Name="pruebasSPPersonas.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:localhost:True</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>localhost</AssociatedConnSrvName>
+          <AssociatedConnUserName />
+          <FullPath>pruebasSPPersonas.sql</FullPath>
+        </FileNode>
         <FileNode Name="pruebasSPResponsable.sql">
           <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:localhost:True</AssociatedConnectionMoniker>
           <AssociatedConnSrvName>localhost</AssociatedConnSrvName>
@@ -117,6 +129,12 @@
           <AssociatedConnSrvName>localhost</AssociatedConnSrvName>
           <AssociatedConnUserName />
           <FullPath>Reportes.sql</FullPath>
+        </FileNode>
+        <FileNode Name="verTablas.sql">
+          <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:localhost:True</AssociatedConnectionMoniker>
+          <AssociatedConnSrvName>localhost</AssociatedConnSrvName>
+          <AssociatedConnUserName />
+          <FullPath>verTablas.sql</FullPath>
         </FileNode>
       </Items>
     </LogicalFolder>

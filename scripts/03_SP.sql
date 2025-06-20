@@ -8,12 +8,12 @@ GO
 * Nombre: CrearPersona
 * Descripcion: Inserta una nueva persona en la tabla persona, validando su informacion. 
 * Parametros:
-*	@dni  VARCHAR(8) - DNI de la persona.
+*	@dni  VARCHAR(9) - DNI de la persona.
 *	@nombre NVARCHAR(50) - Nombre de la persona. 
 *	@apellido NVARCHAR(50) - Apellido de la persona. 
 * 	@email VARCHAR(320) - Email de la persona. 
 * 	@fecha_nac DATE - Fecha de nacimiento.
-*	@telefono VARCHAR(15) - Telefono de la persona
+*	@telefono NVARCHAR(20) - Telefono de la persona
 * Valores de retorno:
 *	 0: Exito. 
 *	-1: DNI Invalido. 
@@ -22,12 +22,12 @@ GO
 *	-99: Error desconocido.
 */
 CREATE or ALTER PROCEDURE manejo_personas.CrearPersona
-	@dni VARCHAR(8),
+	@dni VARCHAR(9),
 	@nombre NVARCHAR(50),
 	@apellido NVARCHAR(50),
 	@email VARCHAR(320),
 	@fecha_nac DATE,
-	@telefono VARCHAR(15)
+	@telefono NVARCHAR(20)
 AS
 BEGIN
 	SET TRANSACTION ISOLATION LEVEL READ COMMITTED; 
@@ -35,11 +35,15 @@ BEGIN
 	BEGIN TRANSACTION;
 
 	BEGIN TRY
+		-- Convertir nombres y apellidos a mayúsculas
+		SET @nombre = UPPER(LTRIM(RTRIM(@nombre)));
+		SET @apellido = UPPER(LTRIM(RTRIM(@apellido)));
+		
 		--validar dni
-		IF LEN(@dni) < 7 OR LEN(@dni) > 8 or ISNUMERIC(@dni) = 0 -- dni es numero y entre 1.000.000 y 99.999.999
+		IF LEN(@dni) NOT BETWEEN 7 AND 9 OR ISNUMERIC(@dni) = 0 -- dni es numero y entre 1.000.000 y 999.999.999
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'DNI Invalido. Debe contener entre 7 y 8 digitos numericos.' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'DNI Invalido. Debe contener entre 7 y 9 digitos numericos.' AS Mensaje;
 			RETURN -1;
 		END
 
@@ -61,14 +65,61 @@ BEGIN
 
 		-- se podrian verificar si email y dni existen pero no se si es necesario porque el atributo es unique, si es necesario lo agrego
 
-
 		--insertar persona luego de todas las verificaciones
 		INSERT INTO manejo_personas.persona (dni, nombre, apellido, email, fecha_nac, telefono, fecha_alta)
 		VALUES (@dni, @nombre, @apellido, @email, @fecha_nac, @telefono, GETDATE());
 
+		-- Obtener el ID de la persona recién creada
+		DECLARE @id_persona INT = SCOPE_IDENTITY();
+
+		-- Generar automáticamente el siguiente número de socio
+		DECLARE @nuevo_numero_socio VARCHAR(7);
+		DECLARE @ultimo_numero INT = 0;
+		DECLARE @ultimo_socio VARCHAR(7);
+
+		-- Buscar el último número de socio
+		SELECT TOP 1 @ultimo_socio = numero_socio
+		FROM manejo_personas.socio
+		WHERE numero_socio LIKE 'SN-%'
+		ORDER BY CAST(SUBSTRING(numero_socio, 4, LEN(numero_socio)) AS INT) DESC;
+
+		-- Si no hay socios, empezar con SN-4001
+		IF @ultimo_socio IS NULL
+		BEGIN
+			SET @nuevo_numero_socio = 'SN-4001';
+		END
+		ELSE
+		BEGIN
+			-- Extraer el número del último socio e incrementarlo
+			SET @ultimo_numero = CAST(SUBSTRING(@ultimo_socio, 4, LEN(@ultimo_socio)) AS INT);
+			SET @nuevo_numero_socio = 'SN-' + RIGHT('0000' + CAST(@ultimo_numero + 1 AS VARCHAR(4)), 4);
+		END
+
+		-- Crear automáticamente el socio con el número generado
+		-- Determinar la categoría por edad
+		DECLARE @edad INT = DATEDIFF(YEAR, @fecha_nac, GETDATE());
+		DECLARE @id_categoria INT;
+
+		IF @edad <= 12
+			SELECT @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE nombre_categoria = 'Menor';
+		ELSE IF @edad <= 17
+			SELECT @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE nombre_categoria = 'Cadete';
+		ELSE
+			SELECT @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE nombre_categoria = 'Mayor';
+
+		-- Si no se encuentra categoría, usar la primera disponible
+		IF @id_categoria IS NULL
+		BEGIN
+			SELECT TOP 1 @id_categoria = id_categoria FROM manejo_actividades.categoria;
+		END
+
+		-- Crear el socio automáticamente
+		INSERT INTO manejo_personas.socio (id_persona, numero_socio, id_categoria)
+		VALUES (@id_persona, @nuevo_numero_socio, @id_categoria);
+
 		COMMIT TRANSACTION;
 
-		SELECT 'Exito' AS RESULTADO, 'Persona registrada correctamente.' AS Mensaje;
+		SELECT 'Exito' AS RESULTADO, 'Persona registrada correctamente con número de socio: ' + @nuevo_numero_socio AS Mensaje;
 		RETURN 0;
 	END TRY
 	BEGIN CATCH
@@ -101,7 +152,7 @@ CREATE OR ALTER PROCEDURE manejo_personas.ModificarPersona
 	@nombre NVARCHAR(50) = NULL,
 	@apellido NVARCHAR(50) = NULL,
 	@email VARCHAR(320) = NULL,
-	@telefono VARCHAR(15) = NULL
+	@telefono NVARCHAR(20) = NULL
 	-- tienen valor default null por si solo se quiere actualizar un cmapo
 AS
 BEGIN
@@ -109,12 +160,18 @@ BEGIN
 	BEGIN TRANSACTION;
 
 	BEGIN TRY
+		-- Convertir nombres y apellidos a mayúsculas si se proporcionan
+		IF @nombre IS NOT NULL
+			SET @nombre = UPPER(LTRIM(RTRIM(@nombre)));
+		IF @apellido IS NOT NULL
+			SET @apellido = UPPER(LTRIM(RTRIM(@apellido)));
+		
 		--validar existencia persona (por id)
 		IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona)
 		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'La persona no existe' AS Mensaje;
-			RETURN -1;
+				ROLLBACK TRANSACTION;
+				SELECT 'Error' AS Resultado, 'La persona no existe' AS Mensaje;
+				RETURN -1;
 		END
 
 		--validar email (si se da en el exec)
@@ -155,7 +212,7 @@ BEGIN
 		RETURN -99;
 	END CATCH
 
-END; 
+END;
 /*
 * Nombre: EliminarPersona
 * Descripcion: Realiza una eliminacion logica de una persona.
@@ -2503,8 +2560,8 @@ GO
 -- crear socio
 CREATE OR ALTER PROCEDURE manejo_personas.CrearSocio
     @id_persona INT,
-	@nro_socio VARCHAR(7),
-    @telefono_emergencia VARCHAR(15),
+	@nro_socio VARCHAR(7) = NULL,
+    @telefono_emergencia NVARCHAR(20) = NULL,
     @obra_nro_socio VARCHAR(20) = NULL,
     @id_obra_social INT = NULL,
     @id_categoria INT,
@@ -2585,26 +2642,29 @@ BEGIN
             RETURN -8;
         END
 
-		-- validaciones nro_socio
+		-- Si no se proporciona número de socio, generarlo automáticamente
         IF @nro_socio IS NULL OR LTRIM(RTRIM(@nro_socio)) = ''
         BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'El número de socio no puede ser nulo o vacío' AS Mensaje;
-            RETURN -9;
+            DECLARE @nuevo_numero_socio VARCHAR(7);
+            EXEC manejo_personas.GenerarSiguienteNumeroSocio @nuevo_numero_socio OUTPUT;
+            SET @nro_socio = @nuevo_numero_socio;
         END
-
-        IF @nro_socio NOT LIKE 'SN-[0-9][0-9][0-9][0-9]'
+        ELSE
         BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'El número de socio debe tener el formato SN-####' AS Mensaje;
-            RETURN -10;
-        END
+            -- validaciones nro_socio si se proporciona manualmente
+            IF @nro_socio NOT LIKE 'SN-[0-9][0-9][0-9][0-9]'
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El número de socio debe tener el formato SN-####' AS Mensaje;
+                RETURN -9;
+            END
 
-        IF EXISTS (SELECT 1 FROM manejo_personas.socio WHERE numero_socio = @nro_socio)
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'El número de socio ya está en uso' AS Mensaje;
-            RETURN -11;
+            IF EXISTS (SELECT 1 FROM manejo_personas.socio WHERE numero_socio = @nro_socio)
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El número de socio ya está en uso' AS Mensaje;
+                RETURN -10;
+            END
         END
         
         -- insertamos el nuevo socio
@@ -2613,7 +2673,7 @@ BEGIN
 
         
         COMMIT TRANSACTION;
-        SELECT 'Éxito' AS Resultado, 'Socio registrado correctamente' AS Mensaje;
+        SELECT 'Éxito' AS Resultado, 'Socio registrado correctamente con número: ' + @nro_socio AS Mensaje;
         RETURN 0;
     END TRY
 
@@ -2629,7 +2689,7 @@ GO
 -- modificar socio
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarSocio
     @id_socio INT,
-    @telefono_emergencia VARCHAR(15) = NULL,
+    @telefono_emergencia NVARCHAR(20) = NULL,
     @obra_nro_socio VARCHAR(20) = NULL,
     @id_obra_social INT = NULL,
     @id_categoria INT = NULL,
@@ -2803,4 +2863,32 @@ BEGIN
 
 END;
 
+GO
+
+-- SP auxiliar para generar el siguiente número de socio
+CREATE OR ALTER PROCEDURE manejo_personas.GenerarSiguienteNumeroSocio
+    @nuevo_numero_socio VARCHAR(7) OUTPUT
+AS
+BEGIN
+    DECLARE @ultimo_numero INT = 0;
+    DECLARE @ultimo_socio VARCHAR(7);
+
+    -- Buscar el último número de socio
+    SELECT TOP 1 @ultimo_socio = numero_socio
+    FROM manejo_personas.socio
+    WHERE numero_socio LIKE 'SN-%'
+    ORDER BY CAST(SUBSTRING(numero_socio, 4, LEN(numero_socio)) AS INT) DESC;
+
+    -- Si no hay socios, empezar con SN-4001
+    IF @ultimo_socio IS NULL
+    BEGIN
+        SET @nuevo_numero_socio = 'SN-4001';
+    END
+    ELSE
+    BEGIN
+        -- Extraer el número del último socio e incrementarlo
+        SET @ultimo_numero = CAST(SUBSTRING(@ultimo_socio, 4, LEN(@ultimo_socio)) AS INT);
+        SET @nuevo_numero_socio = 'SN-' + RIGHT('0000' + CAST(@ultimo_numero + 1 AS VARCHAR(4)), 4);
+    END
+END;
 GO
