@@ -14,6 +14,22 @@ EXEC sp_MSSet_oledb_prop N'Microsoft.ACE.OLEDB.12.0', N'DynamicParameters', 1;
 RECONFIGURE;
 GO
 
+-- Funcion aux para quitar acentos y pasar a mayus
+CREATE OR ALTER FUNCTION dbo.NormalizarTexto(@texto NVARCHAR(200)) RETURNS NVARCHAR(200)
+AS
+BEGIN
+    -- Reemplaza acentos y pasa a mayúsculas
+    SET @texto = UPPER(@texto)
+    SET @texto = REPLACE(@texto, 'Á', 'A')
+    SET @texto = REPLACE(@texto, 'É', 'E')
+    SET @texto = REPLACE(@texto, 'Í', 'I')
+    SET @texto = REPLACE(@texto, 'Ó', 'O')
+    SET @texto = REPLACE(@texto, 'Ú', 'U')
+    SET @texto = REPLACE(@texto, 'Ü', 'U')
+    SET @texto = REPLACE(@texto, 'Ñ', 'N')
+    RETURN @texto
+END
+GO
 
 -- Importar Categorias - FUNCIONANDO
 CREATE OR ALTER PROCEDURE manejo_actividades.ImportarCategorias
@@ -61,6 +77,11 @@ BEGIN
         WHILE @@FETCH_STATUS = 0
         BEGIN
             BEGIN TRY
+                -- Antes de insertar, normalizar los campos de texto
+                SET @nombre_categoria = dbo.NormalizarTexto(@nombre_categoria);
+                SET @costo_membrecia = @costo_membrecia;
+                SET @vigencia = @vigencia;
+                
                 EXEC manejo_actividades.CrearCategoria
                     @nombre_categoria = @nombre_categoria,
                     @costo_membrecia = @costo_membrecia,
@@ -167,24 +188,25 @@ BEGIN
         
         WHILE @@FETCH_STATUS = 0
         BEGIN
+            -- Antes de insertar, normalizar los campos de texto
+            SET @nombre_actividad = dbo.NormalizarTexto(@nombre_actividad);
+            SET @costo_actividad = @costo_actividad;
+            SET @vigencia = @vigencia;
+            
             BEGIN TRY
                 EXEC manejo_actividades.CrearActividad
                     @nombre_actividad = @nombre_actividad,
                     @costo_mensual = @costo_actividad,
                     @vigencia = @vigencia;
-                
                 SET @ContadorExitosos = @ContadorExitosos + 1;
             END TRY
             BEGIN CATCH
                 SET @ContadorErrores = @ContadorErrores + 1;
                 SET @ErrorOcurrido = 1;
-                
-                -- Concatenar errores para reporte final
                 SET @MensajeError = @MensajeError + 
                     'Error en actividad "' + ISNULL(@nombre_actividad, 'NULL') + '": ' + 
                     ERROR_MESSAGE() + CHAR(13) + CHAR(10);
             END CATCH
-            
             FETCH NEXT FROM cur INTO @nombre_actividad, @costo_actividad, @vigencia;
         END
         
@@ -276,6 +298,10 @@ BEGIN
         WHILE @@FETCH_STATUS = 0
         BEGIN
             BEGIN TRY
+                -- Antes de insertar, normalizar los campos de texto
+                SET @numero_socio = dbo.NormalizarTexto(@numero_socio);
+                SET @medio_pago = dbo.NormalizarTexto(@medio_pago);
+                
                 -- Buscar id_persona a partir del numero_socio
                 SELECT @id_persona = s.id_persona
                 FROM manejo_personas.socio s
@@ -428,10 +454,10 @@ BEGIN
         WHILE @@FETCH_STATUS = 0
         BEGIN
             BEGIN TRY
-                -- LIMPIEZA DE CAMPOS
+                -- Antes de insertar, normalizar los campos de texto
                 SET @dni = REPLACE(REPLACE(LTRIM(RTRIM(@dni)), '.', ''), '-', '');
-                SET @nombre = UPPER(LTRIM(RTRIM(@nombre)));
-                SET @apellido = UPPER(LTRIM(RTRIM(@apellido)));
+                SET @nombre = dbo.NormalizarTexto(@nombre);
+                SET @apellido = dbo.NormalizarTexto(@apellido);
                 SET @email = LOWER(REPLACE(LTRIM(RTRIM(@email)), ' ', ''));
                 
                 -- Corregir teléfonos de notación científica y limpiar
@@ -451,9 +477,9 @@ BEGIN
                     IF @telefonoEmergencia = '' SET @telefonoEmergencia = NULL;
                 END
 
-                SET @obraSocial = LTRIM(RTRIM(@obraSocial));
+                SET @obraSocial = dbo.NormalizarTexto(@obraSocial);
                 SET @nroSocioObra = LTRIM(RTRIM(@nroSocioObra));
-                SET @nroSocio = LTRIM(RTRIM(@nroSocio));
+                SET @nroSocio = UPPER(LTRIM(RTRIM(@nroSocio)));
 
                 -- VALIDACIONES
                 IF LEN(@dni) NOT BETWEEN 7 AND 9 OR ISNUMERIC(@dni) = 0
@@ -497,11 +523,11 @@ BEGIN
                     DECLARE @id_categoria INT;
 
                     IF @edad <= 12
-                        SELECT @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE nombre_categoria = 'Menor';
+                        SELECT @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE dbo.NormalizarTexto(nombre_categoria) LIKE 'MENOR%';
                     ELSE IF @edad <= 17
-                        SELECT @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE nombre_categoria = 'Cadete';
+                        SELECT @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE dbo.NormalizarTexto(nombre_categoria) LIKE 'CADETE%';
                     ELSE
-                        SELECT @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE nombre_categoria = 'Mayor';
+                        SELECT @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE dbo.NormalizarTexto(nombre_categoria) LIKE 'MAYOR%';
 
                     IF @id_categoria IS NULL
                     BEGIN
@@ -520,6 +546,8 @@ BEGIN
                 IF @obraSocial IS NOT NULL AND @obraSocial <> ''
                 BEGIN
                     DECLARE @id_obra_social INT;
+                    -- Eliminar espacios en blanco antes de usar la obra social
+                    SET @obraSocial = LTRIM(RTRIM(@obraSocial));
                     EXEC manejo_personas.CreacionObraSocial @nombre = @obraSocial;
 
                     SELECT @id_obra_social = id_obra_social 
@@ -590,14 +618,24 @@ BEGIN
 END
 GO
 
--- Importar Presentismo de Actividades desde Excel -- NO FUNCIONA
+-- Importar Presentismo de Actividades desde Excel - FUNCIONANDO
 CREATE OR ALTER PROCEDURE manejo_actividades.ImportarPresentismoActividades
     @RutaArchivo NVARCHAR(260)
 AS
 BEGIN
     SET NOCOUNT ON;
-
+    
+    -- Manejo de errores mejorado
     BEGIN TRY
+        -- Tablas temporales
+        CREATE TABLE #ErroresImportacion (
+            NroSocio VARCHAR(20),
+            Actividad NVARCHAR(100),
+            Fecha DATE,
+            Profesor NVARCHAR(100),
+            MensajeError NVARCHAR(MAX)
+        );
+
         CREATE TABLE #TempDatos (
             [Nro de Socio] VARCHAR(20),
             [Actividad] NVARCHAR(100),
@@ -606,19 +644,35 @@ BEGIN
             [Profesor] NVARCHAR(100)
         );
 
+        -- Importar datos desde Excel con validación de archivo
         DECLARE @SQL NVARCHAR(MAX);
         SET @SQL = N'
             INSERT INTO #TempDatos ([Nro de Socio], [Actividad], [fecha de asistencia], [Asistencia], [Profesor])
-            SELECT [Nro de Socio], [Actividad], [fecha de asistencia], [Asistencia], [Profesor]
+            SELECT 
+                LTRIM(RTRIM(CAST([Nro de Socio] AS VARCHAR(20)))),
+                LTRIM(RTRIM(CAST([Actividad] AS NVARCHAR(100)))),
+                CAST([fecha de asistencia] AS DATE),
+                LTRIM(RTRIM(CAST([Asistencia] AS VARCHAR(15)))),
+                LTRIM(RTRIM(CAST([Profesor] AS NVARCHAR(100))))
             FROM OPENROWSET(
                 ''Microsoft.ACE.OLEDB.12.0'',
                 ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
-                ''SELECT * FROM [presentismo_actividades$A1:E10000]'')';
+                ''SELECT * FROM [presentismo_actividades$A1:E10000]'')
+            WHERE [Nro de Socio] IS NOT NULL 
+              AND [Actividad] IS NOT NULL 
+              AND [fecha de asistencia] IS NOT NULL';
+        
         EXEC sp_executesql @SQL;
 
-        DECLARE @nroSocio VARCHAR(20), @actividad NVARCHAR(100), @fecha DATE, @asistencia VARCHAR(15), @profesor NVARCHAR(100);
-        DECLARE @id_socio INT, @id_actividad INT, @id_usuario INT, @estado BIT;
+        -- Variables de trabajo
+        DECLARE @nroSocio VARCHAR(20), @actividad NVARCHAR(100), @fecha DATE, 
+                @asistencia VARCHAR(15), @profesor NVARCHAR(100);
+        DECLARE @id_socio INT, @id_actividad INT, @id_usuario INT, @estado BIT, 
+                @id_clase INT, @id_categoria INT;
+        DECLARE @dia VARCHAR(9) = 'LUNES', @horario TIME = '08:00:00';
+        DECLARE @registrosProcesados INT = 0, @registrosExitosos INT = 0;
 
+        -- Cursor para procesar datos
         DECLARE cur CURSOR FOR
             SELECT [Nro de Socio], [Actividad], [fecha de asistencia], [Asistencia], [Profesor]
             FROM #TempDatos
@@ -629,80 +683,196 @@ BEGIN
 
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            -- Limpiar y buscar id_socio
-            SET @nroSocio = LTRIM(RTRIM(@nroSocio));
-            SELECT @id_socio = id_socio FROM manejo_personas.socio WHERE UPPER(numero_socio) = UPPER(@nroSocio);
+            SET @registrosProcesados = @registrosProcesados + 1;
+            
+            -- Limpiar variables para cada iteración
+            SET @id_socio = NULL;
+            SET @id_actividad = NULL;
+            SET @id_usuario = NULL;
+            SET @id_clase = NULL;
+            SET @id_categoria = NULL;
 
-            -- Limpiar y buscar id_actividad
-            SET @actividad = LTRIM(RTRIM(@actividad));
-            SELECT @id_actividad = id_actividad FROM manejo_actividades.actividad WHERE UPPER(nombre_actividad) = UPPER(@actividad);
+            -- Antes de buscar, normalizar los campos de texto
+            SET @nroSocio = dbo.NormalizarTexto(@nroSocio);
+            SET @actividad = dbo.NormalizarTexto(@actividad);
+            SET @profesor = dbo.NormalizarTexto(@profesor);
+            
+            -- Buscar socio
+            SELECT @id_socio = id_socio, @id_categoria = id_categoria 
+            FROM manejo_personas.socio 
+            WHERE numero_socio = @nroSocio;
 
-            -- Validar existencia
-            IF @id_socio IS NULL OR @id_actividad IS NULL
+            IF @id_socio IS NULL
             BEGIN
-                -- Opcional: registrar error en una tabla temporal de errores
-                -- GOTO SIGUIENTE; -- si usas un cursor
-                FETCH NEXT FROM cur INTO @nroSocio, @actividad, @fecha, @asistencia, @profesor;
-                CONTINUE;
+                INSERT INTO #ErroresImportacion VALUES (@nroSocio, @actividad, @fecha, @profesor, 'Socio no encontrado');
+                GOTO SIGUIENTE_REGISTRO;
             END
 
-            -- Buscar id_usuario (profesor)
-            DECLARE @nombre_prof NVARCHAR(50), @apellido_prof NVARCHAR(50);
-            SET @nombre_prof = LEFT(@profesor, CHARINDEX(' ', @profesor + ' ') - 1);
-            SET @apellido_prof = LTRIM(RIGHT(@profesor, LEN(@profesor) - CHARINDEX(' ', @profesor + ' ')));
-            SELECT @id_usuario = u.id_usuario
-            FROM manejo_personas.usuario u
-            INNER JOIN manejo_personas.persona p ON u.id_persona = p.id_persona
-            WHERE p.nombre = @nombre_prof AND p.apellido = @apellido_prof;
+            -- Buscar actividad (ya no crear si no existe)
+            SELECT @id_actividad = id_actividad
+            FROM manejo_actividades.actividad
+            WHERE DIFFERENCE(dbo.NormalizarTexto(nombre_actividad), dbo.NormalizarTexto(@actividad)) >= 3;
 
-            -- Mapear asistencia
-            SET @estado = CASE 
-                WHEN UPPER(LEFT(@asistencia,1)) = 'J' OR UPPER(@asistencia) = 'PRESENTE' THEN 1
-                ELSE 0
-            END;
-
-            -- Insertar o actualizar presentismo (socio_actividad)
-            IF NOT EXISTS (
-                SELECT 1 FROM manejo_personas.socio_actividad
-                WHERE id_socio = @id_socio AND id_actividad = @id_actividad AND fecha_inicio = @fecha
-            )
+            IF @id_actividad IS NULL
             BEGIN
-                INSERT INTO manejo_personas.socio_actividad (id_socio, id_actividad, fecha_inicio, estado)
-                VALUES (@id_socio, @id_actividad, @fecha, @estado);
+                INSERT INTO #ErroresImportacion VALUES (@nroSocio, @actividad, @fecha, @profesor, 'Actividad no encontrada');
+                GOTO SIGUIENTE_REGISTRO;
+            END
+
+            -- Buscar profesor (mejorado el parsing del nombre)
+            DECLARE @nombre_prof NVARCHAR(50), @apellido_prof NVARCHAR(50);
+            DECLARE @posicion_espacio INT = CHARINDEX(' ', @profesor);
+            
+            IF @posicion_espacio > 0
+            BEGIN
+                SET @nombre_prof = LEFT(@profesor, @posicion_espacio - 1);
+                SET @apellido_prof = LTRIM(SUBSTRING(@profesor, @posicion_espacio + 1, LEN(@profesor)));
             END
             ELSE
             BEGIN
-                UPDATE manejo_personas.socio_actividad
-                SET estado = @estado
-                WHERE id_socio = @id_socio AND id_actividad = @id_actividad AND fecha_inicio = @fecha;
+                SET @nombre_prof = @profesor;
+                SET @apellido_prof = '';
             END
 
+            SELECT @id_usuario = u.id_usuario
+            FROM manejo_personas.usuario u
+            INNER JOIN manejo_personas.persona p ON u.id_persona = p.id_persona
+            WHERE p.nombre LIKE @nombre_prof + '%'
+              AND (@apellido_prof = '' OR p.apellido LIKE @apellido_prof + '%');
+
+            IF @id_usuario IS NULL
+            BEGIN
+                INSERT INTO #ErroresImportacion VALUES (@nroSocio, @actividad, @fecha, @profesor, 'Profesor no encontrado');
+                GOTO SIGUIENTE_REGISTRO;
+            END
+
+            -- Buscar o crear clase
+            SELECT @id_clase = id_clase
+            FROM manejo_actividades.clase
+            WHERE id_actividad = @id_actividad 
+              AND id_categoria = @id_categoria 
+              AND id_usuario = @id_usuario;
+
+            IF @id_clase IS NULL
+            BEGIN
+                BEGIN TRY
+                    EXEC manejo_actividades.CrearClase
+                        @id_actividad = @id_actividad,
+                        @id_categoria = @id_categoria,
+                        @dia = @dia,
+                        @horario = @horario,
+                        @id_usuario = @id_usuario;
+
+                    -- Obtener el ID de la clase recién creada
+                    SELECT @id_clase = id_clase
+                    FROM manejo_actividades.clase
+                    WHERE id_actividad = @id_actividad 
+                      AND id_categoria = @id_categoria 
+                      AND id_usuario = @id_usuario 
+                      AND dia = @dia 
+                      AND horario = @horario;
+                END TRY
+                BEGIN CATCH
+                    INSERT INTO #ErroresImportacion VALUES (@nroSocio, @actividad, @fecha, @profesor, 
+                        'Error al crear clase: ' + ERROR_MESSAGE());
+                    GOTO SIGUIENTE_REGISTRO;
+                END CATCH
+
+                IF @id_clase IS NULL
+                BEGIN
+                    INSERT INTO #ErroresImportacion VALUES (@nroSocio, @actividad, @fecha, @profesor, 'No se pudo crear la clase');
+                    GOTO SIGUIENTE_REGISTRO;
+                END
+            END
+
+            -- Mapear estado de asistencia (mejorado)
+            SET @estado = CASE 
+                WHEN UPPER(LTRIM(RTRIM(@asistencia))) IN ('PRESENTE', 'P', 'SI', 'S', '1') THEN 1
+                WHEN UPPER(LTRIM(RTRIM(@asistencia))) LIKE 'J%' THEN 1  -- Para "Justificada" u otras variantes
+                ELSE 0
+            END;
+
+            -- Insertar o actualizar presentismo
+            BEGIN TRY
+                IF NOT EXISTS (
+                    SELECT 1 FROM manejo_personas.socio_actividad
+                    WHERE id_socio = @id_socio 
+                      AND id_actividad = @id_actividad 
+                      AND fecha_inicio = @fecha
+                )
+                BEGIN
+                    INSERT INTO manejo_personas.socio_actividad (id_socio, id_actividad, fecha_inicio, estado)
+                    VALUES (@id_socio, @id_actividad, @fecha, @estado);
+                END
+                ELSE
+                BEGIN
+                    UPDATE manejo_personas.socio_actividad
+                    SET estado = @estado
+                    WHERE id_socio = @id_socio 
+                      AND id_actividad = @id_actividad 
+                      AND fecha_inicio = @fecha;
+                END
+                
+                SET @registrosExitosos = @registrosExitosos + 1;
+            END TRY
+            BEGIN CATCH
+                INSERT INTO #ErroresImportacion VALUES (@nroSocio, @actividad, @fecha, @profesor, 
+                    'Error al insertar/actualizar: ' + ERROR_MESSAGE());
+            END CATCH
+
+            SIGUIENTE_REGISTRO:
             FETCH NEXT FROM cur INTO @nroSocio, @actividad, @fecha, @asistencia, @profesor;
         END
 
         CLOSE cur;
         DEALLOCATE cur;
+        
+        -- Limpiar tabla temporal
         DROP TABLE #TempDatos;
 
-        SELECT 'Exito' AS Resultado, 'Presentismo importado correctamente' AS Mensaje;
-        RETURN 0;
+        -- Retornar resultados
+        DECLARE @cantidadErrores INT = (SELECT COUNT(*) FROM #ErroresImportacion);
+        
+        IF @cantidadErrores > 0
+        BEGIN
+            SELECT 'Parcial' AS Resultado, 
+                   'Se procesaron ' + CAST(@registrosProcesados AS VARCHAR) + ' registros. ' +
+                   'Exitosos: ' + CAST(@registrosExitosos AS VARCHAR) + '. ' +
+                   'Errores: ' + CAST(@cantidadErrores AS VARCHAR) AS Mensaje;
+            SELECT * FROM #ErroresImportacion ORDER BY NroSocio, Fecha;
+        END
+        ELSE
+        BEGIN
+            SELECT 'Exito' AS Resultado, 
+                   'Se importaron correctamente ' + CAST(@registrosExitosos AS VARCHAR) + ' registros de presentismo' AS Mensaje;
+        END
 
+        DROP TABLE #ErroresImportacion;
+        
     END TRY
     BEGIN CATCH
-        IF CURSOR_STATUS('local', 'cur') >= 0
+        -- Manejo de errores globales
+        IF CURSOR_STATUS('global', 'cur') >= 0
         BEGIN
             CLOSE cur;
             DEALLOCATE cur;
         END
-
-        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
-            DROP TABLE #TempDatos;
-
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
-        RETURN -1;
+        
+        -- Limpiar tablas temporales si existen
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL DROP TABLE #TempDatos;
+        IF OBJECT_ID('tempdb..#ErroresImportacion') IS NOT NULL DROP TABLE #ErroresImportacion;
+        
+        SELECT 'Error' AS Resultado, 
+               'Error crítico en la importación: ' + ERROR_MESSAGE() AS Mensaje;
+        
+        -- Re-lanzar el error para debugging si es necesario
+        -- THROW;
     END CATCH
+    
+    RETURN 0;
 END
 GO
+
 
 EXEC manejo_actividades.ImportarCategorias 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 GO
@@ -716,59 +886,7 @@ GO
 EXEC manejo_actividades.ImportarActividades 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 GO
 
+-- HAY QUE EJECUTAR LO QUE ESTA EN GENERAR DATOS PARA EJECUTAR EL SIGUIENTE
+
 EXEC manejo_actividades.ImportarPresentismoActividades 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 GO
-
-select * from manejo_actividades.categoria
-GO
-
-select * from manejo_actividades.actividad
-GO
-
-select * from manejo_personas.persona
-GO
-
-select * from manejo_personas.socio
-GO
-
-SELECT 
-    sa.id_socio,
-    s.numero_socio,
-    p.nombre AS nombre_socio,
-    p.apellido AS apellido_socio,
-    sa.id_actividad,
-    a.nombre_actividad,
-    sa.fecha_inicio AS fecha_asistencia,
-    sa.estado AS asistencia,
-    u.id_usuario AS id_profesor,
-    pprof.nombre AS nombre_profesor,
-    pprof.apellido AS apellido_profesor
-FROM manejo_personas.socio_actividad sa
-INNER JOIN manejo_personas.socio s ON sa.id_socio = s.id_socio
-INNER JOIN manejo_personas.persona p ON s.id_persona = p.id_persona
-INNER JOIN manejo_actividades.actividad a ON sa.id_actividad = a.id_actividad
-LEFT JOIN manejo_actividades.clase c ON c.id_actividad = a.id_actividad AND c.id_categoria = s.id_categoria
-LEFT JOIN manejo_personas.usuario u ON c.id_usuario = u.id_usuario
-LEFT JOIN manejo_personas.persona pprof ON u.id_persona = pprof.id_persona
-ORDER BY sa.fecha_inicio DESC, s.numero_socio, a.nombre_actividad;
-GO
-
-SELECT 
-    c.id_clase,
-    a.nombre_actividad,
-    cat.nombre_categoria,
-    c.dia,
-    c.horario,
-    u.id_usuario AS id_profesor,
-    p.nombre AS nombre_profesor,
-    p.apellido AS apellido_profesor,
-    c.activo
-FROM manejo_actividades.clase c
-INNER JOIN manejo_actividades.actividad a ON c.id_actividad = a.id_actividad
-INNER JOIN manejo_actividades.categoria cat ON c.id_categoria = cat.id_categoria
-INNER JOIN manejo_personas.usuario u ON c.id_usuario = u.id_usuario
-INNER JOIN manejo_personas.persona p ON u.id_persona = p.id_persona
-ORDER BY a.nombre_actividad, cat.nombre_categoria, c.dia, c.horario;
-GO
-
-

@@ -40,17 +40,17 @@
           <AssociatedConnUserName />
           <FullPath>03_SP.sql</FullPath>
         </FileNode>
-        <FileNode Name="04_ImportarDatos.sql">
+        <FileNode Name="04_vistas.sql">
           <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:localhost:True</AssociatedConnectionMoniker>
           <AssociatedConnSrvName>localhost</AssociatedConnSrvName>
           <AssociatedConnUserName />
-          <FullPath>04_ImportarDatos.sql</FullPath>
+          <FullPath>04_vistas.sql</FullPath>
         </FileNode>
-        <FileNode Name="05_vistas.sql">
+        <FileNode Name="05_ImportarDatos.sql">
           <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:localhost:True</AssociatedConnectionMoniker>
           <AssociatedConnSrvName>localhost</AssociatedConnSrvName>
           <AssociatedConnUserName />
-          <FullPath>05_vistas.sql</FullPath>
+          <FullPath>05_ImportarDatos.sql</FullPath>
         </FileNode>
         <FileNode Name="generarDatos.sql">
           <AssociatedConnectionMoniker>8c91a03d-f9b4-46c0-a305-b5dcc79ff907:localhost:True</AssociatedConnectionMoniker>

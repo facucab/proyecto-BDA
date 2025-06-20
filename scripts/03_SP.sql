@@ -1749,7 +1749,7 @@ BEGIN
 
         IF @nombre_actividad IS NOT NULL AND EXISTS (
             SELECT 1 FROM manejo_actividades.actividad
-            WHERE nombre_actividad = @nombre_actividad AND id_actividad <> @id
+            WHERE dbo.NormalizarTexto(nombre_actividad) = dbo.NormalizarTexto(@nombre_actividad) AND id_actividad <> @id
         )
         BEGIN
             ROLLBACK TRANSACTION;

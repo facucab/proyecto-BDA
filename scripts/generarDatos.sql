@@ -33,6 +33,13 @@ INSERT INTO @roles (descripcion) VALUES
 ('Administrativo de Facturacion'), ('Administrativo Socio'), ('Socios web'),
 ('presidente'), ('vicepresidente'), ('secretario'), ('vocales');
 
+-- Listas de nombres y apellidos reales
+DECLARE @nombres TABLE (nombre NVARCHAR(50));
+INSERT INTO @nombres VALUES ('Juan'), ('María'), ('Pedro'), ('Lucía'), ('Carlos'), ('Ana'), ('Sofía'), ('Martín'), ('Valentina'), ('Javier');
+
+DECLARE @apellidos TABLE (apellido NVARCHAR(50));
+INSERT INTO @apellidos VALUES ('Gómez'), ('Pérez'), ('Rodríguez'), ('Fernández'), ('López'), ('Martínez'), ('García'), ('Sánchez'), ('Romero'), ('Torres');
+
 DECLARE @i INT = 1;
 DECLARE @nombre NVARCHAR(50), @apellido NVARCHAR(50), @dni VARCHAR(9), @email VARCHAR(320), @fecha_nac DATE, @telefono NVARCHAR(20);
 DECLARE @id_persona INT, @id_usuario INT, @id_rol INT;
@@ -40,15 +47,24 @@ DECLARE @username VARCHAR(50), @password_hash VARCHAR(256);
 
 WHILE @i <= (SELECT COUNT(*) FROM @roles)
 BEGIN
-    -- Datos random
-    SET @nombre = 'Nombre' + CAST(@i AS NVARCHAR(10));
-    SET @apellido = 'Apellido' + CAST(@i AS NVARCHAR(10));
+    -- Seleccionar nombre y apellido realista
+    SELECT TOP 1 @nombre = nombre FROM (SELECT nombre, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS rn FROM @nombres) n WHERE n.rn = @i;
+    SELECT TOP 1 @apellido = apellido FROM (SELECT apellido, ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS rn FROM @apellidos) a WHERE a.rn = @i;
+
+    -- Si hay más roles que nombres/apellidos, cicla la lista
+    IF @nombre IS NULL SELECT TOP 1 @nombre = nombre FROM @nombres;
+    IF @apellido IS NULL SELECT TOP 1 @apellido = apellido FROM @apellidos;
+
     SET @dni = RIGHT('00000000' + CAST(40000000 + @i AS VARCHAR(9)), 9);
     SET @email = LOWER(@nombre + '.' + @apellido + '@mail.com');
     SET @fecha_nac = DATEADD(YEAR, -25 - @i, GETDATE());
     SET @telefono = '11' + RIGHT('00000000' + CAST(10000000 + @i AS VARCHAR(8)), 8);
 
     -- Crear persona
+    IF @nombre IS NOT NULL
+        SET @nombre = dbo.NormalizarTexto(LTRIM(RTRIM(@nombre)));
+    IF @apellido IS NOT NULL
+        SET @apellido = dbo.NormalizarTexto(LTRIM(RTRIM(@apellido)));
     EXEC manejo_personas.CrearPersona
         @dni = @dni,
         @nombre = @nombre,
@@ -61,7 +77,7 @@ BEGIN
     SELECT @id_persona = id_persona FROM manejo_personas.persona WHERE dni = @dni;
 
     -- Crear usuario
-    SET @username = LOWER(@nombre + @apellido);
+    SET @username = dbo.NormalizarTexto(LTRIM(RTRIM(@nombre + @apellido)));
     SET @password_hash = REPLICATE('A', 256); -- Hash dummy
     EXEC manejo_personas.CrearUsuario
         @id_persona = @id_persona,
@@ -105,6 +121,10 @@ BEGIN
     SET @telefono = '11' + RIGHT('00000000' + CAST(20000000 + ABS(CHECKSUM(NEWID())) % 1000000 AS VARCHAR(8)), 8);
 
     -- Crear persona
+    IF @prof_nombre IS NOT NULL
+        SET @prof_nombre = dbo.NormalizarTexto(LTRIM(RTRIM(@prof_nombre)));
+    IF @prof_apellido IS NOT NULL
+        SET @prof_apellido = dbo.NormalizarTexto(LTRIM(RTRIM(@prof_apellido)));
     EXEC manejo_personas.CrearPersona
         @dni = @dni,
         @nombre = @prof_nombre,
@@ -117,7 +137,7 @@ BEGIN
     SELECT @id_persona = id_persona FROM manejo_personas.persona WHERE dni = @dni;
 
     -- Crear usuario
-    SET @username = LOWER(REPLACE(@prof_nombre, ' ', '') + REPLACE(@prof_apellido, ' ', ''));
+    SET @username = dbo.NormalizarTexto(LTRIM(RTRIM(REPLACE(@prof_nombre, ' ', '') + REPLACE(@prof_apellido, ' ', ''))));
     SET @password_hash = REPLICATE('B', 256); -- Hash dummy
     EXEC manejo_personas.CrearUsuario
         @id_persona = @id_persona,
@@ -139,4 +159,51 @@ CLOSE prof_cursor;
 DEALLOCATE prof_cursor;
 GO
 
+CREATE OR ALTER VIEW manejo_personas.VistaUsuariosCompleta AS
+SELECT 
+    u.id_usuario,
+    u.username,
+    u.password_hash,
+    u.fecha_alta_contra,
+    u.estado AS usuario_activo,
+    p.id_persona,
+    p.dni,
+    p.nombre,
+    p.apellido,
+    p.email,
+    p.fecha_nac,
+    p.telefono,
+    p.fecha_alta AS persona_fecha_alta,
+    p.activo AS persona_activa,
+    r.descripcion AS rol,
+    CASE 
+        WHEN u.estado = 1 THEN 'Activo'
+        ELSE 'Inactivo'
+    END AS estado_usuario
+FROM manejo_personas.usuario u
+INNER JOIN manejo_personas.persona p ON u.id_persona = p.id_persona
+LEFT JOIN manejo_personas.Usuario_Rol ur ON u.id_usuario = ur.id_usuario
+LEFT JOIN manejo_personas.Rol r ON ur.id_rol = r.id_rol;
+GO
 
+
+--Genera actividades
+EXEC manejo_actividades.CrearActividad
+	@nombre_actividad = dbo.NormalizarTexto(LTRIM(RTRIM('Fulbol'))),
+	@costo_mensual = 2000.00,
+	@vigencia = '2024-12-31';
+
+CREATE OR ALTER FUNCTION dbo.NormalizarTexto(@texto NVARCHAR(200)) RETURNS NVARCHAR(200)
+AS
+BEGIN
+    SET @texto = UPPER(@texto)
+    SET @texto = REPLACE(@texto, 'Á', 'A')
+    SET @texto = REPLACE(@texto, 'É', 'E')
+    SET @texto = REPLACE(@texto, 'Í', 'I')
+    SET @texto = REPLACE(@texto, 'Ó', 'O')
+    SET @texto = REPLACE(@texto, 'Ú', 'U')
+    SET @texto = REPLACE(@texto, 'Ü', 'U')
+    SET @texto = REPLACE(@texto, 'Ñ', 'N')
+    RETURN @texto
+END
+GO
