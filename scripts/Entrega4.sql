@@ -52,7 +52,7 @@ CREATE TABLE usuarios.grupo_familiar(
     estado BIT NOT NULL DEFAULT 1
 );
 GO
-CREATE TABLE usuarios.categoria(
+CREATE TABLE actividades.categoria(
 	id_categoria INT IDENTITY(1,1) PRIMARY KEY, 
 	nombre_categoria VARCHAR(50) NOT NULL,
 	costo_membrecia DECIMAL(10, 2) NOT NULL,
@@ -79,7 +79,7 @@ CREATE TABLE usuarios.socio(
 	ON DELETE SET NULL, -- Si se elimina la obra social, se asigna NULL
 	CONSTRAINT FK_socio_grupo_familiar FOREIGN KEY (id_grupo) REFERENCES usuarios.grupo_familiar(id_grupo_familiar)
 	ON DELETE SET NULL, -- Si se elimina el grupo familiar, se asigna NULL
-	CONSTRAINT FK_Socio_Categoria FOREIGN KEY (id_categoria) REFERENCES usuarios.categoria(id_categoria)
+	CONSTRAINT FK_Socio_Categoria FOREIGN KEY (id_categoria) REFERENCES actividades.categoria(id_categoria)
 
 );
 GO
@@ -117,19 +117,51 @@ CREATE TABLE usuarios.responsable(
 	CONSTRAINT FK_responsable_persona FOREIGN KEY (id_persona) REFERENCES usuarios.persona(id_persona),
 	CONSTRAINT FK_responsable_grupo_familiar FOREIGN KEY (id_grupo) REFERENCES usuarios.grupo_familiar(id_grupo_familiar)
 );
-
-/*
-CREATE TABLE manejo_personas.responsable (
-    id_grupo INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
-    id_responsable INT UNIQUE,
-    id_persona INT NOT NULL UNIQUE,
-    parentesco VARCHAR(10) NOT NULL, -- Todos los roles que dice el TP Pone 5 digitos, le doy 10 por la dudas
-	-- SCHEMA PARA PERSONAS
-    CONSTRAINT FK_Responsable_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
-    CONSTRAINT FK_Responsable_Grupo_Familiar FOREIGN KEY (id_grupo) REFERENCES manejo_personas.grupo_familiar(id_grupo)
+GO
+CREATE TABLE actividades.actividad (
+	id_actividad INT IDENTITY PRIMARY KEY,
+	nombre VARCHAR(50) NOT NULL,
+	costo_mensual DECIMAL(10,2) NOT NULL,
+	estado BIT NOT NULL DEFAULT 1,
+	CONSTRAINT CK_costo_mensual CHECK(costo_mensual > 0)
 );
-*/
+GO
+CREATE TABLE actividades.clase(
+	id_clase INT IDENTITY(1,1) PRIMARY KEY,
+	id_actividad INT NOT NULL,
+	id_categoria INT NOT NULL,
+	dia VARCHAR(9) NOT NULL,
+	horario TIME NOT NULL,
+	id_usuario INT NOT NULL, -- Usuario que dicta la clase. 
+	estado BIT NOT NULL DEFAULT 1,
+	CONSTRAINT FK_clase_usuario FOREIGN KEY (id_usuario) REFERENCES usuarios.usuario(id_usuario),
+	CONSTRAINT FK_clase_actividad FOREIGN KEY (id_actividad) REFERENCES actividades.actividad(id_actividad),
+	CONSTRAINT FK_clase_categoria FOREIGN KEY (id_categoria) REFERENCES actividades.categoria(id_categoria),
+	CONSTRAINT CK_dia CHECK(dia IN('lunes', 'martes', 'miercoles', 'jueves', 'viernes','sabado', 'domingo'))
+); 
+GO
+CREATE TABLE usuarios.Rol (
+    id_rol INT IDENTITY(1,1) PRIMARY KEY,
+	nombre VARCHAR(50) NOT NULL UNIQUE,
+    descripcion VARCHAR(100) NOT NULL
+);
+GO
+CREATE TABLE usuarios.Usuario_Rol(
+	id_usuario INT NOT NULL,
+    id_rol INT NOT NULL,
+    PRIMARY KEY (id_usuario, id_rol),
+	CONSTRAINT FK_Usuario_Rol_Usuario FOREIGN KEY (id_usuario) REFERENCES usuarios.usuario(id_usuario),
+    CONSTRAINT FK_Usuario_Rol_Rol FOREIGN KEY (id_rol) REFERENCES usuarios.rol(id_rol)
+);
+GO
+CREATE TABLE facturacion.metodo_pago (
+	id_metodo_pago INT IDENTITY(1,1) PRIMARY KEY,
+	nombre VARCHAR(50) NOT NULL UNIQUE
+);
+GO 
+-- QUEDAN LAS TABLAS DE FACTURA: 
 
+-- STORE PROCEDURES: 
 
 
 
