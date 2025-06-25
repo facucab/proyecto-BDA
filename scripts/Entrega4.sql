@@ -158,10 +158,171 @@ CREATE TABLE facturacion.metodo_pago (
 	id_metodo_pago INT IDENTITY(1,1) PRIMARY KEY,
 	nombre VARCHAR(50) NOT NULL UNIQUE
 );
-GO 
+
 -- QUEDAN LAS TABLAS DE FACTURA: 
 
--- STORE PROCEDURES: 
+-- ############################################################
+-- ######################## SP PERSONA ########################
+-- ############################################################
+GO 
+/*
+* Nombre: CrearPersona
+* Descripcion: Inserta una nueva persona en la tabla persona, validando su informacion. 
+* Parametros:
+*	@dni  VARCHAR(8) - DNI de la persona.
+*	@nombre VARCHAR(50) - Nombre de la persona. 
+*	@apellido VARCHAR(50) - Apellido de la persona. 
+* 	@email VARCHAR(320) - Email de la persona. 
+* 	@fecha_nac DATE - Fecha de nacimiento.
+*	@telefono VARCHAR(15) - Telefono de la persona
+*
+* Aclaracion: No se utiliza transaccione explicitas ya que: 
+*	Solo se trabaja con una unica tablas y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE usuarios.CrearPersona
+	@dni VARCHAR(9),
+	@nombre VARCHAR(50),
+	@apellido VARCHAR(50),
+	@email VARCHAR(320),
+	@fecha_nac DATE,
+	@telefono VARCHAR(20)
+AS
+BEGIN
+	SET NOCOUNT ON;
+	-- Valido DNI:
+	IF @dni IS NULL OR LEN(@dni) < 7 OR LEN(@dni) > 8 OR @dni LIKE '%[^0-9]%' BEGIN
+		SELECT 'Error' as Resultado, 'DNI inválido. Debe contener entre 7 y 8 dígitos numéricos.' AS Mensaje, '400' AS Estado; 
+		RETURN; 
+	END;
+	-- Valido email: 
+	 IF @email NOT LIKE '%@%.%' OR @email LIKE '@%' OR @email LIKE '%@%@%' BEGIN
+        SELECT 'Error' AS Resultado, 'Formato de email inválido.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END; 
+	-- Valido nombre
+	IF @nombre IS NULL
+	BEGIN
+		SELECT 'Error' AS Resultado, 'El nombre es obligatorio' AS Mensaje, '400' AS Estado;
+	END;
+	-- Valido apellido
+	IF @apellido IS NULL
+	BEGIN
+		SELECT 'Error' AS Resultado, 'El apellido es obligatorio' AS Mensaje, '400' AS Estado;
+	END;
+	--Valido fecha de nacimiento: 
+	 IF @fecha_nac >= GETDATE() BEGIN
+        SELECT 'Error' AS Resultado, 'La fecha de nacimiento debe ser anterior a hoy.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END; 
+	-- Valido telefono: 
+	IF @telefono IS NULL OR LEN(@telefono) = 0 BEGIN
+        SELECT 'Error' AS Resultado, 'Teléfono obligatorio.' AS Mensaje;
+        RETURN;
+    END; 
+	-- Inserto en la tabla: 
+	BEGIN TRY
+		INSERT INTO usuarios.persona(dni, nombre, apellido, email, fecha_nac, telefono)
+        VALUES (@dni, @nombre, @apellido, @email, @fecha_nac, @telefono);
+		SELECT 'OK' as Resultado, 'La persona fue creada correctamente' AS Mensaje, '200' AS Estado;
+	END TRY 
+	BEGIN CATCH
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH; 
+END; 
 
+GO
+/*
+* Nombre: ModificarPersona
+* Descripcion: Permite modificar de una persona los campos: nombre, apellido, email y telefono.
+* Parametros:
+*	@id_persona  INT - ID de persona. 
+*	@nombre NVARCHAR(50) - Nombre nuevo para la persona. (Parametro opcional)
+*	@apellido NVARCHAR(50) - Apellido nuevo para la persona. (Parametro opcional)
+* 	@email VARCHAR(320) - Nuevo email para la persona. (Parametro opcional) 
+*	@telefono VARCHAR(15) - Nuevo telefono para la persona
+*/
+CREATE OR ALTER PROCEDURE usuarios.ModificarPersona
+	@id_persona INT,
+    @nombre VARCHAR(50),
+    @apellido VARCHAR(50),
+    @email VARCHAR(320),
+    @fecha_nac DATE,
+    @telefono VARCHAR(20)
+AS BEGIN
+    SET NOCOUNT ON;
+	-- Valido que exista el id enviado
+	IF NOT EXISTS (SELECT 1 FROM usuarios.persona AS p WHERE p.id_persona = @id_persona AND p.activo = 1)
+	BEGIN
+		SELECT 'Error' AS Resultado, 'La persona no fue encontrada' AS Mensaje, '404' AS Estado;
+        RETURN;
+	END; 
+	-- Valido email: 
+	 IF @email NOT LIKE '%@%.%' OR @email LIKE '@%' OR @email LIKE '%@%@%' BEGIN
+        SELECT 'Error' AS Resultado, 'Formato de email inválido.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END; 
+	-- Valido nombre
+	IF @nombre IS NULL
+	BEGIN
+		SELECT 'Error' AS Resultado, 'El nombre es obligatorio' AS Mensaje, '400' AS Estado;
+	END;
+	-- Valido apellido
+	IF @apellido IS NULL
+	BEGIN
+		SELECT 'Error' AS Resultado, 'El apellido es obligatorio' AS Mensaje, '400' AS Estado;
+	END;
+	--Valido fecha de nacimiento: 
+	 IF @fecha_nac >= GETDATE() BEGIN
+        SELECT 'Error' AS Resultado, 'La fecha de nacimiento debe ser anterior a hoy.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END; 
+	-- Valido telefono: 
+	IF @telefono IS NULL OR LEN(@telefono) = 0 BEGIN
+        SELECT 'Error' AS Resultado, 'Teléfono obligatorio.' AS Mensaje;
+        RETURN;
+    END; 
+	BEGIN TRY
+		UPDATE usuarios.persona SET 
+			nombre = @nombre,
+			apellido = @apellido,
+            email = @email,
+            fecha_nac = @fecha_nac,
+            telefono = @telefono
+        WHERE id_persona = @id_persona;
+        SELECT 'OK' AS Resultado, 'La persona fue modificada correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END; 
+GO 
+/*
+* Nombre: EliminarPersona
+* Descripcion: Realiza una eliminacion logica de una persona.
+* Parametros:
+*	@id_persona  INT - ID de persona a eliminar. 
+*/
+CREATE OR ALTER PROCEDURE usuarios.EliminarPersona
+    @id_persona INT
+AS
+BEGIN
+    SET NOCOUNT ON;
 
+    IF NOT EXISTS (SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'La persona no fue encontrada' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
 
+    BEGIN TRY
+        UPDATE usuarios.persona
+        SET activo = 0
+        WHERE id_persona = @id_persona;
+
+        SELECT 'OK' AS Resultado, 'La persona fue dada de baja correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH
+END;
+GO
