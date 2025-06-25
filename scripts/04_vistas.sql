@@ -1,6 +1,5 @@
 USE Com5600G01;
 GO
--- Ejecuta aquí todo el contenido de 02_CrearTablas.sql
 
 -- Vista para mostrar información completa de socios
 CREATE OR ALTER VIEW manejo_personas.VistaSociosCompleta AS
@@ -128,4 +127,28 @@ INNER JOIN manejo_actividades.clase c ON a.id_actividad = c.id_actividad AND s.i
 INNER JOIN manejo_actividades.categoria cat ON c.id_categoria = cat.id_categoria
 INNER JOIN manejo_personas.usuario up ON c.id_usuario = up.id_usuario
 INNER JOIN manejo_personas.persona pp ON up.id_persona = pp.id_persona;
+GO
+
+-- Vista para mostrar información de grupos familiares
+CREATE OR ALTER VIEW manejo_personas.VistaGruposFamiliares AS
+SELECT
+    gf.id_grupo,
+    gf.fecha_alta AS grupo_fecha_alta,
+    gf.estado AS grupo_activo,
+    r.id_responsable,
+    p_resp.dni AS dni_responsable,
+    p_resp.nombre AS nombre_responsable,
+    p_resp.apellido AS apellido_responsable,
+    s.id_socio,
+    s.numero_socio,
+    p_socio.dni AS dni_socio,
+    p_socio.nombre AS nombre_socio,
+    p_socio.apellido AS apellido_socio,
+    s.id_categoria,
+    s.id_obra_social
+FROM manejo_personas.grupo_familiar gf
+LEFT JOIN manejo_personas.responsable r ON gf.id_grupo = r.id_grupo
+LEFT JOIN manejo_personas.persona p_resp ON r.id_persona = p_resp.id_persona
+LEFT JOIN manejo_personas.socio s ON gf.id_grupo = s.id_grupo
+LEFT JOIN manejo_personas.persona p_socio ON s.id_persona = p_socio.id_persona;
 GO

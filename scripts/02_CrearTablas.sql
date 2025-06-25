@@ -90,13 +90,13 @@ GO
 
 -- RESPONSABLE
 CREATE TABLE manejo_personas.responsable (
-    id_grupo INT NOT NULL IDENTITY(1,1) PRIMARY KEY,
-    id_responsable INT UNIQUE,
+    id_responsable INT IDENTITY(1,1) PRIMARY KEY,
     id_persona INT NOT NULL UNIQUE,
-    parentesco VARCHAR(10) NOT NULL, -- Todos los roles que dice el TP Pone 5 digitos, le doy 10 por la dudas
+    id_grupo INT NOT NULL UNIQUE,
+    parentesco VARCHAR(10) NOT NULL,
 	-- SCHEMA PARA PERSONAS
-    CONSTRAINT FK_Responsable_Persona FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
-    CONSTRAINT FK_Responsable_Grupo_Familiar FOREIGN KEY (id_grupo) REFERENCES manejo_personas.grupo_familiar(id_grupo)
+    CONSTRAINT FK_Responsable_Persona_Resp FOREIGN KEY (id_persona) REFERENCES manejo_personas.persona(id_persona),
+    CONSTRAINT FK_Responsable_Grupo_Familiar_Resp FOREIGN KEY (id_grupo) REFERENCES manejo_personas.grupo_familiar(id_grupo)
 );
 GO
 

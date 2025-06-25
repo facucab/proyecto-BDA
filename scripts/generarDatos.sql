@@ -1,6 +1,21 @@
 USE Com5600G01;
 GO
 
+CREATE OR ALTER FUNCTION dbo.NormalizarTexto(@texto NVARCHAR(200)) RETURNS NVARCHAR(200)
+AS
+BEGIN
+    SET @texto = UPPER(@texto)
+    SET @texto = REPLACE(@texto, 'Á', 'A')
+    SET @texto = REPLACE(@texto, 'É', 'E')
+    SET @texto = REPLACE(@texto, 'Í', 'I')
+    SET @texto = REPLACE(@texto, 'Ó', 'O')
+    SET @texto = REPLACE(@texto, 'Ú', 'U')
+    SET @texto = REPLACE(@texto, 'Ü', 'U')
+    SET @texto = REPLACE(@texto, 'Ñ', 'N')
+    RETURN @texto
+END
+GO
+
 -- Crear roles según la tabla y agregar el rol de profesor
 INSERT INTO manejo_personas.rol (descripcion)
 SELECT 'Jefe de Tesorería' WHERE NOT EXISTS (SELECT 1 FROM manejo_personas.rol WHERE descripcion = 'Jefe de Tesorería');
@@ -159,6 +174,51 @@ CLOSE prof_cursor;
 DEALLOCATE prof_cursor;
 GO
 
+-- Crear personas adicionales para ser socios
+PRINT 'Creando personas adicionales para ser socios...';
+GO
+
+-- Listas de nombres y apellidos para socios
+DECLARE @nombres_socios TABLE (nombre NVARCHAR(50));
+INSERT INTO @nombres_socios VALUES ('Alejandro'), ('Beatriz'), ('Claudio'), ('Daniela'), ('Esteban'), ('Florencia'), ('Gabriel'), ('Laura'), ('Ivan'), ('Julieta'), ('Mariano'), ('Natalia'), ('Oscar'), ('Patricia'), ('Ricardo');
+
+DECLARE @apellidos_socios TABLE (apellido NVARCHAR(50));
+INSERT INTO @apellidos_socios VALUES ('Diaz'), ('Acosta'), ('Moreno'), ('Suarez'), ('Castro'), ('Gimenez'), ('Vazquez'), ('Benitez'), ('Ramirez'), ('Rojas'), ('Heredia'), ('Flores'), ('Vega'), ('Ramos'), ('Soria');
+
+DECLARE @k INT = 1;
+DECLARE @personas_a_crear_socios INT = 25; -- Para llegar de SN-4135 a SN-4153 y un poco más
+
+DECLARE @socio_nombre NVARCHAR(50), @socio_apellido NVARCHAR(50), @socio_dni VARCHAR(9), @socio_email VARCHAR(320), @socio_fecha_nac DATE, @socio_telefono NVARCHAR(20);
+
+WHILE @k <= @personas_a_crear_socios
+BEGIN
+    -- Seleccionar nombre y apellido aleatorio
+    SELECT TOP 1 @socio_nombre = nombre FROM @nombres_socios ORDER BY NEWID();
+    SELECT TOP 1 @socio_apellido = apellido FROM @apellidos_socios ORDER BY NEWID();
+
+    SET @socio_dni = RIGHT('00000000' + CAST(70000000 + @k AS VARCHAR(9)), 9); -- Nuevo rango de DNI
+    SET @socio_email = LOWER(REPLACE(@socio_nombre, ' ', '') + '.' + REPLACE(@socio_apellido, ' ', '') + CAST(@k AS VARCHAR(3)) + '@sociomail.com'); -- Email único
+    SET @socio_fecha_nac = DATEADD(YEAR, -(18 + ABS(CHECKSUM(NEWID())) % 40), GETDATE()); -- Edades entre 18 y 58
+    SET @socio_telefono = '11' + RIGHT('00000000' + CAST(50000000 + @k AS VARCHAR(8)), 8); -- Nuevo rango de teléfonos
+
+    -- Crear persona (asumiendo que CrearPersona se encarga de normalizar)
+    IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE dni = @socio_dni OR email = @socio_email)
+    BEGIN
+        EXEC manejo_personas.CrearPersona
+            @dni = @socio_dni,
+            @nombre = @socio_nombre,
+            @apellido = @socio_apellido,
+            @email = @socio_email,
+            @fecha_nac = @socio_fecha_nac,
+            @telefono = @socio_telefono;
+    END
+
+    SET @k = @k + 1;
+END
+GO
+PRINT 'Creación de personas adicionales finalizada.';
+GO
+
 CREATE OR ALTER VIEW manejo_personas.VistaUsuariosCompleta AS
 SELECT 
     u.id_usuario,
@@ -192,18 +252,3 @@ EXEC manejo_actividades.CrearActividad
 	@nombre_actividad = dbo.NormalizarTexto(LTRIM(RTRIM('Fulbol'))),
 	@costo_mensual = 2000.00,
 	@vigencia = '2024-12-31';
-
-CREATE OR ALTER FUNCTION dbo.NormalizarTexto(@texto NVARCHAR(200)) RETURNS NVARCHAR(200)
-AS
-BEGIN
-    SET @texto = UPPER(@texto)
-    SET @texto = REPLACE(@texto, 'Á', 'A')
-    SET @texto = REPLACE(@texto, 'É', 'E')
-    SET @texto = REPLACE(@texto, 'Í', 'I')
-    SET @texto = REPLACE(@texto, 'Ó', 'O')
-    SET @texto = REPLACE(@texto, 'Ú', 'U')
-    SET @texto = REPLACE(@texto, 'Ü', 'U')
-    SET @texto = REPLACE(@texto, 'Ñ', 'N')
-    RETURN @texto
-END
-GO

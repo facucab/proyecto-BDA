@@ -17,3 +17,5 @@ select * from manejo_personas.persona
 GO
 select * from manejo_personas.socio
 GO
+select * from manejo_personas.VistaGruposFamiliares
+GO

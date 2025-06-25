@@ -251,7 +251,7 @@ BEGIN
 END
 GO
 
--- Importar Facturas
+-- Importar Facturas - FUNCIONANDO
 CREATE OR ALTER PROCEDURE pagos_y_facturas.ImportarFacturas
     @RutaArchivo NVARCHAR(260)
 AS
@@ -709,8 +709,8 @@ BEGIN
             END
 
             -- Buscar actividad (ya no crear si no existe)
-            SELECT @id_actividad = id_actividad
-            FROM manejo_actividades.actividad
+            SELECT @id_actividad = id_actividad 
+            FROM manejo_actividades.actividad 
             WHERE DIFFERENCE(dbo.NormalizarTexto(nombre_actividad), dbo.NormalizarTexto(@actividad)) >= 3;
 
             IF @id_actividad IS NULL
@@ -873,6 +873,495 @@ BEGIN
 END
 GO
 
+-- Importar Grupo Familiar - NO ANDA
+CREATE OR ALTER PROCEDURE manejo_personas.ImportarGrupoFamiliar
+    @RutaArchivo NVARCHAR(260)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+        -- Crear tabla temporal para los datos
+        CREATE TABLE #TempDatos (
+            [Nro de Socio] VARCHAR(20),
+            [Nro de socio RP] VARCHAR(20),
+            [Nombre] NVARCHAR(50),
+            [apellido] NVARCHAR(50),
+            [DNI] VARCHAR(20),
+            [email personal] NVARCHAR(320),
+            [fecha de nacimiento] DATE,
+            [teléfono de contacto] VARCHAR(50),
+            [teléfono de contacto emergencia] VARCHAR(50),
+            [Nombre de la obra social o prepaga] NVARCHAR(100),
+            [nro. de socio obra social/prepaga ] VARCHAR(50),
+            [teléfono de contacto de emergencia] VARCHAR(50)
+        );
+
+        CREATE TABLE #ErroresImportacion (
+            DNI VARCHAR(20),
+            NroSocio VARCHAR(20),
+            MensajeError NVARCHAR(MAX)
+        );
+
+        -- Leer los datos desde la hoja "Grupo Familiar"
+        DECLARE @SQL NVARCHAR(MAX);
+        SET @SQL = N'
+            INSERT INTO #TempDatos (
+                [Nro de Socio], [Nro de socio RP], [Nombre], [apellido], [DNI], [email personal],
+                [fecha de nacimiento], [teléfono de contacto], [teléfono de contacto emergencia],
+                [Nombre de la obra social o prepaga], [nro. de socio obra social/prepaga ], [teléfono de contacto de emergencia]
+            )
+            SELECT *
+            FROM OPENROWSET(
+                ''Microsoft.ACE.OLEDB.12.0'',
+                ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
+                ''SELECT * FROM [Grupo Familiar$]'')';
+        EXEC sp_executesql @SQL;
+
+        -- Variables para el cursor
+        DECLARE @nroSocio VARCHAR(20), @nroSocioRP VARCHAR(20), @nombre NVARCHAR(50), @apellido NVARCHAR(50),
+                @dni VARCHAR(20), @email NVARCHAR(320), @fechaNac DATE, @telefono VARCHAR(50),
+                @telefonoEmergencia VARCHAR(50), @obraSocial NVARCHAR(100), @nroSocioObra VARCHAR(50), @telefonoObra VARCHAR(50);
+        DECLARE @id_persona INT, @id_socio INT, @id_responsable INT, @id_grupo INT, @id_obra_social INT;
+
+        DECLARE cur CURSOR FOR 
+        SELECT [Nro de Socio], [Nro de socio RP], [Nombre], [apellido], [DNI], [email personal],
+               [fecha de nacimiento], [teléfono de contacto], [teléfono de contacto emergencia],
+               [Nombre de la obra social o prepaga], [nro. de socio obra social/prepaga ], [teléfono de contacto de emergencia]
+        FROM #TempDatos
+        WHERE [DNI] IS NOT NULL AND LTRIM(RTRIM([DNI])) <> '';
+
+        OPEN cur;
+        FETCH NEXT FROM cur INTO @nroSocio, @nroSocioRP, @nombre, @apellido, @dni, @email, @fechaNac,
+                                     @telefono, @telefonoEmergencia, @obraSocial, @nroSocioObra, @telefonoObra;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            BEGIN TRY
+                -- Limpiar y normalizar datos
+                SET @dni = REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(@dni, ''))), '.', ''), '-', '');
+                SET @nombre = dbo.NormalizarTexto(ISNULL(@nombre, ''));
+                SET @apellido = dbo.NormalizarTexto(ISNULL(@apellido, ''));
+                SET @email = CASE 
+                    WHEN @email IS NULL OR LTRIM(RTRIM(@email)) = '' THEN NULL
+                    ELSE LOWER(REPLACE(LTRIM(RTRIM(@email)), ' ', ''))
+                END;
+                SET @nroSocio = UPPER(LTRIM(RTRIM(ISNULL(@nroSocio, ''))));
+                SET @nroSocioRP = UPPER(LTRIM(RTRIM(ISNULL(@nroSocioRP, ''))));
+                SET @obraSocial = dbo.NormalizarTexto(LTRIM(RTRIM(ISNULL(@obraSocial, ''))));
+                SET @nroSocioObra = LTRIM(RTRIM(ISNULL(@nroSocioObra, '')));
+
+                -- 1. Verificar que el socio responsable exista
+                SELECT @id_responsable = s.id_socio, @id_grupo = s.id_grupo
+                FROM manejo_personas.socio s
+                WHERE s.numero_socio = @nroSocioRP;
+
+                IF @id_responsable IS NULL
+                BEGIN
+                    INSERT INTO #ErroresImportacion VALUES (@dni, @nroSocio, 'Socio responsable no encontrado: ' + ISNULL(@nroSocioRP, 'NULL'));
+                    GOTO SIGUIENTE;
+                END
+
+                -- 2. Si el responsable no tiene grupo familiar, crear uno y asignarlo
+                IF @id_grupo IS NULL
+                BEGIN
+                    EXEC manejo_personas.CrearGrupoFamiliar;
+                    SELECT TOP 1 @id_grupo = id_grupo FROM manejo_personas.grupo_familiar ORDER BY id_grupo DESC;
+                    -- Asignar responsable al grupo
+                    DECLARE @id_persona_responsable INT;
+                    SELECT @id_persona_responsable = id_persona FROM manejo_personas.socio WHERE id_socio = @id_responsable;
+                    EXEC manejo_personas.CrearResponsable 
+                        @id_persona = @id_persona_responsable,
+                        @parentesco = 'RESPONSABLE',
+                        @id_grupo = @id_grupo;
+                    -- Actualizar socio responsable con el grupo
+                    UPDATE manejo_personas.socio SET id_grupo = @id_grupo WHERE id_socio = @id_responsable;
+                END
+
+                -- 3. Registrar persona (si no existe)
+                IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE dni = @dni)
+                BEGIN
+                    EXEC manejo_personas.CrearPersona 
+                        @dni = @dni,
+                        @nombre = @nombre,
+                        @apellido = @apellido,
+                        @email = @email,
+                        @fecha_nac = @fechaNac,
+                        @telefono = @telefono;
+                END
+                SELECT @id_persona = id_persona FROM manejo_personas.persona WHERE dni = @dni;
+                IF @id_persona IS NULL
+                BEGIN
+                    INSERT INTO #ErroresImportacion VALUES (@dni, @nroSocio, 'No se pudo crear o encontrar la persona.');
+                    GOTO SIGUIENTE;
+                END
+
+                -- 4. Determinar categoría por edad
+                DECLARE @edad INT = DATEDIFF(YEAR, @fechaNac, GETDATE()) - 
+                                   CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, @fechaNac, GETDATE()), @fechaNac) > GETDATE() THEN 1 ELSE 0 END;
+                DECLARE @id_categoria INT = NULL;
+                IF @edad <= 12
+                    SELECT TOP 1 @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE dbo.NormalizarTexto(nombre_categoria) LIKE '%MENOR%';
+                ELSE IF @edad <= 17
+                    SELECT TOP 1 @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE dbo.NormalizarTexto(nombre_categoria) LIKE '%CADETE%';
+                ELSE
+                    SELECT TOP 1 @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE dbo.NormalizarTexto(nombre_categoria) LIKE '%MAYOR%';
+                IF @id_categoria IS NULL
+                BEGIN
+                    INSERT INTO #ErroresImportacion VALUES (@dni, @nroSocio, 'No se encontró categoría para edad: ' + CAST(@edad AS VARCHAR(3)));
+                    GOTO SIGUIENTE;
+                END
+
+                -- 5. Registrar obra social si corresponde
+                IF @obraSocial IS NOT NULL AND @obraSocial <> ''
+                BEGIN
+                    EXEC manejo_personas.CreacionObraSocial @nombre = @obraSocial;
+                    SELECT @id_obra_social = id_obra_social FROM manejo_personas.obra_social WHERE descripcion = @obraSocial;
+                END
+                ELSE
+                    SET @id_obra_social = NULL;
+
+                -- 6. Registrar socio (si no existe)
+                IF NOT EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_persona = @id_persona)
+                BEGIN
+                    EXEC manejo_personas.CrearSocio
+                        @id_persona = @id_persona,
+                        @nro_socio = @nroSocio,
+                        @telefono_emergencia = @telefonoEmergencia,
+                        @obra_nro_socio = @nroSocioObra,
+                        @id_obra_social = @id_obra_social,
+                        @id_categoria = @id_categoria,
+                        @id_grupo = @id_grupo;
+                END
+                ELSE
+                BEGIN
+                    -- Si ya existe, actualizar el grupo y datos relevantes
+                    UPDATE manejo_personas.socio
+                    SET id_grupo = @id_grupo,
+                        id_categoria = @id_categoria,
+                        id_obra_social = @id_obra_social,
+                        obra_nro_socio = @nroSocioObra,
+                        telefono_emergencia = @telefonoEmergencia
+                    WHERE id_persona = @id_persona;
+                END
+
+            END TRY
+            BEGIN CATCH
+                INSERT INTO #ErroresImportacion (DNI, NroSocio, MensajeError)
+                VALUES (@dni, @nroSocio, ERROR_MESSAGE());
+            END CATCH
+
+            SIGUIENTE:
+            FETCH NEXT FROM cur INTO @nroSocio, @nroSocioRP, @nombre, @apellido, @dni, @email, @fechaNac,
+                                         @telefono, @telefonoEmergencia, @obraSocial, @nroSocioObra, @telefonoObra;
+        END
+
+        CLOSE cur;
+        DEALLOCATE cur;
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL DROP TABLE #TempDatos;
+
+        -- Mostrar resultados
+        IF EXISTS (SELECT 1 FROM #ErroresImportacion)
+        BEGIN
+            SELECT 'Parcial' AS Resultado, 'Algunos registros no se pudieron importar' AS Mensaje;
+            SELECT DNI, NroSocio, MensajeError FROM #ErroresImportacion ORDER BY DNI, NroSocio;
+        END
+        ELSE
+        BEGIN
+            SELECT 'Exito' AS Resultado, 'Datos de grupo familiar importados correctamente' AS Mensaje;
+        END
+        IF OBJECT_ID('tempdb..#ErroresImportacion') IS NOT NULL DROP TABLE #ErroresImportacion;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        IF CURSOR_STATUS('local', 'cur') >= 0
+        BEGIN
+            CLOSE cur;
+            DEALLOCATE cur;
+        END
+        IF OBJECT_ID('tempdb..#ErroresImportacion') IS NOT NULL
+        BEGIN
+            IF EXISTS (SELECT 1 FROM #ErroresImportacion)
+            BEGIN
+                SELECT 'Error parcial' AS Resultado, 'Se detectaron errores durante la importación.' AS Mensaje;
+                SELECT DNI, NroSocio, MensajeError FROM #ErroresImportacion ORDER BY DNI, NroSocio;
+            END
+            DROP TABLE #ErroresImportacion;
+        END
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL DROP TABLE #TempDatos;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, ERROR_LINE() AS Linea, ERROR_PROCEDURE() AS Procedimiento;
+        RETURN -1;
+    END CATCH
+END
+GO
+
+-- Otra verision
+-- Importar Grupo Familiar - CORREGIDO
+CREATE OR ALTER PROCEDURE manejo_personas.ImportarGrupoFamiliar
+    @RutaArchivo NVARCHAR(260)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    BEGIN TRY
+        -- Crear tabla temporal para los datos
+        CREATE TABLE #TempDatos (
+            [Nro de Socio] VARCHAR(20),
+            [Nro de socio RP] VARCHAR(20),
+            [Nombre] NVARCHAR(50),
+            [apellido] NVARCHAR(50),
+            [DNI] VARCHAR(20),
+            [email personal] NVARCHAR(320),
+            [fecha de nacimiento] DATE,
+            [teléfono de contacto] VARCHAR(50),
+            [teléfono de contacto emergencia] VARCHAR(50),
+            [Nombre de la obra social o prepaga] NVARCHAR(100),
+            [nro. de socio obra social/prepaga ] VARCHAR(50),
+            [teléfono de contacto de emergencia] VARCHAR(50)
+        );
+
+        CREATE TABLE #ErroresImportacion (
+            DNI VARCHAR(20),
+            NroSocio VARCHAR(20),
+            MensajeError NVARCHAR(MAX)
+        );
+
+        -- Leer los datos desde la hoja "Grupo Familiar"
+        DECLARE @SQL NVARCHAR(MAX);
+        SET @SQL = N'
+            INSERT INTO #TempDatos (
+                [Nro de Socio], [Nro de socio RP], [Nombre], [apellido], [DNI], [email personal],
+                [fecha de nacimiento], [teléfono de contacto], [teléfono de contacto emergencia],
+                [Nombre de la obra social o prepaga], [nro. de socio obra social/prepaga ], [teléfono de contacto de emergencia]
+            )
+            SELECT *
+            FROM OPENROWSET(
+                ''Microsoft.ACE.OLEDB.12.0'',
+                ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
+                ''SELECT * FROM [Grupo Familiar$]'')';
+        EXEC sp_executesql @SQL;
+
+        -- Variables para el cursor
+        DECLARE @nroSocio VARCHAR(20), @nroSocioRP VARCHAR(20), @nombre NVARCHAR(50), @apellido NVARCHAR(50),
+                @dni VARCHAR(20), @email NVARCHAR(320), @fechaNac DATE, @telefono VARCHAR(50),
+                @telefonoEmergencia VARCHAR(50), @obraSocial NVARCHAR(100), @nroSocioObra VARCHAR(50), @telefonoObra VARCHAR(50);
+        DECLARE @id_persona INT, @id_socio INT, @id_responsable INT, @id_grupo INT, @id_obra_social INT;
+
+        DECLARE cur CURSOR FOR 
+        SELECT [Nro de Socio], [Nro de socio RP], [Nombre], [apellido], [DNI], [email personal],
+               [fecha de nacimiento], [teléfono de contacto], [teléfono de contacto emergencia],
+               [Nombre de la obra social o prepaga], [nro. de socio obra social/prepaga ], [teléfono de contacto de emergencia]
+        FROM #TempDatos
+        WHERE [DNI] IS NOT NULL AND LTRIM(RTRIM([DNI])) <> '';
+
+        OPEN cur;
+        FETCH NEXT FROM cur INTO @nroSocio, @nroSocioRP, @nombre, @apellido, @dni, @email, @fechaNac,
+                                     @telefono, @telefonoEmergencia, @obraSocial, @nroSocioObra, @telefonoObra;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            BEGIN TRY
+                -- Reinicializar variables para cada iteración
+                SET @id_persona = NULL;
+                SET @id_socio = NULL;
+                SET @id_responsable = NULL;
+                SET @id_grupo = NULL;
+                SET @id_obra_social = NULL;
+
+                -- Limpiar y normalizar datos
+                SET @dni = REPLACE(REPLACE(LTRIM(RTRIM(ISNULL(@dni, ''))), '.', ''), '-', '');
+                SET @nombre = dbo.NormalizarTexto(ISNULL(@nombre, ''));
+                SET @apellido = dbo.NormalizarTexto(ISNULL(@apellido, ''));
+                SET @email = CASE 
+                    WHEN @email IS NULL OR LTRIM(RTRIM(@email)) = '' THEN NULL
+                    ELSE LOWER(REPLACE(LTRIM(RTRIM(@email)), ' ', ''))
+                END;
+                SET @nroSocio = UPPER(LTRIM(RTRIM(ISNULL(@nroSocio, ''))));
+                SET @nroSocioRP = UPPER(LTRIM(RTRIM(ISNULL(@nroSocioRP, ''))));
+                SET @obraSocial = dbo.NormalizarTexto(LTRIM(RTRIM(ISNULL(@obraSocial, ''))));
+                SET @nroSocioObra = LTRIM(RTRIM(ISNULL(@nroSocioObra, '')));
+
+                -- Validaciones básicas
+                IF @dni = '' OR @nombre = '' OR @apellido = '' OR @nroSocio = '' OR @nroSocioRP = ''
+                BEGIN
+                    INSERT INTO #ErroresImportacion VALUES (@dni, @nroSocio, 'Datos obligatorios faltantes (DNI, nombre, apellido, número de socio o responsable)');
+                    GOTO SIGUIENTE;
+                END
+
+                -- 1. Verificar que el socio responsable exista
+                SELECT @id_responsable = s.id_socio, @id_grupo = s.id_grupo
+                FROM manejo_personas.socio s
+                WHERE s.numero_socio = @nroSocioRP;
+
+                IF @id_responsable IS NULL
+                BEGIN
+                    INSERT INTO #ErroresImportacion VALUES (@dni, @nroSocio, 'Socio responsable no encontrado: ' + ISNULL(@nroSocioRP, 'NULL'));
+                    GOTO SIGUIENTE;
+                END
+
+                -- 2. Si el responsable no tiene grupo familiar, crear uno y asignarlo
+                IF @id_grupo IS NULL
+                BEGIN
+                    EXEC manejo_personas.CrearGrupoFamiliar;
+                    SELECT TOP 1 @id_grupo = id_grupo FROM manejo_personas.grupo_familiar ORDER BY id_grupo DESC;
+                    
+                    -- Obtener persona del responsable
+                    DECLARE @id_persona_responsable INT;
+                    SELECT @id_persona_responsable = id_persona FROM manejo_personas.socio WHERE id_socio = @id_responsable;
+                    
+                    -- Crear el registro de responsable
+                    IF NOT EXISTS (SELECT 1 FROM manejo_personas.responsable WHERE id_persona = @id_persona_responsable)
+                    BEGIN
+                        EXEC manejo_personas.CrearResponsable 
+                            @id_persona = @id_persona_responsable,
+                            @parentesco = 'RESPONSABLE',
+                            @id_grupo = @id_grupo;
+                    END
+                    
+                    -- Actualizar socio responsable con el grupo
+                    UPDATE manejo_personas.socio SET id_grupo = @id_grupo WHERE id_socio = @id_responsable;
+                END
+
+                -- 3. Registrar persona (si no existe)
+                IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE dni = @dni)
+                BEGIN
+                    EXEC manejo_personas.CrearPersona 
+                        @dni = @dni,
+                        @nombre = @nombre,
+                        @apellido = @apellido,
+                        @email = @email,
+                        @fecha_nac = @fechaNac,
+                        @telefono = @telefono;
+                END
+                
+                SELECT @id_persona = id_persona FROM manejo_personas.persona WHERE dni = @dni;
+                IF @id_persona IS NULL
+                BEGIN
+                    INSERT INTO #ErroresImportacion VALUES (@dni, @nroSocio, 'No se pudo crear o encontrar la persona.');
+                    GOTO SIGUIENTE;
+                END
+
+                -- 4. Determinar categoría por edad
+                DECLARE @edad INT = DATEDIFF(YEAR, @fechaNac, GETDATE()) - 
+                                   CASE WHEN DATEADD(YEAR, DATEDIFF(YEAR, @fechaNac, GETDATE()), @fechaNac) > GETDATE() THEN 1 ELSE 0 END;
+                DECLARE @id_categoria INT = NULL;
+                
+                IF @edad <= 12
+                    SELECT TOP 1 @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE dbo.NormalizarTexto(nombre_categoria) LIKE '%MENOR%';
+                ELSE IF @edad <= 17
+                    SELECT TOP 1 @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE dbo.NormalizarTexto(nombre_categoria) LIKE '%CADETE%';
+                ELSE
+                    SELECT TOP 1 @id_categoria = id_categoria FROM manejo_actividades.categoria WHERE dbo.NormalizarTexto(nombre_categoria) LIKE '%MAYOR%';
+                
+                IF @id_categoria IS NULL
+                BEGIN
+                    INSERT INTO #ErroresImportacion VALUES (@dni, @nroSocio, 'No se encontró categoría para edad: ' + CAST(@edad AS VARCHAR(3)));
+                    GOTO SIGUIENTE;
+                END
+
+                -- 5. Registrar obra social si corresponde
+                IF @obraSocial IS NOT NULL AND @obraSocial <> ''
+                BEGIN
+                    -- Verificar si existe, si no existe crearla
+                    IF NOT EXISTS (SELECT 1 FROM manejo_personas.obra_social WHERE descripcion = @obraSocial)
+                    BEGIN
+                        EXEC manejo_personas.CreacionObraSocial @nombre = @obraSocial;
+                    END
+                    SELECT @id_obra_social = id_obra_social FROM manejo_personas.obra_social WHERE descripcion = @obraSocial;
+                END
+                ELSE
+                    SET @id_obra_social = NULL;
+
+                -- 6. Registrar socio (si no existe) o actualizar si existe
+                IF NOT EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_persona = @id_persona)
+                BEGIN
+                    -- Verificar que el número de socio no esté duplicado
+                    IF EXISTS (SELECT 1 FROM manejo_personas.socio WHERE numero_socio = @nroSocio)
+                    BEGIN
+                        INSERT INTO #ErroresImportacion VALUES (@dni, @nroSocio, 'El número de socio ya existe: ' + @nroSocio);
+                        GOTO SIGUIENTE;
+                    END
+
+                    EXEC manejo_personas.CrearSocio
+                        @id_persona = @id_persona,
+                        @nro_socio = @nroSocio,
+                        @telefono_emergencia = @telefonoEmergencia,
+                        @obra_nro_socio = @nroSocioObra,
+                        @id_obra_social = @id_obra_social,
+                        @id_categoria = @id_categoria,
+                        @id_grupo = @id_grupo;
+                END
+                ELSE
+                BEGIN
+                    -- Si ya existe, actualizar el grupo y datos relevantes
+                    UPDATE manejo_personas.socio
+                    SET id_grupo = @id_grupo,
+                        id_categoria = @id_categoria,
+                        id_obra_social = @id_obra_social,
+                        obra_nro_socio = @nroSocioObra,
+                        telefono_emergencia = @telefonoEmergencia
+                    WHERE id_persona = @id_persona;
+                END
+
+            END TRY
+            BEGIN CATCH
+                INSERT INTO #ErroresImportacion (DNI, NroSocio, MensajeError)
+                VALUES (@dni, @nroSocio, 'Error en procesamiento: ' + ERROR_MESSAGE());
+            END CATCH
+
+            SIGUIENTE:
+            FETCH NEXT FROM cur INTO @nroSocio, @nroSocioRP, @nombre, @apellido, @dni, @email, @fechaNac,
+                                         @telefono, @telefonoEmergencia, @obraSocial, @nroSocioObra, @telefonoObra;
+        END
+
+        CLOSE cur;
+        DEALLOCATE cur;
+        
+        -- Limpiar tabla temporal
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL DROP TABLE #TempDatos;
+
+        -- Mostrar resultados
+        IF EXISTS (SELECT 1 FROM #ErroresImportacion)
+        BEGIN
+            SELECT 'Parcial' AS Resultado, 'Algunos registros no se pudieron importar' AS Mensaje;
+            SELECT DNI, NroSocio, MensajeError FROM #ErroresImportacion ORDER BY DNI, NroSocio;
+        END
+        ELSE
+        BEGIN
+            SELECT 'Exito' AS Resultado, 'Datos de grupo familiar importados correctamente' AS Mensaje;
+        END
+        
+        -- Limpiar tabla de errores
+        IF OBJECT_ID('tempdb..#ErroresImportacion') IS NOT NULL DROP TABLE #ErroresImportacion;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        -- Manejo de errores mejorado
+        IF CURSOR_STATUS('local', 'cur') >= 0
+        BEGIN
+            CLOSE cur;
+            DEALLOCATE cur;
+        END
+        
+        IF OBJECT_ID('tempdb..#ErroresImportacion') IS NOT NULL
+        BEGIN
+            IF EXISTS (SELECT 1 FROM #ErroresImportacion)
+            BEGIN
+                SELECT 'Error parcial' AS Resultado, 'Se detectaron errores durante la importación.' AS Mensaje;
+                SELECT DNI, NroSocio, MensajeError FROM #ErroresImportacion ORDER BY DNI, NroSocio;
+            END
+            DROP TABLE #ErroresImportacion;
+        END
+        
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL DROP TABLE #TempDatos;
+        
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, ERROR_LINE() AS Linea, ERROR_PROCEDURE() AS Procedimiento;
+        RETURN -1;
+    END CATCH
+END
+GO
 
 EXEC manejo_actividades.ImportarCategorias 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 GO
@@ -889,4 +1378,7 @@ GO
 -- HAY QUE EJECUTAR LO QUE ESTA EN GENERAR DATOS PARA EJECUTAR EL SIGUIENTE
 
 EXEC manejo_actividades.ImportarPresentismoActividades 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
+GO
+
+EXEC manejo_personas.ImportarGrupoFamiliar 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 GO
