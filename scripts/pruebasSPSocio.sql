@@ -14,183 +14,188 @@
 USE Com5600G01;
 GO
 
--- CrearSocio:
+-- CrearSocio
 
--- Casos normales 
-EXEC manejo_personas.CrearSocio
-    @id_persona = 1,
-    @telefono_emergencia = '11112222',
-    @id_categoria = 1; -- Resultado: Socio registrado correctamente
+-- Caso normal 1: crear persona y socio
+EXEC usuarios.CrearSocio
+	@id_persona          = NULL,
+	@dni                 = '12345678',
+	@nombre              = 'Juan',
+	@apellido            = 'Pérez',
+	@email               = 'juan.perez@example.com',
+	@fecha_nac           = '1990-05-15',
+	@telefono            = '123456789',
+	@numero_socio        = 'S000001',
+	@telefono_emergencia = '987654321',
+	@obra_nro_socio      = 'OS123',
+	@id_obra_social      = 1,
+	@id_categoria        = 1,
+	@id_grupo            = 1;
+-- Resultado esperado: OK, Socio creado correctamente
 
-EXEC manejo_personas.CrearSocio
-    @id_persona = 2,
-    @telefono_emergencia = '22223333',
-    @obra_nro_socio = '123456',
-    @id_obra_social = 1,
-    @id_categoria = 2; -- Resultado: Socio registrado correctamente
+-- Caso normal 2: reutilizar persona existente (id_persona = 1), nuevo socio
+EXEC usuarios.CrearSocio
+	@id_persona          = 1,
+	@dni                 = '00000000',  -- ignorado
+	@nombre              = 'Ignorado',
+	@apellido            = 'Ignorado',
+	@email               = 'ignorado@example.com',
+	@fecha_nac           = '2000-01-01',
+	@telefono            = '000000000',
+	@numero_socio        = 'S000002',
+	@telefono_emergencia = '111222333',
+	@obra_nro_socio      = 'OS124',
+	@id_obra_social      = 2,
+	@id_categoria        = 2,
+	@id_grupo            = 2;
+-- Resultado esperado: OK, Socio creado correctamente
 
+-- DNI inválido
+EXEC usuarios.CrearSocio
+	@id_persona          = NULL,
+	@dni                 = 'ABC123',
+	@nombre              = 'Ana',
+	@apellido            = 'Gómez',
+	@email               = 'ana.gomez@example.com',
+	@fecha_nac           = '1985-07-20',
+	@telefono            = '222333444',
+	@numero_socio        = 'S000003',
+	@telefono_emergencia = NULL,
+	@obra_nro_socio      = NULL,
+	@id_obra_social      = NULL,
+	@id_categoria        = 1,
+	@id_grupo            = NULL;
+-- Resultado esperado: Error, DNI inválido. Debe contener entre 7 y 8 dígitos numéricos.
 
-EXEC manejo_personas.CrearSocio
-    @id_persona = 3,
-    @telefono_emergencia = '33334444',
-    @id_categoria = 3,
-    @id_grupo = 1; -- Resultado: Socio registrado correctamente
+-- Número de socio duplicado
+EXEC usuarios.CrearSocio
+	@id_persona          = NULL,
+	@dni                 = '22334455',
+	@nombre              = 'Luis',
+	@apellido            = 'Martínez',
+	@email               = 'luis.martinez@example.com',
+	@fecha_nac           = '1992-03-10',
+	@telefono            = '555666777',
+	@numero_socio        = 'S000001',
+	@telefono_emergencia = NULL,
+	@obra_nro_socio      = NULL,
+	@id_obra_social      = NULL,
+	@id_categoria        = 1,
+	@id_grupo            = NULL;
+-- Resultado esperado: Error, Numero de socio duplicado
 
+-- Obra social inexistente
+EXEC usuarios.CrearSocio
+	@id_persona          = NULL,
+	@dni                 = '33445566',
+	@nombre              = 'María',
+	@apellido            = 'López',
+	@email               = 'maria.lopez@example.com',
+	@fecha_nac           = '1988-11-05',
+	@telefono            = '888999000',
+	@numero_socio        = 'S000004',
+	@telefono_emergencia = NULL,
+	@obra_nro_socio      = NULL,
+	@id_obra_social      = 999,
+	@id_categoria        = 1,
+	@id_grupo            = NULL;
+-- Resultado esperado: Error, Obra social no existe
 
+-- Categoría inexistente
+EXEC usuarios.CrearSocio
+	@id_persona          = NULL,
+	@dni                 = '44556677',
+	@nombre              = 'Carlos',
+	@apellido            = 'Ruiz',
+	@email               = 'carlos.ruiz@example.com',
+	@fecha_nac           = '1995-09-25',
+	@telefono            = '444555666',
+	@numero_socio        = 'S000005',
+	@telefono_emergencia = NULL,
+	@obra_nro_socio      = NULL,
+	@id_obra_social      = NULL,
+	@id_categoria        = 999,
+	@id_grupo            = NULL;
+-- Resultado esperado: Error, Categoria no existe
 
--- Persona no existe
-EXEC manejo_personas.CrearSocio
-    @id_persona = 99999,
-    @telefono_emergencia = '44445555',
-    @id_categoria = 3; -- Resultado: La persona no existe o está inactiva
-
--- Persona inactiva
-EXEC manejo_personas.CrearSocio
-    @id_persona = 4,
-    @telefono_emergencia = '55556666',
-    @id_categoria = 3; -- Resultado: La persona no existe o está inactiva
-
--- Persona ya es socio
-EXEC manejo_personas.CrearSocio
-    @id_persona = 1,
-    @telefono_emergencia = '66667777',
-    @id_categoria = 1; -- Resultado: La persona ya está registrada como socio
-
--- Categoría no existe
-EXEC manejo_personas.CrearSocio
-    @id_persona = 5,
-    @telefono_emergencia = '77778888',
-    @id_categoria = 99; -- Resultado: La categoría especificada no existe
-
--- Obra social no existe
-EXEC manejo_personas.CrearSocio
-    @id_persona = 5,
-    @telefono_emergencia = '88889999',
-    @id_obra_social = 99,
-    @id_categoria = 3; -- Resultado: La obra social especificada no existe
-
--- Grupo familiar no existe
-EXEC manejo_personas.CrearSocio
-    @id_persona = 5,
-    @telefono_emergencia = '99990000',
-    @id_grupo = 99,
-    @id_categoria = 3; -- Resultado: El grupo familiar especificado no existe o está inactivo
-
--- Grupo familiar inactivo
-EXEC manejo_personas.CrearSocio
-    @id_persona = 5,
-    @telefono_emergencia = '00001111',
-    @id_grupo = 2,
-    @id_categoria = 3; -- Resultado: El grupo familiar especificado no existe o está inactivo
-
--- Edad incorrecta para categoría Menor (demasiado mayor)
-EXEC manejo_personas.CrearSocio
-    @id_persona = 7,
-    @telefono_emergencia = '11110000',
-    @id_categoria = 1; -- Resultado: La categoría Menor es solo para personas hasta 12 años
-
--- Edad incorrecta para categoría Cadete (demasiado joven)
-EXEC manejo_personas.CrearSocio
-    @id_persona = 6,
-    @telefono_emergencia = '00009999',
-    @id_categoria = 2; -- Resultado: La categoría Cadete es solo para personas entre 13 y 17 años
-
--- Edad incorrecta para categoría Mayor (demasiado joven)
-EXEC manejo_personas.CrearSocio
-    @id_persona = 6,
-    @telefono_emergencia = '99998888',
-    @id_categoria = 3; -- Resultado: La categoría Mayor es solo para personas a partir de 18 años
-
-
--- TEST STORED PROCEDURE ModificarSocio:
-
-
--- Casos normales
-EXEC manejo_personas.ModificarSocio
-    @id_socio = 1,
-    @telefono_emergencia = '11223344'; -- Resultado: Datos del socio actualizados correctamente
-
-EXEC manejo_personas.ModificarSocio
-    @id_socio = 1,
-    @id_obra_social = 2,
-    @obra_nro_socio = '654321'; -- Resultado: Datos del socio actualizados correctamente
-
-EXEC manejo_personas.ModificarSocio
-    @id_socio = 2,
-    @id_grupo = 1; -- Resultado: Datos del socio actualizados correctamente
-
-EXEC manejo_personas.ModificarSocio
-    @id_socio = 3,
-    @id_categoria = 3; -- Resultado: Datos del socio actualizados correctamente
-
-
-
--- Socio no existe
-EXEC manejo_personas.ModificarSocio
-    @id_socio = 99999,
-    @telefono_emergencia = '99887766'; -- Resultado: El socio no existe
-
--- Categoría no existe
-EXEC manejo_personas.ModificarSocio
-    @id_socio = 1,
-    @id_categoria = 99; -- Resultado: La categoría especificada no existe
-
--- Edad incompatible con categoría Menor
-EXEC manejo_personas.ModificarSocio
-    @id_socio = 2,
-    @id_categoria = 1; -- Resultado: La categoría Menor es solo para personas hasta 12 años
-
--- Edad incompatible con categoría Cadete
-EXEC manejo_personas.ModificarSocio
-    @id_socio = 3,
-    @id_categoria = 2; -- Resultado: La categoría Cadete es solo para personas entre 13 y 17 años
-
--- Edad incompatible con categoría Mayor
-EXEC manejo_personas.ModificarSocio
-    @id_socio = 1,
-    @id_categoria = 3; -- Resultado: La categoría Mayor es solo para personas a partir de 18 años
-
--- Obra social no existe
-EXEC manejo_personas.ModificarSocio
-    @id_socio = 1,
-    @id_obra_social = 99; -- Resultado: La obra social especificada no existe
-
--- Grupo familiar no existe
-EXEC manejo_personas.ModificarSocio
-    @id_socio = 1,
-    @id_grupo = 99; -- Resultado: El grupo familiar especificado no existe o está inactivo
-
--- Grupo familiar inactivo
-EXEC manejo_personas.ModificarSocio
-    @id_socio = 1,
-    @id_grupo = 2; -- Resultado: El grupo familiar especificado no existe o está inactivo
+-- Grupo inexistente
+EXEC usuarios.CrearSocio
+	@id_persona          = NULL,
+	@dni                 = '55667788',
+	@nombre              = 'Elena',
+	@apellido            = ' Díaz',
+	@email               = 'elena.diaz@example.com',
+	@fecha_nac           = '1993-02-14',
+	@telefono            = '777888999',
+	@numero_socio        = 'S000006',
+	@telefono_emergencia = NULL,
+	@obra_nro_socio      = NULL,
+	@id_obra_social      = NULL,
+	@id_categoria        = 1,
+	@id_grupo            = 999;
+-- Resultado esperado: Error, Grupo familiar no existe
 
 
--- TEST STORED PROCEDURE EliminarSocio:
+-- ModificarSocio
 
--- Caso normal
-EXEC manejo_personas.EliminarSocio
-    @id_socio = 4; -- Resultado: Socio y todas sus relaciones eliminados completamente del sistema
+-- Caso normal: cambiar número de socio y teléfono de emergencia
+EXEC usuarios.ModificarSocio
+	@id_socio            = 1,
+	@numero_socio        = 'S000010',
+	@telefono_emergencia = '999888777';
+-- Resultado esperado: OK, Socio modificado correctamente
 
--- Socio con actividades (se eliminarán las relaciones)
-EXEC manejo_personas.EliminarSocio
-    @id_socio = 3; -- Resultado: Socio y todas sus relaciones eliminados completamente del sistema
+-- Caso normal: asignar nuevo grupo
+EXEC usuarios.ModificarSocio
+	@id_socio = 2,
+	@id_grupo = 3;
+-- Resultado esperado: OK, Socio modificado correctamente
 
--- Socio con invitados (se eliminarán las relaciones)
-EXEC manejo_personas.EliminarSocio
-    @id_socio = 5; -- Resultado: Socio y todas sus relaciones eliminados completamente del sistema
+-- Socio inexistente
+EXEC usuarios.ModificarSocio
+	@id_socio = 99999,
+	@numero_socio = 'S000011';
+-- Resultado esperado: Error, Socio no encontrado
+
+-- Número de socio duplicado
+EXEC usuarios.ModificarSocio
+	@id_socio     = 1,
+	@numero_socio = 'S000002';
+-- Resultado esperado: Error, Numero de socio duplicado
+
+-- Obra social inexistente
+EXEC usuarios.ModificarSocio
+	@id_socio       = 1,
+	@id_obra_social = 999;
+-- Resultado esperado: Error, Obra social no existe
+
+-- Categoría inexistente
+EXEC usuarios.ModificarSocio
+	@id_socio     = 1,
+	@id_categoria = 999;
+-- Resultado esperado: Error, Categoria no existe
+
+-- Grupo inexistente
+EXEC usuarios.ModificarSocio
+	@id_socio = 1,
+	@id_grupo = 999;
+-- Resultado esperado: Error, Grupo familiar no existe
 
 
+-- EliminarSocio
 
--- Socio no existe
-EXEC manejo_personas.EliminarSocio
-    @id_socio = 99999; -- Resultado: El socio no existe
+-- Caso normal 1
+EXEC usuarios.EliminarSocio @id_socio = 1;
+-- Resultado esperado: OK, Socio dado de baja correctamente
 
--- Socio es responsable de un grupo familiar
-EXEC manejo_personas.EliminarSocio
-    @id_socio = 1; -- Resultado: No se puede eliminar el socio porque es responsable de un grupo familiar
+-- Caso normal 2
+EXEC usuarios.EliminarSocio @id_socio = 2;
+-- Resultado esperado: OK, Socio dado de baja correctamente
 
--- Socio tiene facturas asociadas
-EXEC manejo_personas.EliminarSocio
-    @id_socio = 2; -- Resultado: No se puede eliminar el socio porque tiene facturas asociadas
+-- Socio inexistente
+EXEC usuarios.EliminarSocio @id_socio = 99999;
+-- Resultado esperado: Error, Socio no encontrado
 
+-- Intentar baja nuevamente
+EXEC usuarios.EliminarSocio @id_socio = 1;
+-- Resultado esperado: Error, Socio no encontrado
