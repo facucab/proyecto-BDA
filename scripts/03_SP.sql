@@ -852,6 +852,8 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+GO
+
 /*
 * Nombre: CrearCategoria
 * Descripcion: Crea una nueva categoria, valida la informacion ingresada.
@@ -866,9 +868,6 @@ END;
 *	-3: Edad negativa. 	 
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE manejo_actividades.CrearCategoria
 	@nombre_categoria VARCHAR(50),
 	@costo_membrecia DECIMAL(10, 2),
@@ -887,6 +886,9 @@ BEGIN
 			RETURN -1;
 		END
 
+		-- normalizamos el nombre (mayúsculas y sin espacios)
+		SET @nombre_categoria = UPPER(LTRIM(RTRIM(@nombre_categoria)));
+
 		-- validar costo de membresía
 		IF @costo_membrecia <= 0
 		BEGIN
@@ -896,15 +898,14 @@ BEGIN
 		END
 
 		-- validamos edad maxima
-		IF @edad_maxima <= 0
+		IF @edad_maxima <= 0 OR @edad_maxima > 120
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'La edad maxima debe ser mayor a cero' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'La edad maxima debe estar entre 1 y 120 años' AS Mensaje;
 			RETURN -3;
 		END
 
 		-- validamos categoria unica
-
 		IF EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE nombre_categoria = @nombre_categoria)
 		BEGIN
 			ROLLBACK TRANSACTION;
@@ -923,22 +924,22 @@ BEGIN
 			WHERE edad_maxima < @edad_maxima;
 		END
 
-		-- verificamos que no haya solapamiento de edades (que ninguna categoria tenga edad_maxima dentro de nuestro rango)
-		IF EXISTS ( SELECT 1 FROM manejo_actividades.categoria WHERE edad_maxima BETWEEN @edad_minima AND @edad_maxima AND edad_maxima <> @edad_maxima) -- se busca si existe alguna categoria donde la edad maxima este entre nuestra edad minima y maxima actuales (excluyendo las que tienen nuestra misma maxima)
+		-- verificamos que no haya solapamiento de edades
+		-- Buscamos si existe alguna categoría que se solape con nuestro rango
+		IF EXISTS (
+			SELECT 1 FROM manejo_actividades.categoria 
+			WHERE (edad_maxima >= @edad_minima AND edad_maxima <= @edad_maxima)
+		)
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'El rango de edad se solapa con otra categoria existente' AS Mensaje;
 			RETURN -5;
 		END
 
-		-- verificamos ademas que no haya "huecos" entre los rangos (por ejemplo, que no haya categoria de 14-16 y otra de 20-22 dejando 17-19)
-		IF EXISTS ( 
-			SELECT 1 FROM manejo_actividades.categoria WHERE edad_maxima > @edad_maxima)
-		AND NOT EXISTS ( 
-			SELECT 1 FROM manejo_actividades.categoria WHERE edad_maxima = @edad_maxima + 1)
-	
-		-- este if lo que hace es buscar primero si hay categorias con edades maximas superiores a la nuestra, y si falta la categoria que tiene que empezar luego de la actual
-
+		-- verificamos que no haya "huecos" entre los rangos
+		-- Si hay categorías con edad máxima mayor a la nuestra, debe existir una categoría que empiece justo después de la nuestra
+		IF EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE edad_maxima > @edad_maxima)
+		AND NOT EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE edad_maxima = @edad_maxima + 1)
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'Hay un hueco en el rango de edades entre esta categoria y la siguiente' AS Mensaje;
@@ -946,7 +947,6 @@ BEGIN
 		END
 
 		-- luego de las validaciones insertamos
-
 		INSERT INTO manejo_actividades.categoria (nombre_categoria, costo_membrecia, edad_maxima)
 		VALUES (@nombre_categoria, @costo_membrecia, @edad_maxima);
 
@@ -961,26 +961,27 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+GO
+
 /*
 * Nombre: ModificarCategoria
 * Descripcion: Modifica los campos nombre y costo de una categoria. 
 * Parametros:
 * 	@id_categoria INT - ID de la categoria a modificar. (Parametro obligatorio)
-*	@nombre_categoria VARCHAR(50) - Nombre nuevo para la categoria. (Parametro opcional)
+*	@nombre_categoria VARCHAR(50) - Nombre nuevo para la categoria. (Parametro obligatorio)
 *	@costo_membrecia DECIMAL(10, 2) -  Nuevo costo de la membresia (Parametro opcional). 
 * Valores de retorno:
 *	 0: Exito. 
-*	-1: @nombre_categoria incorrecto.
-*	-2: El nombre de la categoria esta en uso.
-*	-3: El costo de la membresia debe ser mayor a cero. 	 
+*	-1: La categoria no existe.
+*	-2: El nombre de la categoria está vacío.
+*	-3: El nombre de la categoria excede 50 caracteres.
+*	-4: El nombre de la categoria está en uso por otra categoria.
+*	-5: El costo de la membresia debe ser mayor a cero. 	 
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE manejo_actividades.ModificarCategoria
 	@id_categoria INT,
-	@nombre_categoria VARCHAR(50) = NULL,
+	@nombre_categoria VARCHAR(50),
 	@costo_membrecia DECIMAL(10, 2) = NULL
 AS
 BEGIN
@@ -989,31 +990,39 @@ BEGIN
 	BEGIN TRANSACTION;
 
 	BEGIN TRY
-	-- verificamos que la categoria exista
+		-- verificamos que la categoria exista
 		IF NOT EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria)
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'La categoria no existe' AS Mensaje;
-			RETURN -1
+			RETURN -1;
 		END
 
-	--si nos dan un nombre para cambiar, lo validamos
-		IF @nombre_categoria IS NOT NULL
+		-- validamos que el nombre no sea nulo ni vacío
+		IF @nombre_categoria IS NULL OR LTRIM(RTRIM(@nombre_categoria)) = ''
 		BEGIN
-			IF LTRIM(RTRIM(@nombre_categoria)) = ''
-			BEGIN
-				ROLLBACK TRANSACTION;
-				SELECT 'Error' AS Resultado, 'El nombre de la categoria no puede estar vacio' AS Mensaje;
-				RETURN -1;
-			END
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El nombre de la categoria no puede estar vacio' AS Mensaje;
+			RETURN -2;
+		END
 
-	-- verificamos que no exista ora categoria con el nombre a cambiar (excepto si es la actual)
-			IF EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE nombre_categoria = @nombre_categoria AND id_categoria <> @id_categoria)
-			BEGIN
-				ROLLBACK TRANSACTION;
-				SELECT 'Error' AS Resultado, 'Ya existe otra categoría con ese nombre' AS Mensaje;
-				RETURN -2;
-			END
+		-- normalizamos el nombre (mayúsculas y sin espacios)
+		SET @nombre_categoria = UPPER(LTRIM(RTRIM(@nombre_categoria)));
+
+		-- validamos longitud del nombre
+		IF LEN(@nombre_categoria) > 50
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El nombre de la categoria no puede exceder 50 caracteres' AS Mensaje;
+			RETURN -3;
+		END
+
+		-- verificamos que no exista otra categoria con el nombre a cambiar (excepto si es la actual)
+		IF EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE nombre_categoria = @nombre_categoria AND id_categoria <> @id_categoria)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ya existe otra categoría con ese nombre' AS Mensaje;
+			RETURN -4;
 		END
 
 		-- si nos dan costo, que no sea negativo
@@ -1021,11 +1030,11 @@ BEGIN
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'El costo de membresía debe ser mayor a cero' AS Mensaje;
-			RETURN -3;
+			RETURN -5;
 		END
 
 		UPDATE manejo_actividades.categoria
-		SET nombre_categoria = ISNULL(@nombre_categoria, nombre_categoria),
+		SET nombre_categoria = @nombre_categoria,
 			costo_membrecia = ISNULL(@costo_membrecia, costo_membrecia)
 		WHERE id_categoria = @id_categoria;
 
@@ -1041,6 +1050,62 @@ BEGIN
 	END CATCH
 
 END;
+GO
+
+/*
+* Nombre: EliminarCategoria
+* Descripcion: Realiza borrado físico de una categoria. 
+* Parametros:
+* 	@id_categoria INT - ID de la categoria a eliminar. (Parametro obligatorio)
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: La categoria no existe.
+*	-2: No se puede eliminar porque hay socios asignados a esta categoría.
+*	-99: Error desconocido.
+*/
+CREATE OR ALTER PROCEDURE manejo_actividades.EliminarCategoria
+	@id_categoria INT
+AS
+BEGIN
+	
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- verificamos que la categoria exista
+		IF NOT EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La categoria no existe' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- verificamos que no haya socios asignados a esta categoría
+		IF EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_categoria = @id_categoria)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'No se puede eliminar la categoría porque hay socios asignados a ella' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- realizamos borrado físico
+		DELETE FROM manejo_actividades.categoria
+		WHERE id_categoria = @id_categoria;
+
+		COMMIT TRANSACTION;
+		SELECT 'Exito' AS Resultado, 'Categoria eliminada correctamente' AS Mensaje;
+		RETURN 0;
+		
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+
+END;
+GO
+
 /*
 * Nombre: CrearClase
 * Descripcion: Modifica los campos nombre y costo de una categoria. 
@@ -1062,9 +1127,6 @@ END;
 *	-7: El profesor ya tiene otra clase asignada en ese dia y horario
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE manejo_actividades.CrearClase
 	@id_actividad INT,
 	@id_categoria INT,
@@ -1158,7 +1220,6 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
-
 GO
 
 

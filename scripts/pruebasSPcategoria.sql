@@ -1,42 +1,44 @@
 /*
-	Entrega 4 - Documento de instalación y configuración
+	Entrega 4 - Documento de instalacin y configuracin
 
 	Trabajo Practico DDBBA Entrega 3 - Grupo 1
 	Comision 5600 - Viernes Tarde 
-	43990422 | Aguirre, Alex Rubén 
-	45234709 | Gauto, Gastón Santiago 
+	43990422 | Aguirre, Alex Rubn 
+	45234709 | Gauto, Gastn Santiago 
 	44363498 | Caballero, Facundo 
-	40993965 | Cornara Perez, Tomás Andrés
+	40993965 | Cornara Perez, Toms Andrs
 
-		Luego de decidirse por un motor de base de datos relacional, llegó el momento de generar la
-	base de datos. En esta oportunidad utilizarán SQL Server.
-	Deberá instalar el DMBS y documentar el proceso. No incluya capturas de pantalla. Detalle
-	las configuraciones aplicadas (ubicación de archivos, memoria asignada, seguridad, puertos,
-	etc.) en un documento como el que le entregaría al DBA.
-	Cree la base de datos, entidades y relaciones. Incluya restricciones y claves. Deberá entregar
-	un archivo .sql con el script completo de creación (debe funcionar si se lo ejecuta “tal cual” es
-	entregado en una sola ejecución). Incluya comentarios para indicar qué hace cada módulo
-	de código.
-	Genere store procedures para manejar la inserción, modificado, borrado (si corresponde,
-	también debe decidir si determinadas entidades solo admitirán borrado lógico) de cada tabla.
-	Los nombres de los store procedures NO deben comenzar con “SP”.
-	Algunas operaciones implicarán store procedures que involucran varias tablas, uso de
+		Luego de decidirse por un motor de base de datos relacional, lleg el momento de generar la
+	base de datos. En esta oportunidad utilizarn SQL Server.
+	Deber instalar el DMBS y documentar el proceso. No incluya capturas de pantalla. Detalle
+	las configuraciones aplicadas (ubicacin de archivos, memoria asignada, seguridad, puertos,
+	etc.) en un documento como el que le entregara al DBA.
+	Cree la base de datos, entidades y relaciones. Incluya restricciones y claves. Deber entregar
+	un archivo .sql con el script completo de creacin (debe funcionar si se lo ejecutatal cual es
+	entregado en una sola ejecucin). Incluya comentarios para indicar qu hace cada mdulo
+	de cdigo.
+	Genere store procedures para manejar la insercin, modificado, borrado (si corresponde,
+	tambin debe decidir si determinadas entidades solo admitirn borrado lgico) de cada tabla.
+	Los nombres de los store procedures NO deben comenzar conSP.
+	Algunas operaciones implicarn store procedures que involucran varias tablas, uso de
 	transacciones, etc. Puede que incluso realicen ciertas operaciones mediante varios SPs.
-	Asegúrense de que los comentarios que acompañen al código lo expliquen.
-	Genere esquemas para organizar de forma lógica los componentes del sistema y aplique esto
-	en la creación de objetos. NO use el esquema “dbo”.
-	Todos los SP creados deben estar acompañados de juegos de prueba. Se espera que
-	realicen validaciones básicas en los SP (p/e cantidad mayor a cero, CUIT válido, etc.) y que
-	en los juegos de prueba demuestren la correcta aplicación de las validaciones.
+	Asegrense de que los comentarios que acompaen al cdigo lo expliquen.
+	Genere esquemas para organizar de forma lgica los componentes del sistema y aplique esto
+	en la creacin de objetos. NO use el esquemadbo.
+	Todos los SP creados deben estar acompaados de juegos de prueba. Se espera que
+	realicen validaciones bsicas en los SP (p/e cantidad mayor a cero, CUIT vlido, etc.) y que
+	en los juegos de prueba demuestren la correcta aplicacin de las validaciones.
 	Las pruebas deben realizarse en un script separado, donde con comentarios se indique en
 	cada caso el resultado esperado
 	El archivo .sql con el script debe incluir comentarios donde consten este enunciado, la fecha
-	de entrega, número de grupo, nombre de la materia, nombres y DNI de los alumnos.
+	de entrega, nmero de grupo, nombre de la materia, nombres y DNI de los alumnos.
 	Entregar todo en un zip (observar las pautas para nomenclatura antes expuestas) mediante
-	la sección de prácticas de MIEL. Solo uno de los miembros del grupo debe hacer la entrega.
+	la seccin de prcticas de MIEL. Solo uno de los miembros del grupo debe hacer la entrega.
 */
 
 -- Pruebas categoria
+USE Com5600G01
+GO
 
 --creacion
 
@@ -48,22 +50,26 @@ EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Veterano', @costo_me
 -- Resultado: Categoria crada correctamente
 
 --Nombre vacio
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = '', @costo_membrecia = 900.00,@edad_maxima = 40;--Resultado: El nombre de la categoría no puede estar vacío
+EXEC manejo_actividades.CrearCategoria @nombre_categoria = '', @costo_membrecia = 900.00,@edad_maxima = 40;--Resultado: El nombre de la categora no puede estar vaco
 
 -- costo de membresia menor o igual a 0
 EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Adulto Joven', @costo_membrecia = -900.00,@edad_maxima = 40;
 EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Jubilado', @costo_membrecia = 0,@edad_maxima = 40;
--- Resultado: El costo de membresía debe ser mayor a cero
+-- Resultado: El costo de membresa debe ser mayor a cero
 
 -- Edad menor o igual a 0
 EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Bebe', @costo_membrecia = 900.00,@edad_maxima = 0;
 EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Bebe', @costo_membrecia = 900.00,@edad_maxima = -5;
--- Resultado: La edad maxima debe ser mayor a cero
+-- Resultado: La edad maxima debe estar entre 1 y 120 aÃ±os
 
--- Nombre duplicado
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Menor', @costo_membrecia = 1800.00,@edad_maxima = 13;-- Resultado: Ya existe una categoría con ese nombre
+-- Edad mayor a 120
+EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Super Centenario', @costo_membrecia = 900.00,@edad_maxima = 150;
+-- Resultado: La edad maxima debe estar entre 1 y 120 aÃ±os
 
--- Solapamiento de edades - edad máxima dentro del rango existente
+-- Nombre duplicado (considerando normalizaciÃ³n a mayÃºsculas)
+EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'menor', @costo_membrecia = 1800.00,@edad_maxima = 13;-- Resultado: Ya existe una categora con ese nombre
+
+-- Solapamiento de edades - edad mxima dentro del rango existente
 EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Pre-adolescente', @costo_membrecia = 1800.00, @edad_maxima = 14;
 -- Resultado: El rango de edad se solapa con otra categoria existente
 
@@ -78,12 +84,6 @@ EXEC manejo_actividades.ModificarCategoria
 	@id_categoria = 1,
 	@nombre_categoria = 'Adolecente',
 	@costo_membrecia = 1900.00;
-EXEC manejo_actividades.ModificarCategoria 
-	@id_categoria = 1,
-	@costo_membrecia = 1700.00;
-EXEC manejo_actividades.ModificarCategoria 
-	@id_categoria = 1,
-	@nombre_categoria = 'Niños';
 -- Resultado: Categoria modificada correctamente
 
 -- Id inexistente
@@ -91,7 +91,7 @@ EXEC manejo_actividades.ModificarCategoria
 	@id_categoria = 99999,
 	@nombre_categoria = 'adulto',
 	@costo_membrecia = 1900.00;
---Resultado: 'La categoria no existe
+--Resultado: La categoria no existe
 
 --Nombre vacio
 EXEC manejo_actividades.ModificarCategoria 
@@ -105,12 +105,30 @@ EXEC manejo_actividades.ModificarCategoria
 	@id_categoria = 1,
 	@nombre_categoria = 'Adulto',
 	@costo_membrecia = 0;
--- Resultado: El costo de membresía debe ser mayor a cero
+-- Resultado: El costo de membresa debe ser mayor a cero
 
---Nombre ya usado
+--Nombre ya usado (considerando normalizaciÃ³n a mayÃºsculas)
 EXEC manejo_actividades.ModificarCategoria 
 	@id_categoria = 1,
-	@nombre_categoria = 'Cadete',
+	@nombre_categoria = 'cadete',
 	@costo_membrecia = 1000.00;
---Resultado: Ya existe otra categoría con ese nombre
+--Resultado: Ya existe otra categora con ese nombre
+
+--Eliminacion
+
+--Caso normal
+EXEC manejo_actividades.EliminarCategoria @id_categoria = 4;
+-- Resultado: Categoria eliminada correctamente
+
+-- Id inexistente
+EXEC manejo_actividades.EliminarCategoria @id_categoria = 99999;
+--Resultado: La categoria no existe
+
+-- Intentar eliminar categorÃ­a ya eliminada
+EXEC manejo_actividades.EliminarCategoria @id_categoria = 4;
+--Resultado: La categoria no existe
+
+-- Intentar eliminar categorÃ­a con socios asignados (asumiendo que hay socios en categorÃ­a 1)
+-- EXEC manejo_actividades.EliminarCategoria @id_categoria = 1;
+--Resultado: No se puede eliminar la categorÃ­a porque hay socios asignados a ella
 

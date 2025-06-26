@@ -75,7 +75,8 @@ CREATE TABLE manejo_actividades.categoria (
     id_categoria INT IDENTITY(1,1) PRIMARY KEY,
     nombre_categoria VARCHAR(50) NOT NULL,
     costo_membrecia DECIMAL(10, 2) NOT NULL,
-    edad_maxima INT NOT NULL
+    edad_maxima INT NOT NULL,
+	activo BIT NOT NULL DEFAULT 1
 );
 GO
 
