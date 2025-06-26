@@ -1108,7 +1108,7 @@ GO
 
 /*
 * Nombre: CrearClase
-* Descripcion: Modifica los campos nombre y costo de una categoria. 
+* Descripcion: Crea una nueva clase, validando que no haya conflictos de horarios. 
 * Parametros:
 * 	@id_actividad INT - ID de la actividad que se realiza en la clase.
 *	@id_categoria INT - ID de la categoria. 
@@ -1119,12 +1119,12 @@ GO
 * Valores de retorno:
 *	 0: Exito. 
 *	-1: Actividad no existe.
-*	-2: Categoria no existe.
+*	-2: Categoria no existe o está inactiva.
 *	-3: El usuario no existe. 
 *	-4: Dia invalido. 
 *	-5: Horario invalido. 
-*	-6: 'Ya existe una clase con la misma actividad, categoría, día y horario.
-*	-7: El profesor ya tiene otra clase asignada en ese dia y horario
+*	-6: Ya existe una clase activa con la misma actividad, categoría, día y horario.
+*	-7: El profesor ya tiene otra clase activa asignada en ese dia y horario
 *	-99: Error desconocido.
 */
 CREATE OR ALTER PROCEDURE manejo_actividades.CrearClase
@@ -1148,8 +1148,7 @@ BEGIN
 			RETURN -1;
 		END
 
-		-- validar que la categoria exista
-
+		-- validar que la categoria exista y esté activa
 		IF NOT EXISTS (SELECT 1 FROM manejo_actividades.categoria WHERE id_categoria = @id_categoria)
 		BEGIN
 			ROLLBACK TRANSACTION;
@@ -1165,8 +1164,7 @@ BEGIN
 			RETURN -3;
 		END
 
-		-- valdar formato del dia
-
+		-- validar formato del dia
 		SET @dia = UPPER(@dia);
 
 		IF @dia NOT IN ('LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO')
@@ -1176,36 +1174,34 @@ BEGIN
 			RETURN -4;
 		END
 
-		--validar horario (entre 6am y 22pm por ejemplo)
-
+		-- validar horario (entre 6am y 22pm)
 		DECLARE @hora_minima TIME = '06:00:00';
 		DECLARE @hora_maxima TIME = '22:00:00';
 
-		IF @horario < @hora_minima OR @horario > @hora_maxima
+		IF @horario < @hora_minima OR @horario >= @hora_maxima
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'El horario debe ser entre 06 am y 22 pm' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'El horario debe ser entre 06:00 y 21:59' AS Mensaje;
 			RETURN -5;
 		END
 
-		-- verficar la no existencia de otra clase con misma actividad, categoria, dia y horario
-		IF EXISTS ( SELECT 1 FROM manejo_actividades.clase WHERE id_actividad = @id_actividad AND id_categoria = @id_categoria AND dia = @dia AND horario = @horario)
+		-- verificar la no existencia de otra clase activa con misma actividad, categoria, dia y horario
+		IF EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_actividad = @id_actividad AND id_categoria = @id_categoria AND dia = @dia AND horario = @horario AND activo = 1)
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Ya existe una clase con la misma actividad, categoría, día y horario' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'Ya existe una clase activa con la misma actividad, categoría, día y horario' AS Mensaje;
 			RETURN -6;
 		END
 
-		-- verificar que el profesor no tenga otra clase a la misma hora
-		IF EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_usuario = @id_usuario AND dia = @dia AND horario = @horario)
+		-- verificar que el profesor no tenga otra clase activa a la misma hora
+		IF EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_usuario = @id_usuario AND dia = @dia AND horario = @horario AND activo = 1)
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'El profesor ya tiene otra clase asignada en ese dia y horario' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'El profesor ya tiene otra clase activa asignada en ese dia y horario' AS Mensaje;
 			RETURN -7;
 		END
 
-		-- insertar la nueva clase
-
+		-- insertar la nueva clase (el campo activo se establece automáticamente en 1 por el DEFAULT)
 		INSERT INTO manejo_actividades.clase(id_actividad, id_categoria, dia, horario, id_usuario)
 		VALUES (@id_actividad, @id_categoria, @dia, @horario, @id_usuario);
 
@@ -1222,7 +1218,29 @@ BEGIN
 END;
 GO
 
-
+/*
+* Nombre: ModificarClase
+* Descripcion: Modifica los campos de una clase existente, validando que no haya conflictos de horarios. 
+* Parametros:
+* 	@id_clase INT - ID de la clase a modificar. (Parametro obligatorio)
+*	@id_actividad INT - ID de la actividad que se realiza en la clase. (Parametro opcional)
+*	@id_categoria INT - ID de la categoria. (Parametro opcional)
+*	@dia VARCHAR(9) - Dia que se realiza la actividad. (Parametro opcional)
+*	@horario TIME - Horario de la clase. (Parametro opcional)
+* 	@id_usuario INT - ID del usuario que es responsable de la clase. (Parametro opcional)
+*	
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: La clase no existe o está inactiva.
+*	-2: La actividad no existe.
+*	-3: La categoría no existe.
+*	-4: El usuario no existe. 
+*	-5: Dia invalido. 
+*	-6: Horario invalido. 
+*	-7: Ya existe otra clase activa con la misma actividad, categoría, día y horario.
+*	-8: El profesor ya tiene otra clase activa asignada en ese dia y horario
+*	-99: Error desconocido.
+*/
 CREATE OR ALTER PROCEDURE manejo_actividades.ModificarClase
     @id_clase INT,
     @id_actividad INT = NULL,
@@ -1237,11 +1255,11 @@ BEGIN
     BEGIN TRANSACTION;
     
     BEGIN TRY
-        -- verificamos que la clase exista
-        IF NOT EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_clase = @id_clase)
+        -- verificamos que la clase exista y esté activa
+        IF NOT EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_clase = @id_clase AND activo = 1)
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'La clase no existe' AS Mensaje;
+            SELECT 'Error' AS Resultado, 'La clase no existe o está inactiva' AS Mensaje;
             RETURN -1;
         END
         
@@ -1287,15 +1305,15 @@ BEGIN
             DECLARE @hora_minima TIME = '06:00:00';
             DECLARE @hora_maxima TIME = '22:00:00';
           
-            IF @horario < @hora_minima OR @horario > @hora_maxima
+            IF @horario < @hora_minima OR @horario >= @hora_maxima
             BEGIN
                 ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'El horario debe estar entre 06:00 y 22:00' AS Mensaje;
+                SELECT 'Error' AS Resultado, 'El horario debe estar entre 06:00 y 21:59' AS Mensaje;
                 RETURN -6;
             END
         END
         
-        -- verificamos que no haya otra clase con la misma combinación (si cambiamos algun valor)
+        -- verificamos que no haya otra clase activa con la misma combinación (si cambiamos algun valor)
         IF @id_actividad IS NOT NULL OR @id_categoria IS NOT NULL OR @dia IS NOT NULL OR @horario IS NOT NULL
         BEGIN
             IF EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_actividad = ISNULL(@id_actividad, id_actividad) 
@@ -1303,30 +1321,32 @@ BEGIN
 				AND dia = ISNULL(@dia, dia) 
 				AND horario = ISNULL(@horario, horario)
                 AND id_clase <> @id_clase
+                AND activo = 1
             )
             BEGIN
                 ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'Ya existe otra clase con la misma actividad, categoría, día y horario' AS Mensaje;
+                SELECT 'Error' AS Resultado, 'Ya existe otra clase activa con la misma actividad, categoría, día y horario' AS Mensaje;
                 RETURN -7;
             END
         END
         
-        -- verificamos que el profesor no tenga otra clase a la misma hora (solo si cambiamos profesor/día/hora)
+        -- verificamos que el profesor no tenga otra clase activa a la misma hora (solo si cambiamos profesor/día/hora)
         IF @id_usuario IS NOT NULL OR @dia IS NOT NULL OR @horario IS NOT NULL
         BEGIN
             IF EXISTS (SELECT 1 FROM manejo_actividades.clase WHERE id_usuario = ISNULL(@id_usuario, id_usuario)
                 AND dia = ISNULL(@dia, dia)
                 AND horario = ISNULL(@horario, horario)
                 AND id_clase <> @id_clase
+                AND activo = 1
             )
             BEGIN
                 ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'El profesor ya tiene otra clase asignada en ese día y horario' AS Mensaje;
+                SELECT 'Error' AS Resultado, 'El profesor ya tiene otra clase activa asignada en ese día y horario' AS Mensaje;
                 RETURN -8;
             END
         END
         
-        -- verificamos la clase
+        -- actualizamos la clase
         UPDATE manejo_actividades.clase
         SET id_actividad = ISNULL(@id_actividad, id_actividad),
             id_categoria = ISNULL(@id_categoria, id_categoria),
@@ -1351,7 +1371,28 @@ BEGIN
 END;
 GO
 
-
+/*
+* Nombre: EliminarClase
+* Descripcion: Realiza borrado lógico de una clase desactivándola, validando que no haya socios inscritos en la actividad y categoría correspondiente. 
+* Parametros:
+* 	@id_clase INT - ID de la clase a eliminar. (Parametro obligatorio)
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: La clase no existe o ya está inactiva.
+*	-2: No se puede eliminar porque hay socios inscritos en esta actividad y categoría.
+*	-99: Error desconocido.
+*/
+/*
+* Nombre: EliminarClase
+* Descripcion: Realiza borrado lógico de una clase desactivándola, validando que no haya socios inscritos en la actividad y categoría correspondiente. 
+* Parametros:
+* 	@id_clase INT - ID de la clase a eliminar. (Parametro obligatorio)
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: La clase no existe o ya está inactiva.
+*	-2: No se puede eliminar porque hay socios inscritos en esta actividad y categoría.
+*	-99: Error desconocido.
+*/
 CREATE OR ALTER PROCEDURE manejo_actividades.EliminarClase
     @id_clase INT
 AS
@@ -1368,36 +1409,19 @@ BEGIN
             SELECT 'Error' AS Resultado, 'La clase no existe o ya está inactiva' AS Mensaje;
             RETURN -1;
         END
-        
-        -- verificamos si hay socios inscritos en esta actividad y categoría
-        IF EXISTS (SELECT 1 FROM manejo_personas.socio_actividad sa
-            JOIN manejo_personas.socio s ON sa.id_socio = s.id_socio
-            JOIN manejo_actividades.clase c ON c.id_clase = @id_clase
-            WHERE sa.id_actividad = c.id_actividad
-            AND s.id_categoria = c.id_categoria
-        )
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'No se puede eliminar la clase porque hay socios inscritos en esta actividad y categoría' AS Mensaje;
-            RETURN -2;
-        END
-		-- esto casi seguro habria que cambiarlo/repensarlo porque no se eliminaria la clase aun si el socio esta inscrito en actividad y categoria pero 
-		-- en otra clase, capaz habria que unir de alguna forma socio con clase. !!!
-		-- aparte tiene que hacer joins y dudo que sea optimo
 
         -- realizamos borrado lógico cambiando el estado a inactivo
         UPDATE manejo_actividades.clase
-        SET activo = 0 -- agregue atributo activo a clase para hacer borrado lógico, si les parece que no deberia de haber borrado lógico lo cambiamos
+        SET activo = 0
         WHERE id_clase = @id_clase;
         
         COMMIT TRANSACTION;
         
-        SELECT 'Éxito' AS Resultado, 'Clase inactivada correctamente' AS Mensaje;
+        SELECT 'Éxito' AS Resultado, 'Clase inactivada correctamente (borrado lógico)' AS Mensaje;
         RETURN 0;
 
     END TRY
     BEGIN CATCH
-
         ROLLBACK TRANSACTION;
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
         RETURN -99;
@@ -1749,7 +1773,19 @@ BEGIN
 END;
 GO
 
-
+/*
+* Nombre: CrearActividad
+* Descripcion: Crea una nueva actividad, validando que el nombre no exista y que el costo sea válido.
+* Parametros:
+*   @nombre_actividad VARCHAR(100) - Nombre de la actividad.
+*   @costo_mensual DECIMAL(10,2) - Costo mensual de la actividad.
+* Valores de retorno:
+*    0: Éxito.
+*   -1: El nombre de la actividad es nulo o vacío.
+*   -2: Ya existe una actividad con ese nombre.
+*   -3: El costo mensual es inválido.
+*  -999: Error desconocido.
+*/
 CREATE OR ALTER PROCEDURE manejo_actividades.CrearActividad
 	@nombre_actividad VARCHAR(100),
 	@costo_mensual DECIMAL(10,2)
@@ -1806,8 +1842,25 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
-
 GO
+
+
+/*
+* Nombre: ModificarActividad
+* Descripcion: Modifica el nombre y el costo mensual de una actividad existente, validando que el nombre no se repita y que el costo sea válido.
+* Parametros:
+*   @id INT - ID de la actividad a modificar.
+*   @nombre_actividad VARCHAR(100) - Nuevo nombre de la actividad.
+*   @costo_mensual DECIMAL(10,2) - Nuevo costo mensual de la actividad.
+* Valores de retorno:
+*    0: Éxito.
+*   -1: ID nulo.
+*   -2: ID no existente.
+*   -3: El nombre de la actividad es nulo o vacío.
+*   -4: Ya existe una actividad con ese nombre.
+*   -5: El costo mensual es inválido.
+*  -999: Error desconocido.
+*/
 CREATE OR ALTER PROCEDURE manejo_actividades.ModificarActividad
 	@id INT,
 	@nombre_actividad VARCHAR(100),
@@ -1888,7 +1941,17 @@ BEGIN
 END;
 GO
 
-
+/*
+* Nombre: EliminarActividad
+* Descripcion: Realiza una eliminación lógica de una actividad, cambiando su estado a inactiva.
+* Parametros:
+*   @id INT - ID de la actividad a eliminar.
+* Valores de retorno:
+*    0: Éxito.
+*   -1: ID nulo.
+*   -2: ID no existente o ya eliminada.
+*  -999: Error desconocido.
+*/
 CREATE OR ALTER PROCEDURE manejo_actividades.EliminarActividad
 	@id INT
 AS
@@ -1906,19 +1969,19 @@ BEGIN
 			RETURN -1;
 		END
 
-		-- Verifico que exista en la tabla
-		IF NOT EXISTS (SELECT 1 FROM manejo_actividades.actividad WHERE id_actividad = @id)
+		-- Verifico que exista en la tabla y que esté activa
+		IF NOT EXISTS (SELECT 1 FROM manejo_actividades.actividad WHERE id_actividad = @id AND estado = 1)
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'id no existente o ya eliminada' AS Mensaje;
 			RETURN -2;
 		END
 
-		-- Elimino la actividad
-		DELETE FROM manejo_actividades.actividad WHERE id_actividad = @id;
+		-- Eliminación logica
+		UPDATE manejo_actividades.actividad SET estado = 0 WHERE id_actividad = @id;
 
 		COMMIT TRANSACTION;
-		SELECT 'Exito' AS Resultado, 'Actividad eliminada correctamente' AS Mensaje;
+		SELECT 'Exito' AS Resultado, 'Actividad eliminada lógicamente correctamente' AS Mensaje;
 		RETURN 0;
 	END TRY
 
@@ -2929,5 +2992,47 @@ BEGIN
     END CATCH
 
 END;
-
 GO
+
+/*
+* Nombre: CrearActividad
+* Descripcion: Crea una nueva actividad, validando que el nombre no exista y que el costo sea válido.
+* Parametros:
+*   @nombre_actividad VARCHAR(100) - Nombre de la actividad.
+*   @costo_mensual DECIMAL(10,2) - Costo mensual de la actividad.
+* Valores de retorno:
+*    0: Éxito.
+*   -1: El nombre de la actividad es nulo o vacío.
+*   -2: Ya existe una actividad con ese nombre.
+*   -3: El costo mensual es inválido.
+*  -999: Error desconocido.
+*/
+
+/*
+* Nombre: ModificarActividad
+* Descripcion: Modifica el nombre y el costo mensual de una actividad existente, validando que el nombre no se repita y que el costo sea válido.
+* Parametros:
+*   @id INT - ID de la actividad a modificar.
+*   @nombre_actividad VARCHAR(100) - Nuevo nombre de la actividad.
+*   @costo_mensual DECIMAL(10,2) - Nuevo costo mensual de la actividad.
+* Valores de retorno:
+*    0: Éxito.
+*   -1: ID nulo.
+*   -2: ID no existente.
+*   -3: El nombre de la actividad es nulo o vacío.
+*   -4: Ya existe una actividad con ese nombre.
+*   -5: El costo mensual es inválido.
+*  -999: Error desconocido.
+*/
+
+/*
+* Nombre: EliminarActividad
+* Descripcion: Realiza una eliminación lógica de una actividad, cambiando su estado a inactiva.
+* Parametros:
+*   @id INT - ID de la actividad a eliminar.
+* Valores de retorno:
+*    0: Éxito.
+*   -1: ID nulo.
+*   -2: ID no existente o ya eliminada.
+*  -999: Error desconocido.
+*/
