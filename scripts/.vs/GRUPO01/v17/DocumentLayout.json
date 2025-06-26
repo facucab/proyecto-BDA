@@ -3,16 +3,8 @@
   "WorkspaceRootPath": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\01_CrearBD.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
-      "RelativeMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|solutionrelative:01_CrearBD.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Reportes.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
-      "RelativeMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|solutionrelative:Reportes.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
-    },
-    {
-      "AbsoluteMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\pruebasSPUsuarios.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
-      "RelativeMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|solutionrelative:pruebasSPUsuarios.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+      "AbsoluteMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\03_SP.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|solutionrelative:03_SP.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
     }
   ],
   "DocumentGroupContainers": [
@@ -27,35 +19,13 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "01_CrearBD.sql - localhost.master (tPcWin\\tomas (56))",
-              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\01_CrearBD.sql",
-              "RelativeDocumentMoniker": "01_CrearBD.sql",
-              "ToolTip": "01_CrearBD.sql - localhost.master (tPcWin\\tomas (56))",
+              "Title": "03_SP.sql - localhost.Com5600G01 (tPcWin\\tomas (54))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\03_SP.sql",
+              "RelativeDocumentMoniker": "03_SP.sql",
+              "ToolTip": "03_SP.sql - localhost.Com5600G01 (tPcWin\\tomas (54))",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
-              "WhenOpened": "2025-06-26T15:52:58.612Z",
-              "EditorCaption": " - localhost.master (tPcWin\\tomas (56))"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "Reportes.sql - localhost.master (tPcWin\\tomas (52))",
-              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Reportes.sql",
-              "RelativeDocumentMoniker": "Reportes.sql",
-              "ToolTip": "Reportes.sql - localhost.master (tPcWin\\tomas (52))",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
-              "WhenOpened": "2025-06-26T15:50:30.326Z",
-              "EditorCaption": " - localhost.master (tPcWin\\tomas (52))"
-            },
-            {
-              "$type": "Document",
-              "DocumentIndex": 2,
-              "Title": "pruebasSPUsuarios.sql - localhost.master (tPcWin\\tomas (85))",
-              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\pruebasSPUsuarios.sql",
-              "RelativeDocumentMoniker": "pruebasSPUsuarios.sql",
-              "ToolTip": "pruebasSPUsuarios.sql - localhost.master (tPcWin\\tomas (85))",
-              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
-              "WhenOpened": "2025-06-26T15:47:40.834Z",
-              "EditorCaption": " - localhost.master (tPcWin\\tomas (85))"
+              "WhenOpened": "2025-06-26T16:03:58.619Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (54))"
             }
           ]
         }

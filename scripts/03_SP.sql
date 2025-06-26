@@ -244,7 +244,7 @@ BEGIN
 		END
 
 		-- Normalizo el nombre
-		SET @nombre = UPPER(LTRIM(RTRIM(@nombre)));
+		SET @nombre = LTRIM(RTRIM(@nombre));
 
 		-- Verifico que el nombre no exista ya
 		IF EXISTS (SELECT 1 FROM manejo_personas.obra_social WHERE descripcion = @nombre)
@@ -322,15 +322,15 @@ BEGIN
 		END
 
 		-- Normalizo el nombre
-		SET @nombre_nuevo = UPPER(LTRIM(RTRIM(@nombre_nuevo)));
+		SET @nombre_nuevo = LTRIM(RTRIM(@nombre_nuevo));
 
 		-- Verifico que el nombre no exista ya en la tabla
 		IF EXISTS (SELECT 1 FROM manejo_personas.obra_social WHERE descripcion = @nombre_nuevo)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'La obra social ya esta registrada' AS Mensaje;
-			RETURN -3;
-		END
+			BEGIN
+				ROLLBACK TRANSACTION;
+				SELECT 'Error' AS Resultado, 'La obra social ya esta registrada' AS Mensaje;
+				RETURN -3;
+			END
 
 
 		-- Actualizo los datos
@@ -861,7 +861,7 @@ BEGIN
 		END
 
 		-- normalizamos el nombre (mayúsculas y sin espacios)
-		SET @nombre_categoria = UPPER(LTRIM(RTRIM(@nombre_categoria)));
+		SET @nombre_categoria = LTRIM(RTRIM(@nombre_categoria));
 
 		-- validar costo de membresía
 		IF @costo_membrecia <= 0
@@ -981,7 +981,7 @@ BEGIN
 		END
 
 		-- normalizamos el nombre (mayúsculas y sin espacios)
-		SET @nombre_categoria = UPPER(LTRIM(RTRIM(@nombre_categoria)));
+		SET @nombre_categoria = LTRIM(RTRIM(@nombre_categoria));
 
 		-- validamos longitud del nombre
 		IF LEN(@nombre_categoria) > 50
@@ -1139,7 +1139,7 @@ BEGIN
 		END
 
 		-- validar formato del dia
-		SET @dia = UPPER(@dia);
+		SET @dia = LTRIM(RTRIM(@dia));
 
 		IF @dia NOT IN ('LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO')
 		BEGIN
@@ -1264,7 +1264,7 @@ BEGIN
         -- verificamos formato del día si se proporciona y convertir a mayúsculas
         IF @dia IS NOT NULL
         BEGIN
-            SET @dia = UPPER(@dia);
+            SET @dia = LTRIM(RTRIM(@dia));
             IF @dia NOT IN ('LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO')
             BEGIN
                 ROLLBACK TRANSACTION;
