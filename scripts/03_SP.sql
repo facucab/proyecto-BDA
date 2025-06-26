@@ -238,6 +238,9 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+GO
+
+
 /*
 * Nombre: CreacionObraSocial
 * Descripcion: Realiza una eliminacion logica de una persona.
@@ -249,9 +252,6 @@ END;
 *	-2: El nombre ya esta en uso.
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE manejo_personas.CreacionObraSocial
 	@nombre VARCHAR(50)
 AS
@@ -269,6 +269,9 @@ BEGIN
 			RETURN -1;
 		END
 
+		-- Normalizo el nombre
+		SET @nombre = UPPER(LTRIM(RTRIM(@nombre)));
+
 		-- Verifico que el nombre no exista ya
 		IF EXISTS (SELECT 1 FROM manejo_personas.obra_social WHERE descripcion = @nombre)
 		BEGIN
@@ -277,9 +280,9 @@ BEGIN
 			RETURN -2;
 		END
 
-	
-		INSERT INTO manejo_personas.obra_social(descripcion)
-		VALUES (@nombre);
+		-- Inserto los datos
+		INSERT INTO manejo_personas.obra_social(descripcion,activo)
+		VALUES (@nombre,1);
 
 		COMMIT TRANSACTION;
 
@@ -293,6 +296,9 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+GO
+
+
 /*
 * Nombre: ModificacionObraSocial
 * Descripcion: Permite modificar el nombre de una obra social.
@@ -306,9 +312,6 @@ END;
 *	-3: Nombre esta en uso. 
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE manejo_personas.ModificacionObraSocial
 	@id INT,
 	@nombre_nuevo VARCHAR(50)
@@ -335,6 +338,7 @@ BEGIN
 			RETURN -2;
 		END
 
+
 		-- Verifico que el nombre no sea nulo
 		IF @nombre_nuevo IS NULL
 		BEGIN
@@ -343,14 +347,19 @@ BEGIN
 			RETURN -1;
 		END
 
+		-- Normalizo el nombre
+		SET @nombre_nuevo = UPPER(LTRIM(RTRIM(@nombre_nuevo)));
+
 		-- Verifico que el nombre no exista ya en la tabla
 		IF EXISTS (SELECT 1 FROM manejo_personas.obra_social WHERE descripcion = @nombre_nuevo)
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Esa obra social ya esta registrada' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'La obra social ya esta registrada' AS Mensaje;
 			RETURN -3;
 		END
 
+
+		-- Actualizo los datos
 		UPDATE manejo_personas.obra_social
 		SET descripcion = @nombre_nuevo
 		WHERE obra_social.id_obra_social = @id;
@@ -367,9 +376,12 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+GO
+
+
 /*
 * Nombre: ModificacionObraSocial
-* Descripcion: Elimina una obra social. (Eliminacion fisica)
+* Descripcion: Desactiva una obra social. (Eliminacion logica)
 * Parametros:
 *	@id INT - id de la obra social. (DEBE SER NO NULO)
 * Valores de retorno:
@@ -377,9 +389,6 @@ END;
 *	-1: @id no existente.
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE manejo_personas.EliminacionObraSocial
 	@id INT
 AS BEGIN
@@ -404,12 +413,18 @@ AS BEGIN
 			RETURN -1;
 		END
 
-		DELETE FROM manejo_personas.obra_social
-		WHERE obra_social.id_obra_social = @id;
+		-- Borrado fisico
+		--DELETE FROM manejo_personas.obra_social
+		--WHERE obra_social.id_obra_social = @id;
+
+		-- Borrado Logico
+		UPDATE manejo_personas.obra_social
+		SET activo = 0
+		WHERE id_obra_social = @id;
 
 		COMMIT TRANSACTION;
 
-		SELECT 'Exito' AS Resultado, 'Obra Social eliminada' AS Mensaje;
+		SELECT 'Exito' AS Resultado, 'Obra Social desactiada' AS Mensaje;
 		RETURN 0;
 
 	END TRY
@@ -419,6 +434,9 @@ AS BEGIN
 		RETURN -99;
 	END CATCH
 END;
+GO
+
+
 /*
 * Nombre: CreacionMetodoPago
 * Descripcion: Crea un metodo de pago. 
@@ -430,9 +448,6 @@ END;
 *	-2: El nombre ya esta en uso.
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE pagos_y_facturas.CreacionMetodoPago
 	@nombre VARCHAR(50)
 AS

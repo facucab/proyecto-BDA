@@ -57,7 +57,8 @@ GO
 -- OBRA SOCIAL
 CREATE TABLE manejo_personas.obra_social (
     id_obra_social INT IDENTITY(1,1) PRIMARY KEY,
-    descripcion VARCHAR(50) NOT NULL
+    descripcion VARCHAR(50) NOT NULL,
+	activo BIT NOT NULL DEFAULT 1
 );
 GO
 
