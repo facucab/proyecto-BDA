@@ -98,9 +98,20 @@ EXEC manejo_actividades.EliminarCategoria @id_categoria = 4;
 EXEC manejo_actividades.EliminarCategoria @id_categoria = 99999;
 --Resultado: La categoria no existe
 
--- Intentar eliminar categoría ya eliminada
+-- Intentar eliminar categoría ya eliminada (borrado lógico)
 EXEC manejo_actividades.EliminarCategoria @id_categoria = 4;
 --Resultado: La categoria no existe
+
+-- Intentar modificar categoría ya eliminada (borrado lógico)
+EXEC manejo_actividades.ModificarCategoria 
+	@id_categoria = 4,
+	@nombre_categoria = 'Eliminada',
+	@costo_membrecia = 1000.00;
+--Resultado: La categoria no existe
+
+-- Intentar crear una categoría con el mismo nombre de una eliminada lógicamente (debería permitirlo si solo se consideran activas)
+EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Veterano', @costo_membrecia = 2100.00,@edad_maxima = 80;
+-- Resultado: Categoria creada correctamente (si la anterior fue eliminada lógicamente)
 
 -- Intentar eliminar categoría con socios asignados (asumiendo que hay socios en categoría 1)
 -- EXEC manejo_actividades.EliminarCategoria @id_categoria = 1;

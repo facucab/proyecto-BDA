@@ -1395,6 +1395,19 @@ END;
 GO
 
 
+/*
+* Nombre: CrearDescuento
+* Descripcion: Crea un nuevo descuento en la base de datos, validando que la descripción no esté vacía, que no exista un descuento duplicado y que el valor del descuento sea distinto de cero o nulo.
+* Parametros:
+* 	@descripcion VARCHAR(50) - Descripción del descuento. (Parametro obligatorio)
+* 	@cantidad DECIMAL(4,3) - Valor del descuento en forma decimal. (Parametro obligatorio)
+* Valores de retorno:
+*	 0: Éxito. Descuento creado correctamente.
+*	-1: Descripción nula o vacía.
+*	-2: Ya existe un descuento con la misma descripción.
+*	-3: Valor del descuento nulo o igual a cero.
+*	-999: Error inesperado capturado en el bloque TRY-CATCH.
+*/
 CREATE OR ALTER PROCEDURE pagos_y_facturas.CrearDescuento
 	@descripcion VARCHAR(50),
 	@cantidad DECIMAL(4,3)
@@ -1452,7 +1465,22 @@ BEGIN
 END;
 GO
 
-
+/*
+* Nombre: ModificarDescuento
+* Descripcion: Modifica un descuento existente validando que el ID exista, que la nueva descripción no sea nula ni duplicada, y que el nuevo valor del descuento sea válido.
+* Parametros:
+* 	@id INT - Identificador del descuento a modificar. (Parametro obligatorio)
+* 	@descripcion VARCHAR(50) - Nueva descripción del descuento. (Parametro obligatorio)
+* 	@cantidad DECIMAL(4,3) - Nuevo valor del descuento. (Parametro obligatorio)
+* Valores de retorno:
+*	 0: Éxito. Descuento modificado correctamente.
+*	-1: ID nulo.
+*	-2: ID no existe en la base de datos.
+*	-3: Descripción nula o vacía.
+*	-4: Ya existe otro descuento con esa descripción.
+*	-5: Valor del descuento nulo o igual a cero.
+*	-999: Error inesperado capturado en el bloque TRY-CATCH.
+*/
 CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificarDescuento
 	@id INT,
 	@descripcion VARCHAR(50),
@@ -1472,11 +1500,11 @@ BEGIN
 			RETURN -1;
 		END
 			
-		-- Verifico que exista en la tabla
-		IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.descuento WHERE id_descuento = @id)
+		-- Verifico que exista en la tabla y esté activo
+		IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.descuento WHERE id_descuento = @id AND estado = 1)
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'id no existente o ya eliminado' AS Mensaje;
 			RETURN -2;
 		END
 
@@ -1488,10 +1516,10 @@ BEGIN
 			RETURN -3;
 		END
 
-		-- Verifico que no exista ya en la base de datos
+		-- Verifico que no exista ya en la base de datos (solo activos)
 		IF EXISTS (
 			SELECT 1 FROM pagos_y_facturas.descuento
-			WHERE descripcion = @descripcion AND id_descuento <> @id
+			WHERE descripcion = @descripcion AND id_descuento <> @id AND estado = 1
 		)
 		BEGIN
 			ROLLBACK TRANSACTION;
@@ -1532,6 +1560,17 @@ END;
 GO
 
 
+/*
+* Nombre: EliminarDescuento
+* Descripcion: Realiza la eliminación lógica de un descuento, estableciendo su estado en 0 (inactivo), validando que el ID no sea nulo y que exista en la tabla.
+* Parametros:
+* 	@id INT - Identificador del descuento a eliminar. (Parametro obligatorio)
+* Valores de retorno:
+*	 0: Éxito. Descuento eliminado lógicamente.
+*	-1: ID nulo.
+*	-2: ID no existe en la base de datos.
+*	-999: Error inesperado capturado en el bloque TRY-CATCH.
+*/
 CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminarDescuento
 	@id INT
 AS
@@ -1549,16 +1588,21 @@ BEGIN
 			RETURN -1;
 		END
 
-		-- Verifico que exista en la tabla
-		IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.descuento WHERE id_descuento = @id)
+		-- Verifico que exista y esté activo
+		IF NOT EXISTS (
+			SELECT 1 FROM pagos_y_facturas.descuento 
+			WHERE id_descuento = @id AND estado = 1
+		)
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			SELECT 'Error' AS Resultado, 'id no existente o ya eliminado' AS Mensaje;
 			RETURN -2;
 		END
 
-		-- Elimino el descuento
-		DELETE FROM pagos_y_facturas.descuento WHERE id_descuento = @id;
+		-- Eliminación lógica: seteo estado = 0
+		UPDATE pagos_y_facturas.descuento
+		SET estado = 0
+		WHERE id_descuento = @id;
 
 		COMMIT TRANSACTION;
 		SELECT 'Exito' AS Resultado, 'Descuento eliminado correctamente' AS Mensaje;
@@ -1579,6 +1623,7 @@ BEGIN
 	END CATCH
 END;
 GO
+
 
 
 CREATE OR ALTER PROCEDURE pagos_y_facturas.CreacionFactura

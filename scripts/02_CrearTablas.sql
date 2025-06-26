@@ -181,6 +181,7 @@ GO
 CREATE TABLE pagos_y_facturas.descuento (
 	id_descuento INT IDENTITY(1,1) PRIMARY KEY,
 	descripcion VARCHAR(100) NOT NULL,
+    estado BIT NOT NULL DEFAULT 1,
 	valor DECIMAL(4,3) NOT NULL -- esto era cantidad pero lo vole y puse valor porque no veo mucho sentido en el atributo cantidad, capaz me equivoco.
 );								 -- RTA: Creo que tenes razon, solo que no se si hacian falta 8 digitos adelante. Si vos guardas descuentos porcentuales como
 GO								 -- 50%, guardas 0.5, asi que realmente solo necesitarias 1 digito adelante y 2 o 3 atras. Mi opinion. 
