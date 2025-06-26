@@ -2680,56 +2680,60 @@ GO
 
 /*
 * Nombre: CrearGrupoFamiliar
-* Descripcion: Crea un nuevo grupo familiar con la fecha de alta actual y estado activo (1).
+* Descripcion: Crea un nuevo grupo familiar con la fecha de alta actual y estado activo.
 * Parametros: Ninguno.
 * Valores de retorno:
-*   0     - Éxito. Grupo familiar creado correctamente.
-* -99     - Error: Excepción no controlada. Se retorna el mensaje del error.
+*    0: Exito. Grupo familiar creado correctamente.
+*  -99: Error desconocido.
 */
 CREATE OR ALTER PROCEDURE manejo_personas.CrearGrupoFamiliar
 AS
 BEGIN
     SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-    BEGIN TRANSACTION;
 
     BEGIN TRY
+        BEGIN TRANSACTION;
+
         INSERT INTO manejo_personas.grupo_familiar (fecha_alta, estado)
         VALUES (GETDATE(), 1);
 
         COMMIT TRANSACTION;
         SELECT 'Exito' AS Resultado, 'Grupo familiar creado correctamente' AS Mensaje;
         RETURN 0;
-
     END TRY
+
     BEGIN CATCH
-        ROLLBACK TRANSACTION;
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        SELECT
+            'Error' AS Resultado, ERROR_MESSAGE()   AS Mensaje;
         RETURN -99;
     END CATCH
+
 END;
 GO
 
 /*
 * Nombre: ModificarEstadoGrupoFamiliar
-* Descripcion: Modifica el estado (activo/inactivo) de un grupo familiar existente. Valida que el grupo exista y que el estado sea 0 o 1.
+* Descripcion: Modifica el estado (activo/inactivo) de un grupo familiar existente.
 * Parametros:
-*   @id_grupo INT - ID del grupo familiar a modificar. Debe existir en manejo_personas.grupo_familiar. (Obligatorio)
-*   @estado BIT = NULL - Nuevo estado del grupo: 1 (activo) o 0 (inactivo). (Opcional)
+*   @id_grupo INT      - ID del grupo familiar a modificar.
+*   @estado   BIT = NULL - Nuevo estado: 1 (activo) o 0 (inactivo). Opcional.
 * Valores de retorno:
-*   0     - Éxito. Estado actualizado correctamente.
-*  -1     - Error: Grupo familiar no encontrado.
-*  -2     - Error: Estado inválido (debe ser 0 o 1).
-* -99     - Error: Excepción no controlada. Se retorna el mensaje del error.
+*    0: Exito. Estado actualizado correctamente.
+*   -1: Grupo familiar no encontrado.
+*   -2: Estado inválido (debe ser 0 o 1).
+*  -99: Error desconocido.
 */
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarEstadoGrupoFamiliar
     @id_grupo INT,
-    @estado BIT = NULL
+    @estado   BIT = NULL
 AS
 BEGIN
     SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-    BEGIN TRANSACTION;
 
     BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- 1) Verificar existencia
         IF NOT EXISTS (SELECT 1 FROM manejo_personas.grupo_familiar WHERE id_grupo = @id_grupo)
         BEGIN
             ROLLBACK TRANSACTION;
@@ -2737,77 +2741,82 @@ BEGIN
             RETURN -1;
         END
 
-        -- Verificar que el estado sea valido
-        IF @estado IS NOT NULL AND @estado NOT IN (0, 1)
+        -- 2) Validar estado si se proporciona
+        IF @estado IS NOT NULL AND @estado NOT IN (0,1)
         BEGIN
             ROLLBACK TRANSACTION;
             SELECT 'Error' AS Resultado, 'Estado debe ser 0 (inactivo) o 1 (activo)' AS Mensaje;
             RETURN -2;
         END
 
-		-- Modifico el estado
+        -- 3) Actualizar estado (preserva antiguo si @estado IS NULL)
         UPDATE manejo_personas.grupo_familiar
-        SET estado = @estado
+        SET estado = ISNULL(@estado, estado)
         WHERE id_grupo = @id_grupo;
 
         COMMIT TRANSACTION;
-        SELECT 'Exito' AS Resultado, 'Estado del Grupo familiar actualizado correctamente' AS Mensaje;
+        SELECT 'Exito' AS Resultado, 'Estado del grupo familiar actualizado correctamente' AS Mensaje;
         RETURN 0;
-
     END TRY
+
     BEGIN CATCH
-        ROLLBACK TRANSACTION;
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        SELECT
+            'Error' AS Resultado, ERROR_MESSAGE()   AS Mensaje;
         RETURN -99;
     END CATCH
+
 END;
 GO
 
 /*
 * Nombre: EliminarGrupoFamiliar
-* Descripcion: Realiza la eliminación lógica (inactivación) de un grupo familiar si no tiene responsables ni socios asignados activos.
+* Descripcion: Realiza la eliminación lógica de un grupo familiar si no tiene responsables ni socios asignados.
 * Parametros:
-*   @id_grupo INT - ID del grupo familiar a eliminar. Debe existir en manejo_personas.grupo_familiar. (Obligatorio)
+*   @id_grupo INT - ID del grupo familiar a eliminar.
 * Valores de retorno:
-*   0     - Éxito. Grupo familiar inactivado correctamente.
-*  -1     - Error: Grupo familiar no encontrado.
-*  -2     - Error: No se puede eliminar, el grupo tiene responsables asignados.
-*  -3     - Error: No se puede eliminar, el grupo tiene socios asignados.
-* -99     - Error: Excepción no controlada. Se retorna el mensaje del error.
+*    0: Exito. Grupo familiar inactivado correctamente.
+*   -1: Grupo familiar no encontrado.
+*   -2: No se puede eliminar: grupo tiene responsables asignados.
+*   -3: No se puede eliminar: grupo tiene socios asignados.
+*  -99: Error desconocido.
 */
+
 CREATE OR ALTER PROCEDURE manejo_personas.EliminarGrupoFamiliar
     @id_grupo INT
 AS
 BEGIN
     SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-    BEGIN TRANSACTION;
-
     BEGIN TRY
-		-- Verifico que el grupo familiar exista en la tabla
+        BEGIN TRANSACTION;
+
+        -- 1) Verificar existencia
         IF NOT EXISTS (SELECT 1 FROM manejo_personas.grupo_familiar WHERE id_grupo = @id_grupo)
+
         BEGIN
             ROLLBACK TRANSACTION;
             SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje;
             RETURN -1;
         END
 
-        -- Validar que no tenga responsables ni socios activos
+        -- 2) Verificar responsables
         IF EXISTS (SELECT 1 FROM manejo_personas.responsable WHERE id_grupo = @id_grupo)
+
         BEGIN
             ROLLBACK TRANSACTION;
             SELECT 'Error' AS Resultado, 'No se puede eliminar: grupo tiene responsables asignados' AS Mensaje;
             RETURN -2;
         END
 
-		-- Verificar que no tenga socios asignados al grupo
+        -- 3) Verificar socios
         IF EXISTS (SELECT 1 FROM manejo_personas.socio WHERE id_grupo = @id_grupo)
+
         BEGIN
             ROLLBACK TRANSACTION;
             SELECT 'Error' AS Resultado, 'No se puede eliminar: grupo tiene socios asignados' AS Mensaje;
             RETURN -3;
         END
 
-        -- Borrado logico
+        -- 4) Borrado lógico
         UPDATE manejo_personas.grupo_familiar
         SET estado = 0
         WHERE id_grupo = @id_grupo;
@@ -2815,15 +2824,17 @@ BEGIN
         COMMIT TRANSACTION;
         SELECT 'Exito' AS Resultado, 'Grupo familiar inactivado correctamente' AS Mensaje;
         RETURN 0;
-
     END TRY
+
     BEGIN CATCH
-        ROLLBACK TRANSACTION;
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        SELECT
+            'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
         RETURN -99;
     END CATCH
+
 END;
 GO
+
 
 
 /*

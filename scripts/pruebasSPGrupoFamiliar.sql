@@ -14,48 +14,63 @@
 USE Com5600G01;
 GO
 
---Modificacion 
+-- Crear Grupo Familiar
 
---Casos Normales
+-- Caso normal
+EXEC manejo_personas.CrearGrupoFamiliar;
+-- Resultado esperado: Exito, Grupo familiar creado correctamente (deberia funcionar siempre a no ser error desconocido)
+
+-- ModificarEstadoGrupoFamiliar
+
+-- Casos Normales
 EXEC manejo_personas.ModificarEstadoGrupoFamiliar
-    @id_grupo =1,
-    @estado =0;
+    @id_grupo = 1,
+    @estado   = 0;
+-- Resultado esperado: Exito, Estado del grupo familiar actualizado correctamente
+
 EXEC manejo_personas.ModificarEstadoGrupoFamiliar
-    @id_grupo =5,
-    @estado =0;
+    @id_grupo = 5,
+    @estado   = 0;
+-- Resultado esperado: Exito, Estado del grupo familiar actualizado correctamente
+
 EXEC manejo_personas.ModificarEstadoGrupoFamiliar
-    @id_grupo =4,
-    @estado =1;
---Respuesta: Estado del Grupo familiar actualizado correctamente
+    @id_grupo = 4,
+    @estado   = 1;
+-- Resultado esperado: Exito, Estado del grupo familiar actualizado correctamente
 
---Grupo inexistente
+-- Grupo inexistente
 EXEC manejo_personas.ModificarEstadoGrupoFamiliar
-    @id_grupo =78964,
-    @estado =1;
---Resultado: Grupo familiar no encontrado
+    @id_grupo = 78964,
+    @estado   = 1;
+-- Resultado esperado: Error, Grupo familiar no encontrado
 
---Estado invalido
+-- Estado invalido
 EXEC manejo_personas.ModificarEstadoGrupoFamiliar
-    @id_grupo =3,
-    @estado =61;
---Resultado: Estado debe ser 0 (inactivo) o 1 (activo)
+    @id_grupo = 3,
+    @estado   = 61;
+-- Resultado esperado: Error, Estado debe ser 0 (inactivo) o 1 (activo)
 
---Eliminacion
 
---Casos Normales
-EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo =3;
-EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo =6;
-EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo =9;
---Resultado: Grupo familiar inactivado correctamente
+-- EliminarGrupoFamiliar
 
---Grupo inexistente
-EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo =27894;
---Resultado: Grupo familiar no encontrado
+-- Casos Normales
+EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo = 3;
+-- Resultado esperado: Exito, Grupo familiar inactivado correctamente
 
---Responsable asignado
-EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo =2;
---Resultado: No se puede eliminar: grupo tiene responsables asignados
+EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo = 6;
+-- Resultado esperado: Exito, Grupo familiar inactivado correctamente
 
---Miembros activos
-EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo =4;
---Resultado: No se puede eliminar: grupo tiene socios asignados
+EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo = 9;
+-- Resultado esperado: Exito, Grupo familiar inactivado correctamente
+
+-- Grupo inexistente
+EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo = 27894;
+-- Resultado esperado: Error, Grupo familiar no encontrado
+
+-- Responsable asignado
+EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo = 2;
+-- Resultado esperado: Error, No se puede eliminar: grupo tiene responsables asignados
+
+-- Miembros activos
+EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo = 4;
+-- Resultado esperado: Error, No se puede eliminar: grupo tiene socios asignados
