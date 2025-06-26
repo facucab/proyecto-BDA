@@ -14,6 +14,12 @@
 USE Com5600G01;
 GO
 
+-- Datos previos necesarios para validar FKs
+INSERT INTO usuarios.obra_social(descripcion) VALUES('Obra Social Test');
+INSERT INTO actividades.categoria(nombre_categoria, costo_membrecia, vigencia) VALUES('Categoria Test',100.00,GETDATE());
+INSERT INTO usuarios.grupo_familiar(fecha_alta,estado) VALUES(GETDATE(),1);
+GO
+
 -- CrearSocio
 
 -- Caso normal 1: crear persona y socio
@@ -36,7 +42,7 @@ EXEC usuarios.CrearSocio
 -- Caso normal 2: reutilizar persona existente (id_persona = 1), nuevo socio
 EXEC usuarios.CrearSocio
 	@id_persona          = 1,
-	@dni                 = '00000000',  -- ignorado
+	@dni                 = '00000000',  
 	@nombre              = 'Ignorado',
 	@apellido            = 'Ignorado',
 	@email               = 'ignorado@example.com',
@@ -45,9 +51,9 @@ EXEC usuarios.CrearSocio
 	@numero_socio        = 'S000002',
 	@telefono_emergencia = '111222333',
 	@obra_nro_socio      = 'OS124',
-	@id_obra_social      = 2,
-	@id_categoria        = 2,
-	@id_grupo            = 2;
+	@id_obra_social      = 1,
+	@id_categoria        = 1,
+	@id_grupo            = 1;
 -- Resultado esperado: OK, Socio creado correctamente
 
 -- DNI inválido
@@ -123,7 +129,7 @@ EXEC usuarios.CrearSocio
 	@id_persona          = NULL,
 	@dni                 = '55667788',
 	@nombre              = 'Elena',
-	@apellido            = ' Díaz',
+	@apellido            = 'Díaz',
 	@email               = 'elena.diaz@example.com',
 	@fecha_nac           = '1993-02-14',
 	@telefono            = '777888999',
@@ -148,7 +154,7 @@ EXEC usuarios.ModificarSocio
 -- Caso normal: asignar nuevo grupo
 EXEC usuarios.ModificarSocio
 	@id_socio = 2,
-	@id_grupo = 3;
+	@id_grupo = 1;
 -- Resultado esperado: OK, Socio modificado correctamente
 
 -- Socio inexistente
@@ -199,3 +205,6 @@ EXEC usuarios.EliminarSocio @id_socio = 99999;
 -- Intentar baja nuevamente
 EXEC usuarios.EliminarSocio @id_socio = 1;
 -- Resultado esperado: Error, Socio no encontrado
+
+USE Com5600G01;
+GO
