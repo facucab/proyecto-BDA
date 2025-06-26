@@ -87,6 +87,8 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+GO
+
 /*
 * Nombre: ModificarPersona
 * Descripcion: Permite modificar de una persona los campos: nombre, apellido, email y telefono.
@@ -103,9 +105,6 @@ END;
 *	-3: El email ya esta en uso. 
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarPersona
 	@id_persona INT,
 	@nombre NVARCHAR(50) = NULL,
@@ -166,6 +165,8 @@ BEGIN
 	END CATCH
 
 END; 
+GO
+
 /*
 * Nombre: EliminarPersona
 * Descripcion: Realiza una eliminacion logica de una persona.
@@ -176,9 +177,6 @@ END;
 *	-1: Persona no encontrada. 
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE manejo_personas.EliminarPersona
 	@id_persona INT
 AS
@@ -464,6 +462,8 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+GO
+
 /*
 * Nombre: ModificacionMetodoPago
 * Descripcion: Modifica el nombre de un metodo de pago.
@@ -475,9 +475,6 @@ END;
 *	-1: Parametros incorrectos.
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificacionMetodoPago
 	@id INT,
 	@nombre_nuevo VARCHAR(50)
@@ -536,6 +533,7 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+GO
 
 /*
 * Nombre: ModificacionMetodoPago
@@ -548,9 +546,6 @@ END;
 *	-1: Parametros incorrectos.
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminacionMetodoPago
 	@id INT
 AS
@@ -591,6 +586,8 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+GO
+
 /*
 * Nombre: EliminacionMetodoPago
 * Descripcion: Realiza una eliminacion fisica de metodo pago
@@ -602,9 +599,6 @@ END;
 *	-99: Error desconocido.
 * Observacion: Revisar la restriccion referencial. 
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminacionMetodoPago
 	@id INT
 AS
@@ -645,6 +639,8 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+GO
+
 /*
 * Nombre: CreacionRol
 * Descripcion: Crea un rol. 
@@ -655,9 +651,6 @@ END;
 *	-1: @nombre Parametro incorrecto.
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE manejo_personas.CreacionRol
 	@nombre VARCHAR(50)
 AS
@@ -700,6 +693,7 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+GO
 
 /*
 * Nombre: ModificacionRol
@@ -712,9 +706,6 @@ END;
 *	-1: Parametros incorrectos.
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE manejo_personas.ModificacionRol
 	@id INT,
 	@nombre_nuevo VARCHAR(50)
@@ -773,6 +764,8 @@ BEGIN
 		RETURN -99;
 	END CATCH
 END;
+GO
+
 /*
 * Nombre: EliminacionRol
 * Descripcion: Elimina un rol. 
@@ -783,9 +776,6 @@ END;
 *	-1: Parametros incorrectos.
 *	-99: Error desconocido.
 */
-GO
-
-
 CREATE OR ALTER PROCEDURE manejo_personas.EliminacionRol
 	@id INT
 AS
@@ -1025,6 +1015,7 @@ BEGIN
 
 END;
 GO
+
 
 /*
 * Nombre: EliminarCategoria
@@ -2967,46 +2958,3 @@ BEGIN
 
 END;
 GO
-
-/*
-* Nombre: CrearActividad
-* Descripcion: Crea una nueva actividad, validando que el nombre no exista y que el costo sea válido.
-* Parametros:
-*   @nombre_actividad VARCHAR(100) - Nombre de la actividad.
-*   @costo_mensual DECIMAL(10,2) - Costo mensual de la actividad.
-* Valores de retorno:
-*    0: Éxito.
-*   -1: El nombre de la actividad es nulo o vacío.
-*   -2: Ya existe una actividad con ese nombre.
-*   -3: El costo mensual es inválido.
-*  -999: Error desconocido.
-*/
-
-/*
-* Nombre: ModificarActividad
-* Descripcion: Modifica el nombre y el costo mensual de una actividad existente, validando que el nombre no se repita y que el costo sea válido.
-* Parametros:
-*   @id INT - ID de la actividad a modificar.
-*   @nombre_actividad VARCHAR(100) - Nuevo nombre de la actividad.
-*   @costo_mensual DECIMAL(10,2) - Nuevo costo mensual de la actividad.
-* Valores de retorno:
-*    0: Éxito.
-*   -1: ID nulo.
-*   -2: ID no existente.
-*   -3: El nombre de la actividad es nulo o vacío.
-*   -4: Ya existe una actividad con ese nombre.
-*   -5: El costo mensual es inválido.
-*  -999: Error desconocido.
-*/
-
-/*
-* Nombre: EliminarActividad
-* Descripcion: Realiza una eliminación lógica de una actividad, cambiando su estado a inactiva.
-* Parametros:
-*   @id INT - ID de la actividad a eliminar.
-* Valores de retorno:
-*    0: Éxito.
-*   -1: ID nulo.
-*   -2: ID no existente o ya eliminada.
-*  -999: Error desconocido.
-*/
