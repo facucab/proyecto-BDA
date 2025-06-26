@@ -1,4 +1,15 @@
--- Pruebas para manejo_actividades.CrearActividad, ModificarActividad y EliminarActividad
+/*
+	Entrega 4 - Documento de instalación y configuración
+
+	Trabajo Practico DDBBA Entrega 3 - Grupo 1
+	Comision 5600 - Viernes Tarde 
+	43990422 | Aguirre, Alex Rubén 
+	45234709 | Gauto, Gastón Santiago 
+	44363498 | Caballero, Facundo 
+	40993965 | Cornara Perez, Tomás Andrés
+
+	Pruebas para Crear, Modificar y Eliminar Actividad
+*/
 
 USE Com5600G01;
 GO

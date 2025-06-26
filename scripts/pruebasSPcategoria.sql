@@ -1,42 +1,16 @@
 /*
-	Entrega 4 - Documento de instalacin y configuracin
+	Entrega 4 - Documento de instalación y configuración
 
 	Trabajo Practico DDBBA Entrega 3 - Grupo 1
 	Comision 5600 - Viernes Tarde 
-	43990422 | Aguirre, Alex Rubn 
-	45234709 | Gauto, Gastn Santiago 
+	43990422 | Aguirre, Alex Rubén 
+	45234709 | Gauto, Gastón Santiago 
 	44363498 | Caballero, Facundo 
-	40993965 | Cornara Perez, Toms Andrs
+	40993965 | Cornara Perez, Tomás Andrés
 
-		Luego de decidirse por un motor de base de datos relacional, lleg el momento de generar la
-	base de datos. En esta oportunidad utilizarn SQL Server.
-	Deber instalar el DMBS y documentar el proceso. No incluya capturas de pantalla. Detalle
-	las configuraciones aplicadas (ubicacin de archivos, memoria asignada, seguridad, puertos,
-	etc.) en un documento como el que le entregara al DBA.
-	Cree la base de datos, entidades y relaciones. Incluya restricciones y claves. Deber entregar
-	un archivo .sql con el script completo de creacin (debe funcionar si se lo ejecutatal cual es
-	entregado en una sola ejecucin). Incluya comentarios para indicar qu hace cada mdulo
-	de cdigo.
-	Genere store procedures para manejar la insercin, modificado, borrado (si corresponde,
-	tambin debe decidir si determinadas entidades solo admitirn borrado lgico) de cada tabla.
-	Los nombres de los store procedures NO deben comenzar conSP.
-	Algunas operaciones implicarn store procedures que involucran varias tablas, uso de
-	transacciones, etc. Puede que incluso realicen ciertas operaciones mediante varios SPs.
-	Asegrense de que los comentarios que acompaen al cdigo lo expliquen.
-	Genere esquemas para organizar de forma lgica los componentes del sistema y aplique esto
-	en la creacin de objetos. NO use el esquemadbo.
-	Todos los SP creados deben estar acompaados de juegos de prueba. Se espera que
-	realicen validaciones bsicas en los SP (p/e cantidad mayor a cero, CUIT vlido, etc.) y que
-	en los juegos de prueba demuestren la correcta aplicacin de las validaciones.
-	Las pruebas deben realizarse en un script separado, donde con comentarios se indique en
-	cada caso el resultado esperado
-	El archivo .sql con el script debe incluir comentarios donde consten este enunciado, la fecha
-	de entrega, nmero de grupo, nombre de la materia, nombres y DNI de los alumnos.
-	Entregar todo en un zip (observar las pautas para nomenclatura antes expuestas) mediante
-	la seccin de prcticas de MIEL. Solo uno de los miembros del grupo debe hacer la entrega.
+	Pruebas para Crear, Modificar y Eliminar Categoria
 */
 
--- Pruebas categoria
 USE Com5600G01
 GO
 
