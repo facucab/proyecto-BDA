@@ -11,6 +11,9 @@
 	Pruebas para Crear, Modificar y Eliminar Usuario
 */
 
+USE Com5600G01;
+GO
+
 --Creacion
 
 --Casos Normales

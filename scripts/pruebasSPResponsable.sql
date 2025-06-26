@@ -11,6 +11,9 @@
 	Pruebas para Crear, Modificar y Eliminar Responsable
 */
 
+USE Com5600G01;
+GO
+
 --Creacion 
 
 --Casos Normales

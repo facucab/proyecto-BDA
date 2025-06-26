@@ -11,6 +11,8 @@
 	Pruebas para Crear, Modificar y Eliminar Clase
 */
 
+USE Com5600G01;
+GO
 
 -- Caso normal
 EXEC manejo_actividades.CrearClase 

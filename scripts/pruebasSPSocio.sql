@@ -11,6 +11,9 @@
 	Pruebas para Crear, Modificar y Eliminar Socio
 */
 
+USE Com5600G01;
+GO
+
 -- CrearSocio:
 
 -- Casos normales 

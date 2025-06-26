@@ -11,6 +11,8 @@
 	Pruebas para Crear, Modificar y Eliminar Factura
 */
 
+USE Com5600G01;
+GO
 
 --Creacion
 

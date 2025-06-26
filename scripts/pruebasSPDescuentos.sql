@@ -11,6 +11,8 @@
 	Pruebas para Crear, Modificar y Eliminar Descuento
 */
 
+USE Com5600G01;
+GO
 
 --Creacion
 EXEC pagos_y_facturas.CrearDescuento 
