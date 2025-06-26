@@ -326,3 +326,546 @@ BEGIN
     END CATCH
 END;
 GO
+
+
+-- ############################################################
+-- ######################## SP ROL ############################
+-- ############################################################
+
+/*
+* Nombre: CrearRol
+* Descripcion: Inserta un nuevo rol en la tabla usuarios.Rol, validando su informacion.
+* Parametros:
+*   @nombre VARCHAR(50)       - Nombre del rol.
+*   @descripcion VARCHAR(100) - Descripcion del rol.
+* Aclaracion: No se utiliza transacciones explicitas ya que: 
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE usuarios.CrearRol
+    @nombre VARCHAR(50),
+    @descripcion VARCHAR(100)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Valido nombre:
+    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El nombre del rol es obligatorio.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    -- Valido descripcion:
+    IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'La descripcion del rol es obligatoria.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    -- Verifico duplicado de nombre:
+    IF EXISTS (SELECT 1 FROM usuarios.Rol WHERE nombre = LTRIM(RTRIM(@nombre)))
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Ya existe un rol con ese nombre.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    BEGIN TRY
+        INSERT INTO usuarios.Rol (nombre, descripcion)
+        VALUES (LTRIM(RTRIM(@nombre)), LTRIM(RTRIM(@descripcion)));
+        SELECT 'OK' AS Resultado, 'Rol creado correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+
+/*
+* Nombre: ModificarRol
+* Descripcion: Modifica el nombre y descripcion de un rol existente, validando su informacion.
+* Parametros:
+*   @id_rol      INT          - ID del rol a modificar.
+*   @nombre      VARCHAR(50)  - Nuevo nombre del rol.
+*   @descripcion VARCHAR(100) - Nueva descripcion del rol.
+* Aclaracion: No se utiliza transacciones explicitas ya que: 
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE usuarios.ModificarRol
+    @id_rol      INT,
+    @nombre      VARCHAR(50),
+    @descripcion VARCHAR(100)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Valido existencia del rol:
+    IF NOT EXISTS (SELECT 1 FROM usuarios.Rol WHERE id_rol = @id_rol)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Rol no encontrado.' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+    -- Valido nombre:
+    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El nombre del rol es obligatorio.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    -- Valido descripcion:
+    IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'La descripcion del rol es obligatoria.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    -- Verifico duplicado de nombre en otro rol:
+    IF EXISTS (
+        SELECT 1
+          FROM usuarios.Rol
+         WHERE nombre = LTRIM(RTRIM(@nombre))
+           AND id_rol <> @id_rol
+    )
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Ya existe otro rol con ese nombre.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    BEGIN TRY
+        UPDATE usuarios.Rol
+           SET nombre      = LTRIM(RTRIM(@nombre)),
+               descripcion = LTRIM(RTRIM(@descripcion))
+         WHERE id_rol = @id_rol;
+        SELECT 'OK' AS Resultado, 'Rol modificado correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+
+/*
+* Nombre: EliminarRol
+* Descripcion: Elimina fisicamente un rol de la tabla usuarios.Rol.
+* Parametros:
+*   @id_rol INT - ID del rol a eliminar.
+* Aclaracion: No se utiliza transacciones explicitas ya que: 
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE usuarios.EliminarRol
+    @id_rol INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Valido existencia del rol:
+    IF NOT EXISTS (SELECT 1 FROM usuarios.Rol WHERE id_rol = @id_rol)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Rol no encontrado.' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+    BEGIN TRY
+        DELETE FROM usuarios.Rol
+        WHERE id_rol = @id_rol;
+        SELECT 'OK' AS Resultado, 'Rol eliminado correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+
+-- ############################################################
+-- ######################## SP CLASE ##########################
+-- ############################################################
+
+/*
+* Nombre: CrearClase
+* Descripcion: Crea una nueva clase, validando que no haya conflictos de horarios.
+* Parametros:
+*	@id_actividad INT    - ID de la actividad que se realiza en la clase.
+*	@id_categoria INT    - ID de la categoria.
+*	@dia VARCHAR(9)      - Dia de la semana.
+*	@horario TIME        - Horario de la clase.
+*	@id_usuario INT      - ID del usuario responsable de la clase.
+*
+* Aclaracion: Se utiliza transaccion explicita porque se validan varias tablas y se requiere rollback ante cualquier fallo.
+*/
+CREATE OR ALTER PROCEDURE actividades.CrearClase
+	@id_actividad INT,
+	@id_categoria INT,
+	@dia VARCHAR(9),
+	@horario TIME,
+	@id_usuario INT
+AS
+BEGIN
+	SET NOCOUNT ON;
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- 1) Validar actividad
+		IF NOT EXISTS (SELECT 1 FROM actividades.actividad WHERE id_actividad = @id_actividad AND estado = 1)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La actividad no existe' AS Mensaje, '404' AS Estado;
+			RETURN -1;
+		END;
+
+		-- 2) Validar categoria
+		IF NOT EXISTS (SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La categoria no existe' AS Mensaje, '404' AS Estado;
+			RETURN -2;
+		END;
+
+		-- 3) Validar usuario
+		IF NOT EXISTS (SELECT 1 FROM usuarios.usuario WHERE id_usuario = @id_usuario AND estado = 1)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El usuario no existe' AS Mensaje, '404' AS Estado;
+			RETURN -3;
+		END;
+
+		-- 4) Validar dia
+		SET @dia = LOWER(LTRIM(RTRIM(@dia)));
+		IF @dia NOT IN ('lunes','martes','miercoles','jueves','viernes','sabado','domingo')
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Dia invalido' AS Mensaje, '400' AS Estado;
+			RETURN -4;
+		END;
+
+		-- 5) Validar horario
+		IF @horario < '06:00:00' OR @horario >= '22:00:00'
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Horario invalido' AS Mensaje, '400' AS Estado;
+			RETURN -5;
+		END;
+
+		-- 6) Conflicto exacto
+		IF EXISTS (
+			SELECT 1 
+			  FROM actividades.clase 
+			 WHERE id_actividad = @id_actividad
+			   AND id_categoria = @id_categoria
+			   AND dia          = @dia
+			   AND horario      = @horario
+			   AND estado       = 1
+		)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ya existe una clase activa con la misma actividad, categoria, dia y horario' AS Mensaje, '409' AS Estado;
+			RETURN -6;
+		END;
+
+		-- 7) Conflicto profesor
+		IF EXISTS (
+			SELECT 1 
+			  FROM actividades.clase 
+			 WHERE id_usuario = @id_usuario
+			   AND dia        = @dia
+			   AND horario    = @horario
+			   AND estado     = 1
+		)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El profesor ya tiene otra clase activa en ese dia y horario' AS Mensaje, '409' AS Estado;
+			RETURN -7;
+		END;
+
+		-- Insertar
+		INSERT INTO actividades.clase (id_actividad, id_categoria, dia, horario, id_usuario)
+		VALUES (@id_actividad, @id_categoria, @dia, @horario, @id_usuario);
+
+		COMMIT TRANSACTION;
+		SELECT 'OK' AS Resultado, 'Clase creada correctamente' AS Mensaje, '200' AS Estado;
+		RETURN 0;
+	END TRY
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+		RETURN -99;
+	END CATCH;
+END;
+GO
+
+/*
+* Nombre: ModificarClase
+* Descripcion: Modifica campos de una clase existente, validando conflictos de horarios.
+* Parametros:
+*	@id_clase       INT          - ID de la clase a modificar.
+*	@id_actividad   INT    = NULL - (Opcional) Nueva actividad.
+*	@id_categoria   INT    = NULL - (Opcional) Nueva categoria.
+*	@dia            VARCHAR(9) = NULL - (Opcional) Nuevo dia.
+*	@horario        TIME       = NULL - (Opcional) Nuevo horario.
+*	@id_usuario     INT        = NULL - (Opcional) Nuevo profesor.
+*
+* Aclaracion: Se utiliza transaccion explicita porque se validan varias tablas y se requiere rollback ante cualquier fallo.
+*/
+CREATE OR ALTER PROCEDURE actividades.ModificarClase
+	@id_clase       INT,
+	@id_actividad   INT    = NULL,
+	@id_categoria   INT    = NULL,
+	@dia            VARCHAR(9) = NULL,
+	@horario        TIME       = NULL,
+	@id_usuario     INT        = NULL
+AS
+BEGIN
+	SET NOCOUNT ON;
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- 1) Validar existencia
+		IF NOT EXISTS (SELECT 1 FROM actividades.clase WHERE id_clase = @id_clase AND estado = 1)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La clase no existe o esta inactiva' AS Mensaje, '404' AS Estado;
+			RETURN -1;
+		END;
+
+		-- 2) Validar actividad
+		IF @id_actividad IS NOT NULL
+		   AND NOT EXISTS (SELECT 1 FROM actividades.actividad WHERE id_actividad = @id_actividad AND estado = 1)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La actividad no existe' AS Mensaje, '404' AS Estado;
+			RETURN -2;
+		END;
+
+		-- 3) Validar categoria
+		IF @id_categoria IS NOT NULL
+		   AND NOT EXISTS (SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La categoria no existe' AS Mensaje, '404' AS Estado;
+			RETURN -3;
+		END;
+
+		-- 4) Validar usuario
+		IF @id_usuario IS NOT NULL
+		   AND NOT EXISTS (SELECT 1 FROM usuarios.usuario WHERE id_usuario = @id_usuario AND estado = 1)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El usuario no existe' AS Mensaje, '404' AS Estado;
+			RETURN -4;
+		END;
+
+		-- 5) Validar dia
+		IF @dia IS NOT NULL
+		BEGIN
+			SET @dia = LOWER(LTRIM(RTRIM(@dia)));
+			IF @dia NOT IN ('lunes','martes','miercoles','jueves','viernes','sabado','domingo')
+			BEGIN
+				ROLLBACK TRANSACTION;
+				SELECT 'Error' AS Resultado, 'Dia invalido' AS Mensaje, '400' AS Estado;
+				RETURN -5;
+			END;
+		END;
+
+		-- 6) Validar horario
+		IF @horario IS NOT NULL
+		   AND (@horario < '06:00:00' OR @horario >= '22:00:00')
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Horario invalido' AS Mensaje, '400' AS Estado;
+			RETURN -6;
+		END;
+
+		-- 7) Conflicto exacto
+		IF EXISTS (
+			SELECT 1 
+			  FROM actividades.clase
+			 WHERE id_actividad = ISNULL(@id_actividad,   id_actividad)
+			   AND id_categoria = ISNULL(@id_categoria,   id_categoria)
+			   AND dia          = ISNULL(@dia,            dia)
+			   AND horario      = ISNULL(@horario,        horario)
+			   AND id_clase    <> @id_clase
+			   AND estado       = 1
+		)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ya existe otra clase activa con la misma combinacion' AS Mensaje, '409' AS Estado;
+			RETURN -7;
+		END;
+
+		-- 8) Conflicto profesor
+		IF EXISTS (
+			SELECT 1 
+			  FROM actividades.clase
+			 WHERE id_usuario = ISNULL(@id_usuario, id_usuario)
+			   AND dia        = ISNULL(@dia,       dia)
+			   AND horario    = ISNULL(@horario,   horario)
+			   AND id_clase  <> @id_clase
+			   AND estado     = 1
+		)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El profesor ya tiene otra clase activa en ese dia y horario' AS Mensaje, '409' AS Estado;
+			RETURN -8;
+		END;
+
+		-- Actualizar
+		UPDATE actividades.clase
+		   SET id_actividad = ISNULL(@id_actividad, id_actividad),
+		       id_categoria = ISNULL(@id_categoria, id_categoria),
+		       dia          = ISNULL(@dia,          dia),
+		       horario      = ISNULL(@horario,      horario),
+		       id_usuario   = ISNULL(@id_usuario,   id_usuario)
+		 WHERE id_clase = @id_clase;
+
+		COMMIT TRANSACTION;
+		SELECT 'OK' AS Resultado, 'Clase modificada correctamente' AS Mensaje, '200' AS Estado;
+		RETURN 0;
+	END TRY
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+		RETURN -99;
+	END CATCH;
+END;
+GO
+
+/*
+* Nombre: EliminarClase
+* Descripcion: Realiza un borrado logico de una clase desactivandola.
+* Parametros:
+*	@id_clase INT - ID de la clase a eliminar.
+*
+* Aclaracion: Se utiliza transaccion explicita porque se cambia el estado y se requiere rollback ante fallo.
+*/
+CREATE OR ALTER PROCEDURE actividades.EliminarClase
+	@id_clase INT
+AS
+BEGIN
+	SET NOCOUNT ON;
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- Validar existencia y estado
+		IF NOT EXISTS (SELECT 1 FROM actividades.clase WHERE id_clase = @id_clase AND estado = 1)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La clase no existe o ya esta inactiva' AS Mensaje, '404' AS Estado;
+			RETURN -1;
+		END;
+
+		-- Borrado logico
+		UPDATE actividades.clase
+		   SET estado = 0
+		 WHERE id_clase = @id_clase;
+
+		COMMIT TRANSACTION;
+		SELECT 'OK' AS Resultado, 'Clase inactivada correctamente' AS Mensaje, '200' AS Estado;
+		RETURN 0;
+	END TRY
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+		RETURN -99;
+	END CATCH;
+END;
+GO
+
+
+-- ############################################################
+-- ################### SP GrupoFamiliar #######################
+-- ############################################################
+
+/*
+* Nombre: CrearGrupoFamiliar
+* Descripcion: Crea un nuevo grupo familiar con la fecha de alta actual y estado activo.
+* Parametros: Ninguno.
+* Aclaracion: No se utilizan transacciones explicitas ya que:
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE usuarios.CrearGrupoFamiliar
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        INSERT INTO usuarios.grupo_familiar(fecha_alta, estado)
+        VALUES (GETDATE(), 1);
+        SELECT 'OK' AS Resultado, 'Grupo familiar creado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+
+/*
+* Nombre: ModificarEstadoGrupoFamiliar
+* Descripcion: Modifica el estado (activo/inactivo) de un grupo familiar existente.
+* Parametros:
+*   @id_grupo INT      - ID del grupo familiar a modificar.
+*   @estado   BIT = NULL - Nuevo estado: 1 (activo) o 0 (inactivo). Opcional.
+* Aclaracion: No se utilizan transacciones explicitas ya que:
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE usuarios.ModificarEstadoGrupoFamiliar
+    @id_grupo INT,
+    @estado   BIT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Valido existencia del grupo:
+    IF NOT EXISTS (SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+    -- Valido estado si se proporciona:
+    IF @estado IS NOT NULL AND @estado NOT IN (0,1)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Estado debe ser 0 (inactivo) o 1 (activo)' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    BEGIN TRY
+        UPDATE usuarios.grupo_familiar
+        SET estado = ISNULL(@estado, estado)
+        WHERE id_grupo_familiar = @id_grupo;
+        SELECT 'OK' AS Resultado, 'Estado del grupo familiar actualizado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+
+/*
+* Nombre: EliminarGrupoFamiliar
+* Descripcion: Realiza la eliminacion logica de un grupo familiar si no tiene responsables ni socios asignados.
+* Parametros:
+*   @id_grupo INT - ID del grupo familiar a eliminar.
+* Aclaracion: No se utilizan transacciones explicitas ya que:
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE usuarios.EliminarGrupoFamiliar
+    @id_grupo INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Valido existencia del grupo:
+    IF NOT EXISTS (SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+    -- Verifico responsables asignados:
+    IF EXISTS (SELECT 1 FROM usuarios.responsable WHERE id_grupo = @id_grupo)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'No se puede eliminar: grupo tiene responsables asignados' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    -- Verifico socios asignados:
+    IF EXISTS (SELECT 1 FROM usuarios.socio WHERE id_grupo = @id_grupo)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'No se puede eliminar: grupo tiene socios asignados' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    BEGIN TRY
+        UPDATE usuarios.grupo_familiar
+        SET estado = 0
+        WHERE id_grupo_familiar = @id_grupo;
+        SELECT 'OK' AS Resultado, 'Grupo familiar inactivado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO

@@ -17,35 +17,35 @@ GO
 -- Crear Grupo Familiar
 
 -- Caso normal
-EXEC manejo_personas.CrearGrupoFamiliar;
--- Resultado esperado: Exito, Grupo familiar creado correctamente (deberia funcionar siempre a no ser error desconocido)
+EXEC usuarios.CrearGrupoFamiliar;
+-- Resultado esperado: OK, Grupo familiar creado correctamente
 
 -- ModificarEstadoGrupoFamiliar
 
 -- Casos Normales
-EXEC manejo_personas.ModificarEstadoGrupoFamiliar
+EXEC usuarios.ModificarEstadoGrupoFamiliar
     @id_grupo = 1,
     @estado   = 0;
--- Resultado esperado: Exito, Estado del grupo familiar actualizado correctamente
+-- Resultado esperado: OK, Estado del grupo familiar actualizado correctamente
 
-EXEC manejo_personas.ModificarEstadoGrupoFamiliar
+EXEC usuarios.ModificarEstadoGrupoFamiliar
     @id_grupo = 5,
     @estado   = 0;
--- Resultado esperado: Exito, Estado del grupo familiar actualizado correctamente
+-- Resultado esperado: OK, Estado del grupo familiar actualizado correctamente
 
-EXEC manejo_personas.ModificarEstadoGrupoFamiliar
+EXEC usuarios.ModificarEstadoGrupoFamiliar
     @id_grupo = 4,
     @estado   = 1;
--- Resultado esperado: Exito, Estado del grupo familiar actualizado correctamente
+-- Resultado esperado: OK, Estado del grupo familiar actualizado correctamente
 
 -- Grupo inexistente
-EXEC manejo_personas.ModificarEstadoGrupoFamiliar
+EXEC usuarios.ModificarEstadoGrupoFamiliar
     @id_grupo = 78964,
     @estado   = 1;
 -- Resultado esperado: Error, Grupo familiar no encontrado
 
 -- Estado invalido
-EXEC manejo_personas.ModificarEstadoGrupoFamiliar
+EXEC usuarios.ModificarEstadoGrupoFamiliar
     @id_grupo = 3,
     @estado   = 61;
 -- Resultado esperado: Error, Estado debe ser 0 (inactivo) o 1 (activo)
@@ -54,23 +54,23 @@ EXEC manejo_personas.ModificarEstadoGrupoFamiliar
 -- EliminarGrupoFamiliar
 
 -- Casos Normales
-EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo = 3;
--- Resultado esperado: Exito, Grupo familiar inactivado correctamente
+EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 3;
+-- Resultado esperado: OK, Grupo familiar inactivado correctamente
 
-EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo = 6;
--- Resultado esperado: Exito, Grupo familiar inactivado correctamente
+EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 6;
+-- Resultado esperado: OK, Grupo familiar inactivado correctamente
 
-EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo = 9;
--- Resultado esperado: Exito, Grupo familiar inactivado correctamente
+EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 9;
+-- Resultado esperado: OK, Grupo familiar inactivado correctamente
 
 -- Grupo inexistente
-EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo = 27894;
+EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 27894;
 -- Resultado esperado: Error, Grupo familiar no encontrado
 
 -- Responsable asignado
-EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo = 2;
+EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 2;
 -- Resultado esperado: Error, No se puede eliminar: grupo tiene responsables asignados
 
 -- Miembros activos
-EXEC manejo_personas.EliminarGrupoFamiliar @id_grupo = 4;
+EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 4;
 -- Resultado esperado: Error, No se puede eliminar: grupo tiene socios asignados

@@ -14,96 +14,105 @@
 USE Com5600G01;
 GO
 
--- Pruebas rol
-
--- Crear Rol
+-- CrearRol
 
 -- Casos normales
-EXEC manejo_personas.CrearRol
-	@descripcion = 'Admin';
--- Resultado esperado: Exito, Rol creado correctamente
+EXEC usuarios.CrearRol
+	@nombre       = 'Admin',
+	@descripcion  = 'Administrador del sistema';
+-- Resultado esperado: OK, Rol creado correctamente.
 
-EXEC manejo_personas.CrearRol 
-	@descripcion = 'Usuario';
--- Resultado esperado: Exito, Rol creado correctamente
+EXEC usuarios.CrearRol
+	@nombre       = 'Usuario',
+	@descripcion  = 'Usuario estándar';
+-- Resultado esperado: OK, Rol creado correctamente.
+
+-- Nombre vacío
+EXEC usuarios.CrearRol
+	@nombre       = '',
+	@descripcion  = 'Sin nombre';
+-- Resultado esperado: Error, El nombre del rol es obligatorio.
 
 -- Descripción vacía
-EXEC manejo_personas.CrearRol 
-	@descripcion = '';
--- Resultado esperado: Error, La descripción no puede ser nula o vacía
+EXEC usuarios.CrearRol
+	@nombre       = 'Test',
+	@descripcion  = '';
+-- Resultado esperado: Error, La descripcion del rol es obligatoria.
 
--- Descripción nula
-EXEC manejo_personas.CrearRol 
-	@descripcion = NULL;
--- Resultado esperado: Error, La descripción no puede ser nula o vacía
+-- Parámetros nulos
+EXEC usuarios.CrearRol
+	@nombre       = NULL,
+	@descripcion  = NULL;
+-- Resultado esperado: Error, El nombre del rol es obligatorio.
 
--- Descripción duplicada
-EXEC manejo_personas.CrearRol 
-	@descripcion = 'Admin';
--- Resultado esperado: Error, Ya existe un rol con esa descripción
+-- Nombre duplicado
+EXEC usuarios.CrearRol
+	@nombre       = 'Admin',
+	@descripcion  = 'Duplicado';
+-- Resultado esperado: Error, Ya existe un rol con ese nombre.
 
 
 -- ModificarRol
 
--- Caso normal: cambiar descripción
-EXEC manejo_personas.ModificarRol 
-	@id = 1, @descripcion = 'SuperAdmin';
--- Resultado esperado: Exito, Rol modificado correctamente
+-- Casos normales
+EXEC usuarios.ModificarRol
+	@id_rol       = 1,
+	@nombre       = 'SuperAdmin',
+	@descripcion  = 'Super administrador';
+-- Resultado esperado: OK, Rol modificado correctamente.
 
--- Caso normal: cambiar otra descripción
-EXEC manejo_personas.ModificarRol 
-	@id = 2, @descripcion = 'UsuarioPremium';
--- Resultado esperado: Exito, Rol modificado correctamente
-
--- ID nulo
-EXEC manejo_personas.ModificarRol 
-	@id = NULL, @descripcion = 'Test';
--- Resultado esperado: Error, id nulo
+EXEC usuarios.ModificarRol
+	@id_rol       = 2,
+	@nombre       = 'UsuarioPremium',
+	@descripcion  = 'Usuario con beneficios';
+-- Resultado esperado: OK, Rol modificado correctamente.
 
 -- ID inexistente
-EXEC manejo_personas.ModificarRol 
-	@id = 99999, @descripcion = 'NoExiste';
--- Resultado esperado: Error, Rol no encontrado
+EXEC usuarios.ModificarRol
+	@id_rol       = 99999,
+	@nombre       = 'NoExiste',
+	@descripcion  = 'Sin rol';
+-- Resultado esperado: Error, El rol no fue encontrado.
+
+-- Nombre vacío
+EXEC usuarios.ModificarRol
+	@id_rol       = 1,
+	@nombre       = '',
+	@descripcion  = 'Desc';
+-- Resultado esperado: Error, El nombre del rol es obligatorio.
 
 -- Descripción vacía
-EXEC manejo_personas.ModificarRol 
-	@id = 1, @descripcion = '';
--- Resultado esperado: Error, La descripción no puede ser nula o vacía
+EXEC usuarios.ModificarRol
+	@id_rol       = 1,
+	@nombre       = 'Test',
+	@descripcion  = '';
+-- Resultado esperado: Error, La descripcion del rol es obligatoria.
 
--- Descripción nula
-EXEC manejo_personas.ModificarRol 
-	@id = 1, @descripcion = NULL;
--- Resultado esperado: Error, La descripción no puede ser nula o vacía
-
--- Descripción duplicada de otro rol
-EXEC manejo_personas.ModificarRol 
-	@id = 1, @descripcion = 'UsuarioPremium';
--- Resultado esperado: Error, Ya existe otro rol con esa descripción
+-- Nombre duplicado en otro rol
+EXEC usuarios.ModificarRol
+	@id_rol       = 1,
+	@nombre       = 'UsuarioPremium',
+	@descripcion  = 'Duplicado';
+-- Resultado esperado: Error, Ya existe otro rol con ese nombre.
 
 
 -- EliminarRol
 
--- Caso normal: eliminar rol existente
-EXEC manejo_personas.EliminarRol 
-	@id = 1;
--- Resultado esperado: Exito, Rol eliminado correctamente
+-- Casos normales
+EXEC usuarios.EliminarRol
+	@id_rol = 1;
+-- Resultado esperado: OK, Rol eliminado correctamente.
 
--- Caso normal: eliminar otro rol existente
-EXEC manejo_personas.EliminarRol 
-	@id = 2;
--- Resultado esperado: Exito, Rol eliminado correctamente
-
--- ID nulo
-EXEC manejo_personas.EliminarRol 
-	@id = NULL;
--- Resultado esperado: Error, id nulo
+EXEC usuarios.EliminarRol
+	@id_rol = 2;
+-- Resultado esperado: OK, Rol eliminado correctamente.
 
 -- ID inexistente
-EXEC manejo_personas.EliminarRol 
-	@id = 99999;
--- Resultado esperado: Error, Rol no existente
+EXEC usuarios.EliminarRol
+	@id_rol = 99999;
+-- Resultado esperado: Error, El rol no fue encontrado.
 
--- Intentar eliminar rol ya eliminado
-EXEC manejo_personas.EliminarRol 
-	@id = 1;
--- Resultado esperado: Error, Rol no existente
+-- Intentar eliminar nuevamente
+EXEC usuarios.EliminarRol
+	@id_rol = 1;
+-- Resultado esperado: Error, El rol no fue encontrado.
