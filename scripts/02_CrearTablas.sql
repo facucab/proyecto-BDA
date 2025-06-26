@@ -172,7 +172,8 @@ GO
 -- METODO_PAGO
 CREATE TABLE pagos_y_facturas.metodo_pago (
 	id_metodo_pago INT IDENTITY(1,1) PRIMARY KEY,
-	nombre VARCHAR(50) NOT NULL
+	nombre VARCHAR(50) NOT NULL,
+	estado BIT NOT NULL DEFAULT 1
 );
 GO
 

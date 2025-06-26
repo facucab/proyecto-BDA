@@ -411,245 +411,164 @@ GO
 
 /*
 * Nombre: CreacionMetodoPago
-* Descripcion: Crea un metodo de pago. 
+* Descripcion: Crea un nuevo método de pago, validando que el nombre no exista y que no esté inactivo.
 * Parametros:
-*	@nombre VARCHAR(50) - Nombre del metodo de pago. 
+*   @nombre VARCHAR(50) - Nombre del método de pago.
 * Valores de retorno:
-*	 0: Exito. 
-*	-1: @nombre no puede ser nulo.
-*	-2: El nombre ya esta en uso.
-*	-99: Error desconocido.
+*    0: Éxito.
+*   -1: El nombre no puede ser nulo o vacío.
+*   -2: El nombre ya está en uso (activo o inactivo).
+*   -99: Error desconocido.
 */
 CREATE OR ALTER PROCEDURE pagos_y_facturas.CreacionMetodoPago
-	@nombre VARCHAR(50)
+    @nombre VARCHAR(50)
 AS
 BEGIN
-	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-
-	BEGIN TRANSACTION;
-
-	BEGIN TRY
-		-- Verifico que no sea nulo
-		IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje;
-			RETURN -1;
-		END
-
-		-- Verifico que el nombre no exista ya
-		IF EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE nombre = @nombre)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Ya hay un metodo de pago con ese nombre' AS Mensaje;
-			RETURN -2;
-		END
-
-		
-
-		INSERT INTO pagos_y_facturas.metodo_pago(nombre)
-		VALUES (@nombre);
-
-		COMMIT TRANSACTION;
-
-		SELECT 'Exito' AS Resultado, 'Nuevo metodo de pago creado' AS Mensaje;
-		RETURN 0;
-
-	END TRY
-	BEGIN CATCH
-		ROLLBACK TRANSACTION;
-		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
-		RETURN -99;
-	END CATCH
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        -- Verifico que no sea nulo
+        IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje;
+            RETURN -1;
+        END
+        -- Verifico que el nombre no exista ya (activo o inactivo)
+        IF EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE nombre = @nombre)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Ya hay un método de pago con ese nombre' AS Mensaje;
+            RETURN -2;
+        END
+        INSERT INTO pagos_y_facturas.metodo_pago(nombre, estado)
+        VALUES (@nombre, 1);
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Nuevo método de pago creado' AS Mensaje;
+        RETURN 0;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
 END;
 GO
 
 /*
 * Nombre: ModificacionMetodoPago
-* Descripcion: Modifica el nombre de un metodo de pago.
+* Descripcion: Modifica el nombre de un método de pago, validando que el registro esté activo y que el nuevo nombre no esté en uso por otro método activo.
 * Parametros:
-*	@id INT - id del metodo de pago a modificar. 
-*	@nombre VARCHAR(50) - Nombre del metodo de pago. 
+*   @id INT - ID del método de pago a modificar.
+*   @nombre_nuevo VARCHAR(50) - Nuevo nombre del método de pago.
 * Valores de retorno:
-*	 0: Exito. 
-*	-1: Parametros incorrectos.
-*	-99: Error desconocido.
+*    0: Éxito.
+*   -1: Parámetros incorrectos.
+*   -2: Método de pago no encontrado o inactivo.
+*   -3: El nombre ya está en uso por otro método de pago activo.
+*   -99: Error desconocido.
 */
 CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificacionMetodoPago
-	@id INT,
-	@nombre_nuevo VARCHAR(50)
+    @id INT,
+    @nombre_nuevo VARCHAR(50)
 AS
 BEGIN
-	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-
-	BEGIN TRANSACTION;
-
-	BEGIN TRY
-		-- Verifico que el ID no sea nulo
-		IF @id IS NULL
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
-			RETURN -1;
-		END
-		
-		-- Verifico que exista en la tabla
-		IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE id_metodo_pago = @id)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
-			RETURN -1;
-		END
-
-		-- Verifico que el nombre no sea nulo
-		IF @nombre_nuevo IS NULL
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje;
-			RETURN -1;
-		END
-
-		-- Verifico que el nombre no exista ya en la tabla
-		IF EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE nombre = @nombre_nuevo)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Ese metodo de pago ya esta registrado' AS Mensaje;
-			RETURN -1;
-		END
-
-		UPDATE pagos_y_facturas.metodo_pago
-		SET nombre = @nombre_nuevo
-		WHERE metodo_pago.id_metodo_pago = @id;
-
-		COMMIT TRANSACTION;
-
-		SELECT 'Exito' AS Resultado, 'Metodo de pago modificado' AS Mensaje;
-		RETURN 0;
-
-	END TRY
-	BEGIN CATCH
-		ROLLBACK TRANSACTION;
-		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
-		RETURN -99;
-	END CATCH
-END;
-GO
-
-/*
-* Nombre: ModificacionMetodoPago
-* Descripcion: Modifica el nombre de un metodo de pago.
-* Parametros:
-*	@id INT - id del metodo de pago a modificar. 
-*	@nombre VARCHAR(50) - Nombre del metodo de pago. 
-* Valores de retorno:
-*	 0: Exito. 
-*	-1: Parametros incorrectos.
-*	-99: Error desconocido.
-*/
-CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminacionMetodoPago
-	@id INT
-AS
-BEGIN
-	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-
-	BEGIN TRANSACTION;
-
-	BEGIN TRY
-		-- Verifico que el ID no sea nulo
-		IF @id IS NULL
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
-			RETURN -1;
-		END
-		
-		-- Verifico que exista en la tabla
-		IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE id_metodo_pago = @id)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
-			RETURN -1;
-		END
-
-		DELETE FROM pagos_y_facturas.metodo_pago
-		WHERE metodo_pago.id_metodo_pago = @id;
-
-		COMMIT TRANSACTION;
-
-		SELECT 'Exito' AS Resultado, 'Metodo de pago eliminado' AS Mensaje;
-		RETURN 0;
-
-	END TRY
-	BEGIN CATCH
-		ROLLBACK TRANSACTION;
-		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
-		RETURN -99;
-	END CATCH
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        -- Verifico que el ID no sea nulo
+        IF @id IS NULL OR @nombre_nuevo IS NULL OR LTRIM(RTRIM(@nombre_nuevo)) = ''
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Parámetros incorrectos' AS Mensaje;
+            RETURN -1;
+        END
+        -- Verifico que exista y esté activo
+        IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE id_metodo_pago = @id AND estado = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Método de pago no encontrado o inactivo' AS Mensaje;
+            RETURN -2;
+        END
+        -- Verifico que el nombre no exista ya en otro método de pago activo
+        IF EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE nombre = @nombre_nuevo AND id_metodo_pago <> @id AND estado = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Ese método de pago ya está registrado' AS Mensaje;
+            RETURN -3;
+        END
+        UPDATE pagos_y_facturas.metodo_pago
+        SET nombre = @nombre_nuevo
+        WHERE id_metodo_pago = @id;
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Método de pago modificado' AS Mensaje;
+        RETURN 0;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
 END;
 GO
 
 /*
 * Nombre: EliminacionMetodoPago
-* Descripcion: Realiza una eliminacion fisica de metodo pago
+* Descripcion: Realiza la eliminación lógica de un método de pago, estableciendo su estado en 0 (inactivo).
 * Parametros:
-*	@id INT - id del metodo de pago a eliminar. 
+*   @id INT - ID del método de pago a eliminar.
 * Valores de retorno:
-*	 0: Exito. 
-*	-1: @id Parametros incorrectos.
-*	-99: Error desconocido.
-* Observacion: Revisar la restriccion referencial. 
+*    0: Éxito.
+*   -1: Parámetros incorrectos.
+*   -2: Método de pago no encontrado o ya inactivo.
+*   -99: Error desconocido.
 */
 CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminacionMetodoPago
-	@id INT
+    @id INT
 AS
 BEGIN
-	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-
-	BEGIN TRANSACTION;
-
-	BEGIN TRY
-		-- Verifico que el ID no sea nulo
-		IF @id IS NULL
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
-			RETURN -1;
-		END
-		
-		-- Verifico que exista en la tabla
-		IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE id_metodo_pago = @id)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
-			RETURN -1;
-		END
-
-		DELETE FROM pagos_y_facturas.metodo_pago
-		WHERE metodo_pago.id_metodo_pago = @id;
-
-		COMMIT TRANSACTION;
-
-		SELECT 'Exito' AS Resultado, 'Metodo de pago eliminado' AS Mensaje;
-		RETURN 0;
-
-	END TRY
-	BEGIN CATCH
-		ROLLBACK TRANSACTION;
-		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
-		RETURN -99;
-	END CATCH
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        -- Verifico que el ID no sea nulo
+        IF @id IS NULL
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Parámetros incorrectos' AS Mensaje;
+            RETURN -1;
+        END
+        -- Verifico que exista y esté activo
+        IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE id_metodo_pago = @id AND estado = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Método de pago no encontrado o ya inactivo' AS Mensaje;
+            RETURN -2;
+        END
+        -- Borrado lógico
+        UPDATE pagos_y_facturas.metodo_pago
+        SET estado = 0
+        WHERE id_metodo_pago = @id;
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Método de pago eliminado lógicamente' AS Mensaje;
+        RETURN 0;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
 END;
 GO
 
 /*
-* Nombre: CreacionRol
-* Descripcion: Crea un rol. 
+* Nombre: CrearRol
+* Descripcion: Crea un nuevo rol en el sistema.
 * Parametros:
-*	@nombre VARCHAR(50) - Nombre del rol. 
+*   @nombre VARCHAR(50) - Nombre del rol.
 * Valores de retorno:
-*	 0: Exito. 
-*	-1: @nombre Parametro incorrecto.
-*	-99: Error desconocido.
+*    0: Éxito.
+*   -1: El nombre no puede ser nulo o ya existe.
+*   -99: Error desconocido.
 */
 CREATE OR ALTER PROCEDURE manejo_personas.CreacionRol
 	@nombre VARCHAR(50)
@@ -768,13 +687,13 @@ GO
 
 /*
 * Nombre: EliminacionRol
-* Descripcion: Elimina un rol. 
+* Descripcion: Elimina un rol del sistema.
 * Parametros:
-*	@id INT - ID del rol a eliminar.
+*   @id INT - ID del rol a eliminar.
 * Valores de retorno:
-*	 0: Exito. 
-*	-1: Parametros incorrectos.
-*	-99: Error desconocido.
+*    0: Éxito.
+*   -1: Parámetros incorrectos o id no existente.
+*   -99: Error desconocido.
 */
 CREATE OR ALTER PROCEDURE manejo_personas.EliminacionRol
 	@id INT
@@ -929,19 +848,19 @@ GO
 
 /*
 * Nombre: ModificarCategoria
-* Descripcion: Modifica los campos nombre y costo de una categoria. 
+* Descripcion: Modifica los campos nombre y costo de una categoria.
 * Parametros:
-* 	@id_categoria INT - ID de la categoria a modificar. (Parametro obligatorio)
-*	@nombre_categoria VARCHAR(50) - Nombre nuevo para la categoria. (Parametro obligatorio)
-*	@costo_membrecia DECIMAL(10, 2) -  Nuevo costo de la membresia (Parametro opcional). 
+*   @id_categoria INT - ID de la categoria a modificar. (Obligatorio)
+*   @nombre_categoria VARCHAR(50) - Nuevo nombre de la categoria. (Obligatorio)
+*   @costo_membrecia DECIMAL(10, 2) - Nuevo costo de la membresia (Opcional).
 * Valores de retorno:
-*	 0: Exito. 
-*	-1: La categoria no existe.
-*	-2: El nombre de la categoria está vacío.
-*	-3: El nombre de la categoria excede 50 caracteres.
-*	-4: El nombre de la categoria está en uso por otra categoria.
-*	-5: El costo de la membresia debe ser mayor a cero. 	 
-*	-99: Error desconocido.
+*    0: Éxito.
+*   -1: La categoria no existe.
+*   -2: El nombre de la categoria está vacío.
+*   -3: El nombre de la categoria excede 50 caracteres.
+*   -4: El nombre de la categoria está en uso por otra categoria.
+*   -5: El costo de la membresia debe ser mayor a cero.
+*   -99: Error desconocido.
 */
 CREATE OR ALTER PROCEDURE manejo_actividades.ModificarCategoria
 	@id_categoria INT,
@@ -1338,25 +1257,13 @@ GO
 
 /*
 * Nombre: EliminarClase
-* Descripcion: Realiza borrado lógico de una clase desactivándola, validando que no haya socios inscritos en la actividad y categoría correspondiente. 
+* Descripcion: Realiza borrado lógico de una clase desactivándola.
 * Parametros:
-* 	@id_clase INT - ID de la clase a eliminar. (Parametro obligatorio)
+*   @id_clase INT - ID de la clase a eliminar. (Obligatorio)
 * Valores de retorno:
-*	 0: Exito. 
-*	-1: La clase no existe o ya está inactiva.
-*	-2: No se puede eliminar porque hay socios inscritos en esta actividad y categoría.
-*	-99: Error desconocido.
-*/
-/*
-* Nombre: EliminarClase
-* Descripcion: Realiza borrado lógico de una clase desactivándola, validando que no haya socios inscritos en la actividad y categoría correspondiente. 
-* Parametros:
-* 	@id_clase INT - ID de la clase a eliminar. (Parametro obligatorio)
-* Valores de retorno:
-*	 0: Exito. 
-*	-1: La clase no existe o ya está inactiva.
-*	-2: No se puede eliminar porque hay socios inscritos en esta actividad y categoría.
-*	-99: Error desconocido.
+*    0: Éxito.
+*   -1: La clase no existe o ya está inactiva.
+*   -99: Error desconocido.
 */
 CREATE OR ALTER PROCEDURE manejo_actividades.EliminarClase
     @id_clase INT
@@ -1625,7 +1532,23 @@ END;
 GO
 
 
-
+/*
+* Nombre: CreacionFactura
+* Descripcion: Crea una nueva factura registrando el estado de pago, el monto, el ID de la persona y el método de pago utilizado.
+*              Valida que los parámetros no sean nulos o inválidos y que las entidades referenciadas existan.
+* Parametros:
+*   @estado_pago VARCHAR(10) - Estado del pago (Ej: 'Pagado', 'Pendiente'). No puede ser nulo ni vacío. (Obligatorio)
+*   @monto_a_pagar DECIMAL(10,2) - Monto a pagar. Debe ser mayor a 0. (Obligatorio)
+*   @id_persona INT - ID de la persona a la que se le asocia la factura. Debe existir en manejo_personas.persona. (Obligatorio)
+*   @id_metodo_pago INT - ID del método de pago utilizado. Debe existir en pagos_y_facturas.metodo_pago. (Obligatorio)
+* Valores de retorno:
+*   0     - Éxito. La factura fue creada correctamente.
+*  -1     - Error: El estado de pago es nulo o vacío.
+*  -2     - Error: El monto a pagar es nulo o menor/igual a 0.
+*  -3     - Error: No existe una persona con el ID provisto.
+*  -4     - Error: No existe un método de pago con el ID provisto.
+*  -99    - Error: Excepción no controlada. Se retorna el mensaje del error.
+*/
 CREATE OR ALTER PROCEDURE pagos_y_facturas.CreacionFactura
     @estado_pago VARCHAR(10),
     @monto_a_pagar DECIMAL(10,2),
@@ -1687,7 +1610,23 @@ END;
 GO
 
 
--- Modificacion de facturas
+/*
+* Nombre: ModificacionFactura
+* Descripcion: Actualiza los datos de una factura existente: estado de pago, monto y método de pago.
+*              Valida la existencia de la factura, que los valores nuevos no sean nulos o inválidos, y que el método de pago exista.
+* Parametros:
+*   @id_factura INT - ID de la factura a modificar. Debe existir en pagos_y_facturas.factura. (Obligatorio)
+*   @nuevo_estado_pago VARCHAR(10) - Nuevo estado del pago (Ej: 'Pagado', 'Pendiente'). No puede ser nulo ni vacío. (Obligatorio)
+*   @nuevo_monto DECIMAL(10,2) - Nuevo monto. Debe ser mayor a 0. (Obligatorio)
+*   @nuevo_metodo_pago INT - ID del nuevo método de pago. Debe existir en pagos_y_facturas.metodo_pago. (Obligatorio)
+* Valores de retorno:
+*   0     - Éxito. La factura fue actualizada correctamente.
+*  -1     - Error: No existe una factura con el ID proporcionado.
+*  -2     - Error: El nuevo estado de pago es nulo o vacío.
+*  -3     - Error: El nuevo monto es nulo o menor/igual a 0.
+*  -4     - Error: No existe un método de pago con el ID proporcionado.
+*  -99    - Error: Excepción no controlada. Se retorna el mensaje del error.
+*/
 CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificacionFactura
     @id_factura INT,
     @nuevo_estado_pago VARCHAR(10),
@@ -1750,7 +1689,17 @@ BEGIN
 END;
 GO
 
-
+/*
+* Nombre: EliminacionFactura
+* Descripcion: Elimina de forma definitiva una factura existente en la base de datos. 
+*              Valida previamente que el ID de factura exista.
+* Parametros:
+*   @id_factura INT - ID de la factura a eliminar. Debe existir en pagos_y_facturas.factura. (Obligatorio)
+* Valores de retorno:
+*   0     - Éxito. La factura fue eliminada correctamente.
+*  -1     - Error: No existe una factura con el ID proporcionado.
+*  -99    - Error: Excepción no controlada. Se retorna el mensaje del error.
+*/
 CREATE OR ALTER PROCEDURE pagos_y_facturas.EliminacionFactura
     @id_factura INT
 AS
@@ -2010,7 +1959,26 @@ BEGIN
 END;
 GO
 
-
+/*
+* Nombre: CrearUsuario
+* Descripcion: Crea un nuevo usuario en el sistema asociado a una persona existente, validando la unicidad del username y la existencia de la persona.
+*              Verifica que los datos obligatorios no sean nulos, que el hash tenga longitud 256 y que no existan conflictos previos.
+* Parametros:
+*   @id_persona INT - ID de la persona a asociar. Debe existir en manejo_personas.persona. (Obligatorio)
+*   @username VARCHAR(50) - Nombre de usuario. Debe ser único. (Obligatorio)
+*   @password_hash VARCHAR(256) - Hash SHA-256 de la contraseña. Debe tener exactamente 256 caracteres. (Obligatorio)
+*   @fecha_alta_contra DATE = NULL - Fecha de alta de la contraseña. Si no se provee, se asigna la fecha actual. (Opcional)
+* Valores de retorno:
+*   0     - Éxito. Usuario creado correctamente.
+*  -1     - Error: id_persona nulo.
+*  -2     - Error: username nulo.
+*  -3     - Error: password_hash nulo.
+*  -4     - Error: La persona especificada no existe.
+*  -5     - Error: La persona ya tiene un usuario asignado.
+*  -6     - Error: El nombre de usuario ya está en uso.
+*  -7     - Error: El password_hash no tiene 256 caracteres.
+* -999    - Error: Excepción no controlada. Se retorna el mensaje y detalles del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.CrearUsuario
     @id_persona INT,
     @username VARCHAR(50),
@@ -2105,7 +2073,22 @@ BEGIN
 END
 GO
 
-
+/*
+* Nombre: ModificarUsuario
+* Descripcion: Modifica los datos de un usuario existente. Permite actualizar el nombre de usuario, el hash de contraseña y la fecha de alta,
+*              validando la existencia del usuario y la unicidad del nombre de usuario si se modifica.
+* Parametros:
+*   @id_usuario INT - ID del usuario a modificar. Debe existir en manejo_personas.usuario. (Obligatorio)
+*   @username VARCHAR(50) = NULL - Nuevo nombre de usuario. Si se proporciona, debe ser único. (Opcional)
+*   @password_hash VARCHAR(256) = NULL - Nuevo hash SHA-256 de la contraseña. (Opcional)
+*   @fecha_alta_contra DATE = NULL - Nueva fecha de alta de la contraseña. (Opcional)
+* Valores de retorno:
+*   0     - Éxito. Usuario modificado correctamente.
+*  -1     - Error: id_usuario nulo.
+*  -2     - Error: El usuario especificado no existe.
+*  -3     - Error: El nombre de usuario ya está en uso por otro usuario.
+* -999    - Error: Excepción no controlada. Se retorna el mensaje y detalles del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarUsuario
     @id_usuario INT,
     @username VARCHAR(50) = NULL,
@@ -2168,7 +2151,19 @@ BEGIN
 END;
 GO
 
-
+/*
+* Nombre: EliminarUsuario
+* Descripcion: Realiza la eliminación lógica de un usuario (inactivación), eliminando también sus roles asociados. 
+*              Verifica que el usuario no tenga clases asignadas. Si la persona asociada no cumple otro rol, también se inactiva.
+* Parametros:
+*   @id_usuario INT - ID del usuario a eliminar. Debe existir en manejo_personas.usuario. (Obligatorio)
+* Valores de retorno:
+*   0     - Éxito. Usuario eliminado (inactivado) correctamente y persona inactivada si no cumple otros roles.
+*  -1     - Error: id_usuario nulo.
+*  -2     - Error: El usuario especificado no existe.
+*  -3     - Error: El usuario tiene clases asignadas, no puede ser eliminado.
+* -999    - Error: Excepción no controlada. Se retorna el mensaje y detalles del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.EliminarUsuario
     @id_usuario INT
 AS
@@ -2252,8 +2247,21 @@ END;
 GO
 
 
--------- STORED PROCEDURES PARA ACTIVIDAD
--- Crear Invitado
+/*
+* Nombre: CrearInvitado
+* Descripcion: Crea un registro de invitado asociando una persona existente con un socio que la invita. 
+*              Valida que ambos IDs existan, que la persona no haya sido invitada previamente y que los parámetros no sean nulos.
+* Parametros:
+*   @id_persona INT - ID de la persona que será registrada como invitado. Debe existir en manejo_personas.persona. (Obligatorio)
+*   @id_socio INT - ID del socio que realiza la invitación. Debe existir en manejo_personas.socio. (Obligatorio)
+* Valores de retorno:
+*   0     - Éxito. Invitado creado correctamente.
+*  -1     - Error: Alguno de los parámetros es nulo.
+*  -2     - Error: La persona indicada no existe.
+*  -3     - Error: El socio indicado no existe.
+*  -4     - Error: Ya existe un registro de invitado para esa persona.
+* -999    - Error: Excepción no controlada. Se retorna el mensaje y detalles del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.CrearInvitado
 	@id_persona INT,
 	@id_socio INT
@@ -2315,7 +2323,20 @@ BEGIN
 END;
 GO
 
--- Modificar Invitado
+/*
+* Nombre: ModificarInvitado
+* Descripcion: Modifica el socio asociado a un invitado existente. 
+*              Valida que los IDs no sean nulos, que el invitado exista y que el socio especificado exista.
+* Parametros:
+*   @id_invitado INT - ID del invitado a modificar. Debe existir en manejo_personas.invitado. (Obligatorio)
+*   @id_socio INT - Nuevo ID del socio que invita. Debe existir en manejo_personas.socio. (Obligatorio)
+* Valores de retorno:
+*   0     - Éxito. Invitado modificado correctamente.
+*  -1     - Error: Alguno de los parámetros es nulo.
+*  -2     - Error: El invitado especificado no existe.
+*  -3     - Error: El socio especificado no existe.
+* -999    - Error: Excepción no controlada. Se retorna el mensaje y detalles del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarInvitado
 	@id_invitado INT,
 	@id_socio INT
@@ -2370,7 +2391,18 @@ BEGIN
 END;
 GO
 
--- Eliminar Invitado
+/*
+* Nombre: EliminarInvitado
+* Descripcion: Elimina un invitado existente. Si la persona asociada no cumple ningún otro rol (usuario, socio o responsable),
+*              se elimina también de la tabla persona; de lo contrario, se realiza una inactivación lógica.
+* Parametros:
+*   @id_invitado INT - ID del invitado a eliminar. Debe existir en manejo_personas.invitado. (Obligatorio)
+* Valores de retorno:
+*   0     - Éxito. Invitado eliminado. Persona eliminada físicamente o inactivada según corresponda.
+*  -1     - Error: id_invitado nulo.
+*  -2     - Error: El invitado especificado no existe.
+* -999    - Error: Excepción no controlada. Se retorna el mensaje y detalles del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.EliminarInvitado
     @id_invitado INT
 AS
@@ -2446,8 +2478,22 @@ BEGIN
 END;
 GO
 
--------- STORED PROCEDURES PARA ACTIVIDAD
--- Crear Responsable
+/*
+* Nombre: CrearResponsable
+* Descripcion: Registra una persona como responsable de un grupo familiar, validando existencia de persona y grupo,
+*              que la persona no sea responsable en otro grupo y que el parentesco no sea vacío.
+* Parametros:
+*   @id_persona INT - ID de la persona a registrar como responsable. Debe existir en manejo_personas.persona. (Obligatorio)
+*   @parentesco VARCHAR(10) - Parentesco con el grupo familiar. No puede ser cadena vacía si se provee. (Opcional)
+*   @id_grupo INT - ID del grupo familiar. Debe existir en manejo_personas.grupo_familiar. (Obligatorio)
+* Valores de retorno:
+*   0     - Éxito. Responsable creado correctamente.
+*  -1     - Error: Persona no encontrada.
+*  -2     - Error: Grupo familiar no encontrado.
+*  -3     - Error: La persona ya está registrada como responsable.
+*  -4     - Error: Parentesco no puede estar vacío si se provee.
+* -99     - Error: Excepción no controlada. Se retorna el mensaje del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.CrearResponsable
     @id_persona INT,
     @parentesco VARCHAR(10),
@@ -2507,7 +2553,18 @@ BEGIN
 END;
 GO
 
--- Modificar responsable
+/*
+* Nombre: ModificarResponsable
+* Descripcion: Actualiza el parentesco de un responsable de grupo familiar, validando que el responsable exista y que el parentesco no sea vacío si se proporciona.
+* Parametros:
+*   @id_grupo INT - ID del grupo familiar cuyo responsable se modificará. Debe existir en manejo_personas.responsable. (Obligatorio)
+*   @parentesco VARCHAR(10) = NULL - Nuevo parentesco. Si se proporciona, no puede ser cadena vacía. (Opcional)
+* Valores de retorno:
+*   0     - Éxito. Responsable actualizado correctamente.
+*  -1     - Error: Responsable no encontrado para el grupo dado.
+*  -2     - Error: Parentesco no puede estar vacío si se proporciona.
+* -99     - Error: Excepción no controlada. Se retorna el mensaje del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarResponsable
     @id_grupo INT,
     @parentesco VARCHAR(10) = NULL
@@ -2551,7 +2608,16 @@ BEGIN
 END;
 GO
 
--- Eliminar responsable
+/*
+* Nombre: EliminarResponsable
+* Descripcion: Elimina un responsable de grupo familiar y, si la persona asociada no cumple otros roles (usuario, socio, invitado), la inactiva.
+* Parametros:
+*   @id_grupo INT - ID del grupo familiar cuyo responsable será eliminado. Debe existir en manejo_personas.responsable. (Obligatorio)
+* Valores de retorno:
+*   0     - Éxito. Responsable eliminado e persona inactivada si corresponde.
+*  -1     - Error: Responsable no encontrado para el grupo dado.
+* -99     - Error: Excepción no controlada. Se retorna el mensaje del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.EliminarResponsable
     @id_grupo INT
 AS
@@ -2602,8 +2668,14 @@ BEGIN
 END;
 GO
 
--------- STORED PROCEDURES PARA ACTIVIDAD
--- Crear Grupo Familiar
+/*
+* Nombre: CrearGrupoFamiliar
+* Descripcion: Crea un nuevo grupo familiar con la fecha de alta actual y estado activo (1).
+* Parametros: Ninguno.
+* Valores de retorno:
+*   0     - Éxito. Grupo familiar creado correctamente.
+* -99     - Error: Excepción no controlada. Se retorna el mensaje del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.CrearGrupoFamiliar
 AS
 BEGIN
@@ -2627,7 +2699,18 @@ BEGIN
 END;
 GO
 
--- Modificar Grupo Familiar
+/*
+* Nombre: ModificarEstadoGrupoFamiliar
+* Descripcion: Modifica el estado (activo/inactivo) de un grupo familiar existente. Valida que el grupo exista y que el estado sea 0 o 1.
+* Parametros:
+*   @id_grupo INT - ID del grupo familiar a modificar. Debe existir en manejo_personas.grupo_familiar. (Obligatorio)
+*   @estado BIT = NULL - Nuevo estado del grupo: 1 (activo) o 0 (inactivo). (Opcional)
+* Valores de retorno:
+*   0     - Éxito. Estado actualizado correctamente.
+*  -1     - Error: Grupo familiar no encontrado.
+*  -2     - Error: Estado inválido (debe ser 0 o 1).
+* -99     - Error: Excepción no controlada. Se retorna el mensaje del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarEstadoGrupoFamiliar
     @id_grupo INT,
     @estado BIT = NULL
@@ -2670,7 +2753,18 @@ BEGIN
 END;
 GO
 
--- Eliminar grupo familiar
+/*
+* Nombre: EliminarGrupoFamiliar
+* Descripcion: Realiza la eliminación lógica (inactivación) de un grupo familiar si no tiene responsables ni socios asignados activos.
+* Parametros:
+*   @id_grupo INT - ID del grupo familiar a eliminar. Debe existir en manejo_personas.grupo_familiar. (Obligatorio)
+* Valores de retorno:
+*   0     - Éxito. Grupo familiar inactivado correctamente.
+*  -1     - Error: Grupo familiar no encontrado.
+*  -2     - Error: No se puede eliminar, el grupo tiene responsables asignados.
+*  -3     - Error: No se puede eliminar, el grupo tiene socios asignados.
+* -99     - Error: Excepción no controlada. Se retorna el mensaje del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.EliminarGrupoFamiliar
     @id_grupo INT
 AS
@@ -2719,10 +2813,32 @@ BEGIN
         RETURN -99;
     END CATCH
 END;
-
 GO
------- STORED PROCEDURES PARA SOCIO
--- crear socio
+
+
+/*
+* Nombre: CrearSocio
+* Descripcion: Registra una persona como socio validando existencia y estado activo, no duplicados, categoría válida, obra social y grupo familiar activos (si aplican),
+*              además de verificar que la edad de la persona corresponde a la categoría.
+* Parametros:
+*   @id_persona INT - ID de la persona a registrar como socio. Debe existir y estar activa. (Obligatorio)
+*   @telefono_emergencia VARCHAR(15) - Teléfono de emergencia del socio. (Obligatorio)
+*   @obra_nro_socio VARCHAR(20) = NULL - Número de socio en la obra social (opcional).
+*   @id_obra_social INT = NULL - ID de obra social válida (opcional).
+*   @id_categoria INT - ID de categoría válida en manejo_actividades.categoria. (Obligatorio)
+*   @id_grupo INT = NULL - ID de grupo familiar activo (opcional).
+* Valores de retorno:
+*   0     - Éxito. Socio registrado correctamente.
+*  -1     - Error: Persona no existe o está inactiva.
+*  -2     - Error: Persona ya registrada como socio.
+*  -3     - Error: Categoría especificada no existe.
+*  -4     - Error: Obra social especificada no existe.
+*  -5     - Error: Grupo familiar no existe o está inactivo.
+*  -6     - Error: Categoría Menor solo para personas hasta 12 años.
+*  -7     - Error: Categoría Cadete solo para personas entre 13 y 17 años.
+*  -8     - Error: Categoría Mayor solo para personas desde 18 años.
+* -99     - Error: Excepción no controlada. Se retorna el mensaje del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.CrearSocio
     @id_persona INT,
     @telefono_emergencia VARCHAR(15),
@@ -2824,9 +2940,29 @@ BEGIN
     END CATCH
 
 END;
-
 GO
--- modificar socio
+
+/*
+* Nombre: ModificarSocio
+* Descripcion: Actualiza datos de un socio validando existencia, validez de categoría, obra social y grupo familiar, y que la edad corresponda a la categoría.
+* Parametros:
+*   @id_socio INT - ID del socio a modificar. (Obligatorio)
+*   @telefono_emergencia VARCHAR(15) = NULL - Nuevo teléfono de emergencia (opcional).
+*   @obra_nro_socio VARCHAR(20) = NULL - Nuevo número de socio en obra social (opcional).
+*   @id_obra_social INT = NULL - Nuevo ID de obra social válida (opcional).
+*   @id_categoria INT = NULL - Nuevo ID de categoría válida (opcional).
+*   @id_grupo INT = NULL - Nuevo ID de grupo familiar activo (opcional).
+* Valores de retorno:
+*   0     - Éxito. Socio actualizado correctamente.
+*  -1     - Error: Socio no existe.
+*  -2     - Error: Categoría especificada no existe.
+*  -3     - Error: Categoría Menor solo para personas hasta 12 años.
+*  -4     - Error: Categoría Cadete solo para personas entre 13 y 17 años.
+*  -5     - Error: Categoría Mayor solo para personas desde 18 años.
+*  -6     - Error: Obra social especificada no existe.
+*  -7     - Error: Grupo familiar no existe o está inactivo.
+* -99     - Error: Excepción no controlada. Se retorna el mensaje del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.ModificarSocio
     @id_socio INT,
     @telefono_emergencia VARCHAR(15) = NULL,
@@ -2930,9 +3066,20 @@ BEGIN
     END CATCH
 
 END;
-
 GO
--- eliminar socio
+
+/*
+* Nombre: EliminarSocio
+* Descripcion: Elimina un socio y sus relaciones asociadas, validando que no sea responsable de grupo familiar ni tenga facturas vinculadas.
+* Parametros:
+*   @id_socio INT - ID del socio a eliminar. (Obligatorio)
+* Valores de retorno:
+*   0     - Éxito. Socio y sus relaciones eliminados completamente.
+*  -1     - Error: Socio no existe.
+*  -2     - Error: Socio es responsable de un grupo familiar, no se puede eliminar.
+*  -3     - Error: Socio tiene facturas asociadas, no se puede eliminar.
+* -99     - Error: Excepción no controlada. Se retorna el mensaje del error.
+*/
 CREATE OR ALTER PROCEDURE manejo_personas.EliminarSocio
     @id_socio INT
 AS
@@ -3001,5 +3148,126 @@ BEGIN
         RETURN -99;
     END CATCH
 
+END;
+GO
+
+/*
+* Nombre: CreacionFactura
+* Descripcion: Crea una factura, validando que el método de pago esté activo.
+* Parametros:
+*   @estado_pago VARCHAR(10), @monto_a_pagar DECIMAL(10,2), @id_persona INT, @id_metodo_pago INT
+* Valores de retorno:
+*    0: Éxito.
+*   -4: Método de pago no válido o inactivo.
+*   -99: Error desconocido.
+*/
+CREATE OR ALTER PROCEDURE pagos_y_facturas.CreacionFactura
+    @estado_pago VARCHAR(10),
+    @monto_a_pagar DECIMAL(10,2),
+    @id_persona INT,
+    @id_metodo_pago INT
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        IF @estado_pago IS NULL OR LTRIM(RTRIM(@estado_pago)) = ''
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Estado de pago no puede ser nulo o vacío' AS Mensaje;
+            RETURN -1;
+        END
+        IF @monto_a_pagar IS NULL OR @monto_a_pagar <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Monto inválido' AS Mensaje;
+            RETURN -2;
+        END
+        IF NOT EXISTS (SELECT 1 FROM manejo_personas.persona WHERE id_persona = @id_persona)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Persona no existente' AS Mensaje;
+            RETURN -3;
+        END
+        -- Solo métodos de pago activos
+        IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE id_metodo_pago = @id_metodo_pago AND estado = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Método de pago no válido o inactivo' AS Mensaje;
+            RETURN -4;
+        END
+        INSERT INTO pagos_y_facturas.factura (estado_pago, monto_a_pagar, id_persona, id_metodo_pago)
+        VALUES (@estado_pago, @monto_a_pagar, @id_persona, @id_metodo_pago);
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Factura creada correctamente' AS Mensaje;
+        RETURN 0;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
+END;
+GO
+
+/*
+* Nombre: ModificacionFactura
+* Descripcion: Modifica una factura, validando que el método de pago esté activo.
+* Parametros:
+*   @id_factura INT, @nuevo_estado_pago VARCHAR(10), @nuevo_monto DECIMAL(10,2), @nuevo_metodo_pago INT
+* Valores de retorno:
+*    0: Éxito.
+*   -4: Método de pago no válido o inactivo.
+*   -99: Error desconocido.
+*/
+CREATE OR ALTER PROCEDURE pagos_y_facturas.ModificacionFactura
+    @id_factura INT,
+    @nuevo_estado_pago VARCHAR(10),
+    @nuevo_monto DECIMAL(10,2),
+    @nuevo_metodo_pago INT
+AS
+BEGIN
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+    BEGIN TRY
+        IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.factura WHERE id_factura = @id_factura)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Factura no existente' AS Mensaje;
+            RETURN -1;
+        END
+        IF @nuevo_estado_pago IS NULL OR LTRIM(RTRIM(@nuevo_estado_pago)) = ''
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Estado inválido' AS Mensaje;
+            RETURN -2;
+        END
+        IF @nuevo_monto IS NULL OR @nuevo_monto <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Monto inválido' AS Mensaje;
+            RETURN -3;
+        END
+        -- Solo métodos de pago activos
+        IF NOT EXISTS (SELECT 1 FROM pagos_y_facturas.metodo_pago WHERE id_metodo_pago = @nuevo_metodo_pago AND estado = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Método de pago no válido o inactivo' AS Mensaje;
+            RETURN -4;
+        END
+        UPDATE pagos_y_facturas.factura
+        SET estado_pago = @nuevo_estado_pago,
+            monto_a_pagar = @nuevo_monto,
+            id_metodo_pago = @nuevo_metodo_pago
+        WHERE id_factura = @id_factura;
+        COMMIT TRANSACTION;
+        SELECT 'Exito' AS Resultado, 'Factura actualizada correctamente' AS Mensaje;
+        RETURN 0;
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
 END;
 GO
