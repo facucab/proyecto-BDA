@@ -1,0 +1,19 @@
+# Archivos temporales de Visual Studio
+*.vsidx
+*.suo
+
+# Archivos de configuración de layout
+**/DocumentLayout*.json
+DocumentLayout.backup.json
+
+# Scripts generados o temporales
+scripts/vs/GRUP*.vsidx
+scripts/vs/GRUP*.suo
+
+# Archivos de carpeta VS
+scripts/vs/
+scripts/.vs/GRUPO01/v17/DocumentLayout.json
+scripts/.vs/GRUPO01/v17/DocumentLayout.backup.json
+scripts/.vs/GRUPO01/v17/.suo
+scripts/.vs/GRUPO01/FileContentIndex/92e524b0-7354-441f-91d3-be85ca1ad5b6.vsidx
+scripts/.vs/GRUPO01/FileContentIndex/6586d7cd-4823-4aea-8760-4d694df55437.vsidx

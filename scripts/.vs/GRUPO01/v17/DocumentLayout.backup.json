@@ -1,12 +1,35 @@
 {
   "Version": 1,
   "WorkspaceRootPath": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\",
-  "Documents": [],
+  "Documents": [
+    {
+      "AbsoluteMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\03_SP.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|solutionrelative:03_SP.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    }
+  ],
   "DocumentGroupContainers": [
     {
       "Orientation": 0,
       "VerticalTabListWidth": 256,
-      "DocumentGroups": []
+      "DocumentGroups": [
+        {
+          "DockedWidth": 200,
+          "SelectedChildIndex": 0,
+          "Children": [
+            {
+              "$type": "Document",
+              "DocumentIndex": 0,
+              "Title": "03_SP.sql - localhost.master (tPcWin\\tomas (72))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\03_SP.sql",
+              "RelativeDocumentMoniker": "03_SP.sql",
+              "ToolTip": "03_SP.sql - localhost.master (tPcWin\\tomas (72))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-26T16:13:04.788Z",
+              "EditorCaption": " - localhost.master (tPcWin\\tomas (72))"
+            }
+          ]
+        }
+      ]
     }
   ]
 }
