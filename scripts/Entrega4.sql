@@ -186,7 +186,6 @@ CREATE TABLE facturacion.factura_descuento (
 	CONSTRAINT FK_factura_descuento_factura FOREIGN KEY(id_factura) REFERENCES facturacion.factura(id_factura),
 	CONSTRAINT FK_factura_descuento_descuento FOREIGN KEY(id_descuento) REFERENCES facturacion.descuento(id_descuento)
 );
--- QUEDAN LAS TABLAS DE FACTURA: 
 
 -- ############################################################
 -- ######################## SP PERSONA ########################
@@ -1329,5 +1328,271 @@ BEGIN
 	BEGIN CATCH
 		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
 	END CATCH; 
+END;
+GO
+
+-- ############################################################
+-- #################### SP METODO PAGO ########################
+-- ############################################################
+
+/*
+* Nombre: CrearMetodoPago
+* Descripcion: Crea un nuevo método de pago, validando que el nombre no sea nulo, vacío ni repetido.
+* Parametros:
+*   @nombre VARCHAR(50) - Nombre del método de pago.
+* Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
+*/
+
+CREATE OR ALTER PROCEDURE facturacion.CrearMetodoPago
+    @nombre VARCHAR(50)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Valido nombre
+    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El nombre es obligatorio' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    -- Valido duplicado
+    IF EXISTS (SELECT 1 FROM facturacion.metodo_pago WHERE nombre = LTRIM(RTRIM(@nombre)))
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Ya existe un método de pago con ese nombre' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        INSERT INTO facturacion.metodo_pago(nombre)
+        VALUES (LTRIM(RTRIM(@nombre)));
+        SELECT 'OK' AS Resultado, 'Método de pago creado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+
+END;
+GO
+
+/*
+* Nombre: ModificarMetodoPago
+* Descripcion: Modifica el nombre de un método de pago existente, validando parámetros y unicidad.
+* Parametros:
+*   @id_metodo_pago INT     - ID del método de pago a modificar.
+*   @nombre          VARCHAR(50) - Nuevo nombre. Opcional.
+* Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
+*/
+
+CREATE OR ALTER PROCEDURE facturacion.ModificarMetodoPago
+    @id_metodo_pago INT,
+    @nombre          VARCHAR(50)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Valido existencia
+    IF NOT EXISTS (SELECT 1 FROM facturacion.metodo_pago WHERE id_metodo_pago = @id_metodo_pago)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Método de pago no encontrado' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+
+    -- Valido nombre
+    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El nombre es obligatorio' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    -- Valido duplicado en otro registro
+    IF EXISTS (SELECT 1 FROM facturacion.metodo_pago WHERE nombre = LTRIM(RTRIM(@nombre)) AND id_metodo_pago <> @id_metodo_pago)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Ya existe otro método de pago con ese nombre' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        UPDATE facturacion.metodo_pago
+        SET nombre = LTRIM(RTRIM(@nombre))
+        WHERE id_metodo_pago = @id_metodo_pago;
+        SELECT 'OK' AS Resultado, 'Método de pago modificado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+
+END;
+GO
+
+/*
+* Nombre: EliminarMetodoPago
+* Descripcion: Elimina físicamente un método de pago.
+* Parametros:
+*   @id_metodo_pago INT - ID del método de pago a eliminar.
+* Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
+*/
+
+CREATE OR ALTER PROCEDURE facturacion.EliminarMetodoPago
+    @id_metodo_pago INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Valido existencia
+    IF NOT EXISTS (SELECT 1 FROM facturacion.metodo_pago WHERE id_metodo_pago = @id_metodo_pago)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Método de pago no encontrado' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        DELETE FROM facturacion.metodo_pago
+        WHERE id_metodo_pago = @id_metodo_pago;
+        SELECT 'OK' AS Resultado, 'Método de pago eliminado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+
+END;
+GO
+
+-- ############################################################
+-- #################### SP DESCUENTO ##########################
+-- ############################################################
+
+/*
+* Nombre: CrearDescuento
+* Descripcion: Inserta un nuevo descuento en la tabla facturacion.descuento, validando su información.
+* Parametros:
+*   @descripcion VARCHAR(100) - Descripción del descuento.
+*   @cantidad    DECIMAL(10,2) - Valor del descuento (>= 0).
+* Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
+*/
+
+CREATE OR ALTER PROCEDURE facturacion.CrearDescuento
+    @descripcion VARCHAR(100),
+    @cantidad    DECIMAL(10,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Valido descripción
+    IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'La descripción es obligatoria' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    -- Valido cantidad
+    IF @cantidad < 0
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Cantidad inválida. Debe ser mayor o igual a 0' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        INSERT INTO facturacion.descuento(descripcion, cantidad)
+        VALUES (LTRIM(RTRIM(@descripcion)), @cantidad);
+        SELECT 'OK' AS Resultado, 'Descuento creado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+
+END;
+GO
+
+/*
+* Nombre: ModificarDescuento
+* Descripcion: Modifica los datos de un descuento existente.
+* Parametros:
+*   @id_descuento INT           - ID del descuento a modificar.
+*   @descripcion  VARCHAR(100)  - Nueva descripción. Obligatoria.
+*   @cantidad     DECIMAL(10,2) - Nuevo valor del descuento (>= 0). Obligatorio.
+* Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
+*/
+
+CREATE OR ALTER PROCEDURE facturacion.ModificarDescuento
+    @id_descuento INT,
+    @descripcion  VARCHAR(100),
+    @cantidad     DECIMAL(10,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Valido existencia
+    IF NOT EXISTS (SELECT 1 FROM facturacion.descuento WHERE id_descuento = @id_descuento)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Descuento no encontrado' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+
+    -- Valido descripción
+    IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'La descripción es obligatoria' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    -- Valido cantidad
+    IF @cantidad < 0
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Cantidad inválida. Debe ser mayor o igual a 0' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        UPDATE facturacion.descuento
+        SET
+            descripcion = LTRIM(RTRIM(@descripcion)),
+            cantidad    = @cantidad
+        WHERE id_descuento = @id_descuento;
+        SELECT 'OK' AS Resultado, 'Descuento modificado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+
+END;
+GO
+
+/*
+* Nombre: EliminarDescuento
+* Descripcion: Elimina físicamente un descuento de la tabla facturacion.descuento.
+* Parametros:
+*   @id_descuento INT - ID del descuento a eliminar.
+* Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
+*/
+
+CREATE OR ALTER PROCEDURE facturacion.EliminarDescuento
+    @id_descuento INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Valido existencia
+    IF NOT EXISTS (SELECT 1 FROM facturacion.descuento WHERE id_descuento = @id_descuento)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Descuento no encontrado' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        DELETE FROM facturacion.descuento
+        WHERE id_descuento = @id_descuento;
+        SELECT 'OK' AS Resultado, 'Descuento eliminado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+
 END;
 GO

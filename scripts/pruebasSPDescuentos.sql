@@ -14,103 +14,114 @@
 USE Com5600G01;
 GO
 
---Creacion
-EXEC pagos_y_facturas.CrearDescuento 
-    @descripcion = 'Estudiante', 
-    @cantidad = 0.100;
-EXEC pagos_y_facturas.CrearDescuento 
-    @descripcion = 'Lluvia', 
-    @cantidad = 0.600;
-EXEC pagos_y_facturas.CrearDescuento 
-    @descripcion = 'Familiar', 
-    @cantidad = 0.150;
-EXEC pagos_y_facturas.CrearDescuento 
-    @descripcion = 'actividades', 
-    @cantidad = 0.100;
---Resultado: Descuento Ingresado Correctamente
+BEGIN TRAN TestDescuento;
+GO
 
---Descuento ya existente
-EXEC pagos_y_facturas.CrearDescuento 
-    @descripcion = 'Estudiante', 
-    @cantidad = 0.560;
---Resultado: Ya existe un descuento con esta descripcion
+-- CrearDescuento
 
---Descripcion vacia
-EXEC pagos_y_facturas.CrearDescuento 
-    @descripcion = '', 
-    @cantidad = 0.500;
---Resultado: Los descuentos no pueden tener nombres nulos
+-- Caso normal 1
+EXEC facturacion.CrearDescuento
+	@descripcion = 'Descuento A',
+	@cantidad    = 10.00;
+-- Resultado esperado: OK, Descuento creado correctamente.
+GO
 
---Sin descuento
-EXEC pagos_y_facturas.CrearDescuento 
-    @descripcion = 'Regalo', 
-    @cantidad = 0;
---Resultado: Un descuento no puede no tener descuento
+-- Caso normal 2 (cantidad = 0)
+EXEC facturacion.CrearDescuento
+	@descripcion = 'Descuento Cero',
+	@cantidad    = 0.00;
+-- Resultado esperado: OK, Descuento creado correctamente.
+GO
 
---Modificacion
+-- Descripción vacía
+EXEC facturacion.CrearDescuento
+	@descripcion = '',
+	@cantidad    = 5.00;
+-- Resultado esperado: Error, La descripción es obligatoria.
+GO
+
+-- Descripción nula
+EXEC facturacion.CrearDescuento
+	@descripcion = NULL,
+	@cantidad    = 5.00;
+-- Resultado esperado: Error, La descripción es obligatoria.
+GO
+
+-- Cantidad negativa
+EXEC facturacion.CrearDescuento
+	@descripcion = 'Negativo',
+	@cantidad    = -1.00;
+-- Resultado esperado: Error, Cantidad inválida. Debe ser mayor o igual a 0.
+GO
+
+-- Descripción duplicada
+EXEC facturacion.CrearDescuento
+	@descripcion = 'Descuento A',
+	@cantidad    = 20.00;
+-- Resultado esperado: Error, Ya existe un descuento con esa descripción.
+GO
+
+
+-- ModificarDescuento
 
 -- Caso normal
-EXEC pagos_y_facturas.ModificarDescuento 
-    @id = 1, 
-    @descripcion = 'Estudiante Universitario', 
-    @cantidad = 0.120;
-EXEC pagos_y_facturas.ModificarDescuento 
-    @id = 2, 
-    @descripcion = 'Adulto Mayor', 
-    @cantidad = 0.050;
-EXEC pagos_y_facturas.ModificarDescuento 
-    @id = 3, 
-    @descripcion = 'Empleado', 
-    @cantidad = 0.300;
--- Resultado: Descuento modificado correctamente
+EXEC facturacion.ModificarDescuento
+	@id_descuento = 1,
+	@descripcion  = 'Descuento A Mod',
+	@cantidad     = 15.50;
+-- Resultado esperado: OK, Descuento modificado correctamente.
+GO
 
---Sin descuento
-EXEC pagos_y_facturas.ModificarDescuento 
-    @id = 3, 
-    @descripcion = 'Feriado', 
-    @cantidad = 0;
---Resultado: Una descuento no puede no tener descuento
+-- ID inexistente
+EXEC facturacion.ModificarDescuento
+	@id_descuento = 99999,
+	@descripcion  = 'X',
+	@cantidad     = 1.00;
+-- Resultado esperado: Error, Descuento no encontrado.
+GO
 
---Descuento ya existente
-EXEC pagos_y_facturas.ModificarDescuento 
-    @id = 2, 
-    @descripcion = 'Lluvia', 
-    @cantidad = 0.050;
---Resultado: Ya existe un descuento con esta descripcion
+-- Descripción vacía
+EXEC facturacion.ModificarDescuento
+	@id_descuento = 1,
+	@descripcion  = '',
+	@cantidad     = 15.50;
+-- Resultado esperado: Error, La descripción es obligatoria.
+GO
 
---Descuento sin nombre
-EXEC pagos_y_facturas.ModificarDescuento 
-    @id = 4, 
-    @descripcion = '', 
-    @cantidad = 0.050;
---Resultado: Los descuentos no pueden tener nombres nulos
+-- Cantidad negativa
+EXEC facturacion.ModificarDescuento
+	@id_descuento = 1,
+	@descripcion  = 'Valido',
+	@cantidad     = -5.00;
+-- Resultado esperado: Error, Cantidad inválida. Debe ser mayor o igual a 0.
+GO
 
---Id inexistente
-EXEC pagos_y_facturas.ModificarDescuento 
-    @id = 99992, 
-    @descripcion = 'Familiar', 
-    @cantidad = 0.050;
---Resultado: id no existente
 
---Id nulo
-EXEC pagos_y_facturas.ModificarDescuento 
-    @id = 0, 
-    @descripcion = 'Familiar', 
-    @cantidad = 0.050;
---Resultado: id nulo
+-- EliminarDescuento
 
---Eliminar
+-- Caso normal 1
+EXEC facturacion.EliminarDescuento
+	@id_descuento = 1;
+-- Resultado esperado: OK, Descuento eliminado correctamente.
+GO
 
---Caso normal
-EXEC pagos_y_facturas.EliminarDescuento @id = 1;
-EXEC pagos_y_facturas.EliminarDescuento @id = 2;
-EXEC pagos_y_facturas.EliminarDescuento @id = 3;
---Resultado: Descuento eliminado correctamente
+-- Caso normal 2
+EXEC facturacion.EliminarDescuento
+	@id_descuento = 2;
+-- Resultado esperado: OK, Descuento eliminado correctamente.
+GO
 
---Id nulo
-EXEC pagos_y_facturas.EliminarDescuento @id = 0;
---Resultado: id nulo
+-- ID inexistente
+EXEC facturacion.EliminarDescuento
+	@id_descuento = 99999;
+-- Resultado esperado: Error, Descuento no encontrado.
+GO
 
---Id inexistente
-EXEC pagos_y_facturas.EliminarDescuento @id = 99999;
---Resultado: id no existente
+-- Intentar eliminar nuevamente
+EXEC facturacion.EliminarDescuento
+	@id_descuento = 1;
+-- Resultado esperado: Error, Descuento no encontrado.
+GO
+
+ROLLBACK TRAN TestDescuento;
+GO

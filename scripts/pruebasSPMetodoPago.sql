@@ -1,72 +1,96 @@
-/*
-	Entrega 4 - Pruebas para Metodo de Pago
-
-	Trabajo Practico DDBBA Entrega 3 - Grupo 1
-	Comision 5600 - Viernes Tarde 
-	43990422 | Aguirre, Alex Rubén 
-	45234709 | Gauto, Gastón Santiago 
-	44363498 | Caballero, Facundo 
-	40993965 | Cornara Perez, Tomás Andrés
-
-	Pruebas para Crear, Modificar y Eliminar Metodo de Pago
-*/
-
 USE Com5600G01;
 GO
 
--- Caso normal: crear
-EXEC pagos_y_facturas.CreacionMetodoPago @nombre = 'Efectivo';
-EXEC pagos_y_facturas.CreacionMetodoPago @nombre = 'Tarjeta de Crédito';
-EXEC pagos_y_facturas.CreacionMetodoPago @nombre = 'Transferencia';
--- Resultado: Nuevo método de pago creado
+BEGIN TRAN TestMetodoPago;
+GO
+
+-- CrearMetodoPago
+
+-- Caso normal 1
+EXEC facturacion.CrearMetodoPago
+    @nombre = 'Efectivo';
+-- Resultado esperado: OK, Método de pago creado correctamente.
+GO
+
+-- Caso normal 2
+EXEC facturacion.CrearMetodoPago
+    @nombre = 'Tarjeta';
+-- Resultado esperado: OK, Método de pago creado correctamente.
+GO
+
+-- Nombre vacío
+EXEC facturacion.CrearMetodoPago
+    @nombre = '';
+-- Resultado esperado: Error, El nombre es obligatorio.
+GO
+
+-- Nombre nulo
+EXEC facturacion.CrearMetodoPago
+    @nombre = NULL;
+-- Resultado esperado: Error, El nombre es obligatorio.
+GO
 
 -- Nombre duplicado
-EXEC pagos_y_facturas.CreacionMetodoPago @nombre = 'Efectivo';
--- Resultado: Ya hay un método de pago con ese nombre
+EXEC facturacion.CrearMetodoPago
+    @nombre = 'Efectivo';
+-- Resultado esperado: Error, Ya existe un método de pago con ese nombre.
+GO
 
--- Nombre nulo o vacío
-EXEC pagos_y_facturas.CreacionMetodoPago @nombre = NULL;
-EXEC pagos_y_facturas.CreacionMetodoPago @nombre = '';
--- Resultado: El nombre no puede ser nulo
+-- ModificarMetodoPago
 
--- Modificación normal
-EXEC pagos_y_facturas.ModificacionMetodoPago @id = 1, @nombre_nuevo = 'Efectivo Modificado';
--- Resultado: Método de pago modificado
+-- Caso normal
+EXEC facturacion.ModificarMetodoPago
+    @id_metodo_pago = 1,
+    @nombre         = 'EfectivoActualizado';
+-- Resultado esperado: OK, Método de pago modificado correctamente.
+GO
 
--- Modificación a nombre ya existente
-EXEC pagos_y_facturas.ModificacionMetodoPago @id = 2, @nombre_nuevo = 'Efectivo Modificado';
--- Resultado: Ese método de pago ya está registrado
+-- ID inexistente
+EXEC facturacion.ModificarMetodoPago
+    @id_metodo_pago = 99999,
+    @nombre         = 'NoExiste';
+-- Resultado esperado: Error, Método de pago no encontrado.
+GO
 
--- Modificación de método inactivo
-EXEC pagos_y_facturas.EliminacionMetodoPago @id = 3;
-EXEC pagos_y_facturas.ModificacionMetodoPago @id = 3, @nombre_nuevo = 'Cheque';
--- Resultado: Método de pago no encontrado o inactivo
+-- Nombre vacío
+EXEC facturacion.ModificarMetodoPago
+    @id_metodo_pago = 1,
+    @nombre         = '';
+-- Resultado esperado: Error, El nombre es obligatorio.
+GO
 
--- Eliminación lógica (caso normal)
-EXEC pagos_y_facturas.EliminacionMetodoPago @id = 2;
--- Resultado: Método de pago eliminado lógicamente
+-- Nombre duplicado en otro registro
+EXEC facturacion.ModificarMetodoPago
+    @id_metodo_pago = 1,
+    @nombre         = 'Tarjeta';
+-- Resultado esperado: Error, Ya existe otro método de pago con ese nombre.
+GO
 
--- Eliminación lógica de método ya inactivo
-EXEC pagos_y_facturas.EliminacionMetodoPago @id = 2;
--- Resultado: Método de pago no encontrado o ya inactivo
+-- EliminarMetodoPago
 
--- Eliminación lógica con id inexistente
-EXEC pagos_y_facturas.EliminacionMetodoPago @id = 9999;
--- Resultado: Método de pago no encontrado o ya inactivo
+-- Caso normal 1
+EXEC facturacion.EliminarMetodoPago
+    @id_metodo_pago = 1;
+-- Resultado esperado: OK, Método de pago eliminado correctamente.
+GO
 
--- Prueba de uso en factura (solo métodos activos)
--- Intentar crear factura con método de pago inactivo
-EXEC pagos_y_facturas.CreacionFactura @estado_pago = 'Pendiente', @monto_a_pagar = 1000, @id_persona = 1, @id_metodo_pago = 2;
--- Resultado: Método de pago no válido o inactivo
+-- Caso normal 2
+EXEC facturacion.EliminarMetodoPago
+    @id_metodo_pago = 2;
+-- Resultado esperado: OK, Método de pago eliminado correctamente.
+GO
 
--- Crear factura con método de pago activo
-EXEC pagos_y_facturas.CreacionFactura @estado_pago = 'Pagado', @monto_a_pagar = 500, @id_persona = 1, @id_metodo_pago = 1;
--- Resultado: Factura creada correctamente
+-- ID inexistente
+EXEC facturacion.EliminarMetodoPago
+    @id_metodo_pago = 99999;
+-- Resultado esperado: Error, Método de pago no encontrado.
+GO
 
--- Modificar factura a método de pago inactivo
-EXEC pagos_y_facturas.ModificacionFactura @id_factura = 1, @nuevo_estado_pago = 'Pagado', @nuevo_monto = 600, @nuevo_metodo_pago = 2;
--- Resultado: Método de pago no válido o inactivo
+-- Intentar eliminar nuevamente
+EXEC facturacion.EliminarMetodoPago
+    @id_metodo_pago = 1;
+-- Resultado esperado: Error, Método de pago no encontrado.
+GO
 
--- Modificar factura a método de pago activo
-EXEC pagos_y_facturas.ModificacionFactura @id_factura = 1, @nuevo_estado_pago = 'Pagado', @nuevo_monto = 600, @nuevo_metodo_pago = 1;
--- Resultado: Factura actualizada correctamente
+ROLLBACK TRAN TestMetodoPago;
+GO
