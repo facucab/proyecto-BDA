@@ -1752,6 +1752,11 @@ BEGIN
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
     END CATCH;
 
+-- ############################################################
+-- #################### SP ObraSocial #########################
+-- ############################################################
+
+
 /*
 * Nombre: CreacionObraSocial
 * Descripcion: Crea una nueva obra social.
