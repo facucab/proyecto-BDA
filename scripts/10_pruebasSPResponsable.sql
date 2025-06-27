@@ -194,3 +194,6 @@ DBCC CHECKIDENT('usuarios.responsable',      RESEED, 0);
 DBCC CHECKIDENT('usuarios.persona',          RESEED, 0);
 DBCC CHECKIDENT('usuarios.grupo_familiar',   RESEED, 0);
 GO
+
+SELECT * 
+FROM usuarios.responsable

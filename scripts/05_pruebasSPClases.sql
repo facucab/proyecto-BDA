@@ -18,11 +18,11 @@ GO
 
 -- Caso normal 1
 EXEC actividades.CrearClase 
-	@id_actividad = 1, 
+	@id_actividad = 3, 
 	@id_categoria = 1, 
 	@dia         = 'lunes', 
 	@horario     = '08:00:00', 
-	@id_usuario  = 1;
+	@id_usuario  = 2;
 -- Resultado esperado: OK, Clase creada correctamente.
 
 -- Caso normal 2
@@ -214,3 +214,7 @@ EXEC actividades.EliminarClase
 EXEC actividades.EliminarClase 
 	@id_clase = 1;
 -- Resultado esperado: Error, La clase no existe o ya esta inactiva.
+
+SELECT *
+FROM actividades.clase
+GO

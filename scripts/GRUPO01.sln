@@ -5,13 +5,33 @@ VisualStudioVersion = 17.14.36202.13
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{4F2E2C19-372F-40D8-9FA7-9D2138C6997A}") = "GRUPO01", "GRUPO01.ssmssqlproj", "{FC3DF230-76E7-3903-5A0C-93F690F11CE7}"
 EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Elementos de la solución", "Elementos de la solución", "{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}"
+	ProjectSection(SolutionItems) = preProject
+		01_pruebasObraSocial.sql = 01_pruebasObraSocial.sql
+		02_pruebasSPcategoria.sql = 02_pruebasSPcategoria.sql
+		03_pruebasSpActividad.sql = 03_pruebasSpActividad.sql
+		06_pruebasSPUsuarios.sql = 06_pruebasSPUsuarios.sql
+		05_pruebasSPClases.sql = 05_pruebasSPClases.sql
+		04_pruebasSPRol.sql = 04_pruebasSPRol.sql
+		08_pruebasSPGrupoFamiliar.sql = 08_pruebasSPGrupoFamiliar.sql
+		07_pruebasSPSocio.sql = 07_pruebasSPSocio.sql
+		09_pruebasSPInvitado.sql = 09_pruebasSPInvitado.sql
+		11_pruebasSPDescuentos.sql = 11_pruebasSPDescuentos.sql
+		10_pruebasSPResponsable.sql = 10_pruebasSPResponsable.sql
+		12_pruebasSPMetodoPago.sql = 12_pruebasSPMetodoPago.sql
+		13_pruebasSPFacturas.sql = 13_pruebasSPFacturas.sql
+		Entrega4.sql = Entrega4.sql
+		Reportes.sql = Reportes.sql
+		Roles y permisos.sql = Roles y permisos.sql
+	EndProjectSection
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Default|Default = Default|Default
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{FC3DF230-76E7-3903-5A0C-93F690F11CE7}.Default|Default.ActiveCfg = Default
-		{DA102872-832C-4687-AD01-382368AC7350}.Default|Default.ActiveCfg = Default
+		{D5DCAA73-719F-43BE-9869-3354DDD47AAF}.Default|Default.ActiveCfg = Default
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

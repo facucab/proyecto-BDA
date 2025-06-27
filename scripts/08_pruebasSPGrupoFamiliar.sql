@@ -74,3 +74,6 @@ EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 2;
 -- Miembros activos
 EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 4;
 -- Resultado esperado: Error, No se puede eliminar: grupo tiene socios asignados
+
+SELECT *
+FROM usuarios.grupo_familiar

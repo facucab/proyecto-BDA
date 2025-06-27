@@ -18,6 +18,24 @@ EXEC facturacion.CrearMetodoPago
 -- Resultado esperado: OK, Método de pago creado correctamente.
 GO
 
+-- Caso normal 3
+EXEC facturacion.CrearMetodoPago
+    @nombre = 'Master Card';
+-- Resultado esperado: OK, Método de pago creado correctamente.
+GO
+
+-- Caso normal 4
+EXEC facturacion.CrearMetodoPago
+    @nombre = 'Visa';
+-- Resultado esperado: OK, Método de pago creado correctamente.
+GO
+
+-- Caso normal 5
+EXEC facturacion.CrearMetodoPago
+    @nombre = 'American Express';
+-- Resultado esperado: OK, Método de pago creado correctamente.
+GO
+
 -- Nombre vacío
 EXEC facturacion.CrearMetodoPago
     @nombre = '';
@@ -93,4 +111,8 @@ EXEC facturacion.EliminarMetodoPago
 GO
 
 ROLLBACK TRAN TestMetodoPago;
+GO
+
+SELECT *
+FROM facturacion.metodo_pago
 GO

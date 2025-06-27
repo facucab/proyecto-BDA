@@ -522,86 +522,81 @@ BEGIN
 	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 	BEGIN TRY
 		BEGIN TRANSACTION;
-
-		-- 1) Validar actividad
+		
+		-- 1) Validar actividad (incluyendo estado activo)
 		IF NOT EXISTS (SELECT 1 FROM actividades.actividad WHERE id_actividad = @id_actividad AND estado = 1)
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'La actividad no existe' AS Mensaje, '404' AS Estado;
+			SELECT 'Error' AS Resultado, 'La actividad no existe o no está activa' AS Mensaje, '404' AS Estado;
 			RETURN -1;
 		END;
-
-		-- 2) Validar categoria
+		
+		-- 2) Validar categoria (asumiendo que también tiene estado)
 		IF NOT EXISTS (SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'La categoria no existe' AS Mensaje, '404' AS Estado;
 			RETURN -2;
 		END;
-
+		
 		-- 3) Validar usuario
-		IF NOT EXISTS (SELECT 1 FROM usuarios.usuario WHERE id_usuario = @id_usuario AND estado = 1)
+		IF NOT EXISTS (SELECT 1 FROM usuarios.usuario WHERE id_usuario = @id_usuario)
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'El usuario no existe' AS Mensaje, '404' AS Estado;
 			RETURN -3;
 		END;
-
-		-- 4) Validar dia
+		
+		-- 4) Normalizar día (la validación la hace el constraint de la tabla)
 		SET @dia = LOWER(LTRIM(RTRIM(@dia)));
-		IF @dia NOT IN ('lunes','martes','miercoles','jueves','viernes','sabado','domingo')
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Dia invalido' AS Mensaje, '400' AS Estado;
-			RETURN -4;
-		END;
-
+		
 		-- 5) Validar horario
 		IF @horario < '06:00:00' OR @horario >= '22:00:00'
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Horario invalido' AS Mensaje, '400' AS Estado;
-			RETURN -5;
+			SELECT 'Error' AS Resultado, 'Horario invalido (debe ser entre 06:00 y 22:00)' AS Mensaje, '400' AS Estado;
+			RETURN -4;
 		END;
-
+		
 		-- 6) Conflicto exacto
 		IF EXISTS (
 			SELECT 1 
-			  FROM actividades.clase 
-			 WHERE id_actividad = @id_actividad
-			   AND id_categoria = @id_categoria
-			   AND dia          = @dia
-			   AND horario      = @horario
-			   AND estado       = 1
+			FROM actividades.clase 
+			WHERE id_actividad = @id_actividad
+			AND id_categoria = @id_categoria
+			AND dia = @dia
+			AND horario = @horario
+			AND estado = 1
 		)
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'Ya existe una clase activa con la misma actividad, categoria, dia y horario' AS Mensaje, '409' AS Estado;
-			RETURN -6;
+			RETURN -5;
 		END;
-
+		
 		-- 7) Conflicto profesor
 		IF EXISTS (
 			SELECT 1 
-			  FROM actividades.clase 
-			 WHERE id_usuario = @id_usuario
-			   AND dia        = @dia
-			   AND horario    = @horario
-			   AND estado     = 1
+			FROM actividades.clase 
+			WHERE id_usuario = @id_usuario
+			AND dia = @dia
+			AND horario = @horario
+			AND estado = 1
 		)
 		BEGIN
 			ROLLBACK TRANSACTION;
 			SELECT 'Error' AS Resultado, 'El profesor ya tiene otra clase activa en ese dia y horario' AS Mensaje, '409' AS Estado;
-			RETURN -7;
+			RETURN -6;
 		END;
-
-		-- Insertar
+		
+		-- Insertar la nueva clase
 		INSERT INTO actividades.clase (id_actividad, id_categoria, dia, horario, id_usuario)
 		VALUES (@id_actividad, @id_categoria, @dia, @horario, @id_usuario);
-
+		
 		COMMIT TRANSACTION;
 		SELECT 'OK' AS Resultado, 'Clase creada correctamente' AS Mensaje, '200' AS Estado;
 		RETURN 0;
+		
 	END TRY
 	BEGIN CATCH
 		IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
@@ -2735,7 +2730,6 @@ GO
 *   - Verifica que la persona no esté ya invitada.
 * Transacción explícita porque afecta a dos tablas: persona e invitado.
 */
-
 CREATE OR ALTER PROCEDURE usuarios.CrearInvitado
     @id_persona     INT           = NULL,
     @dni            VARCHAR(9)    = NULL,

@@ -14,12 +14,6 @@
 USE Com5600G01;
 GO
 
--- Datos previos necesarios para validar FKs
-INSERT INTO usuarios.obra_social(descripcion) VALUES('Obra Social Test');
-INSERT INTO actividades.categoria(nombre_categoria, costo_membrecia, vigencia) VALUES('Categoria Test',100.00,GETDATE());
-INSERT INTO usuarios.grupo_familiar(fecha_alta,estado) VALUES(GETDATE(),1);
-GO
-
 -- CrearSocio
 
 -- Caso normal 1: crear persona y socio
@@ -206,5 +200,6 @@ EXEC usuarios.EliminarSocio @id_socio = 99999;
 EXEC usuarios.EliminarSocio @id_socio = 1;
 -- Resultado esperado: Error, Socio no encontrado
 
-USE Com5600G01;
+SELECT * 
+FROM usuarios.socio
 GO

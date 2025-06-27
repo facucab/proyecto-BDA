@@ -27,6 +27,22 @@ EXEC usuarios.CrearRol
 	@descripcion  = 'Usuario estándar';
 -- Resultado esperado: OK, Rol creado correctamente.
 
+EXEC usuarios.CrearRol
+		@nombre       = 'Test1',
+		@descripcion  = 'Test Dec 1';
+-- Resultado esperado: OK, Rol creado correctamente.
+
+EXEC usuarios.CrearRol
+	@nombre       = 'Test2',
+	@descripcion  = 'Test Dec 2';
+-- Resultado esperado: OK, Rol creado correctamente.
+
+
+EXEC usuarios.CrearRol
+	@nombre       = 'Test3',
+	@descripcion  = 'Test Dec 3';
+-- Resultado esperado: OK, Rol creado correctamente.
+
 -- Nombre vacío
 EXEC usuarios.CrearRol
 	@nombre       = '',
@@ -116,3 +132,7 @@ EXEC usuarios.EliminarRol
 EXEC usuarios.EliminarRol
 	@id_rol = 1;
 -- Resultado esperado: Error, El rol no fue encontrado.
+
+SELECT*
+FROM usuarios.Rol
+GO

@@ -32,9 +32,84 @@ EXEC usuarios.CrearUsuario
     @password_hash = 'hash1';
 -- Esperado: OK, Usuario creado correctamente.
 
-SELECT @uid1 = id_usuario 
-  FROM usuarios.usuario 
- WHERE username = 'juanperez';
+PRINT 'Caso normal 2: crear usuario Luis';
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '9876543',
+    @nombre        = 'Luis',
+    @apellido      = 'Mandioca',
+    @email         = 'luis.mandioca@example.com',
+    @fecha_nac     = '1985-05-05',
+    @telefono      = '333333333',
+    @username      = 'luismandioca',
+    @password_hash = 'hash2';
+-- Esperado: OK, Usuario creado correctamente.
+
+PRINT 'Caso normal 3: crear usuario Mario';
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '12312231',
+    @nombre        = 'Mario',
+    @apellido      = 'Catañeda',
+    @email         = 'mario.casta@example.com',
+    @fecha_nac     = '1985-05-05',
+    @telefono      = '6666666666',
+    @username      = 'XXmarioCasXX',
+    @password_hash = 'hash3';
+-- Esperado: OK, Usuario creado correctamente.
+
+PRINT 'Caso normal 4: crear usuario Laura';
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '22334455',
+    @nombre        = 'Laura',
+    @apellido      = 'González',
+    @email         = 'laura.gonzalez@example.com',
+    @fecha_nac     = '1990-08-12',
+    @telefono      = '1162349876',
+    @username      = 'lauraG90',
+    @password_hash = 'hash4';
+-- Esperado: OK, Usuario creado correctamente.
+
+PRINT 'Caso normal 5: crear usuario Pablo';
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '33445566',
+    @nombre        = 'Pablo',
+    @apellido      = 'Martínez',
+    @email         = 'pablo.martinez@example.com',
+    @fecha_nac     = '1982-03-22',
+    @telefono      = '1155558888',
+    @username      = 'pabMart82',
+    @password_hash = 'hash5';
+-- Esperado: OK, Usuario creado correctamente.
+
+PRINT 'Caso normal 6: crear usuario Julieta';
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '44556677',
+    @nombre        = 'Julieta',
+    @apellido      = 'Rodríguez',
+    @email         = 'julieta.rod@example.com',
+    @fecha_nac     = '1995-10-15',
+    @telefono      = '1177889900',
+    @username      = 'julRod95',
+    @password_hash = 'hash6';
+-- Esperado: OK, Usuario creado correctamente.
+
+PRINT 'Caso normal 7: crear usuario Ernesto';
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '55667788',
+    @nombre        = 'Ernesto',
+    @apellido      = 'López',
+    @email         = 'ernesto.lopez@example.com',
+    @fecha_nac     = '1979-12-01',
+    @telefono      = '1199990000',
+    @username      = 'ernLo79',
+    @password_hash = 'hash7';
+-- Esperado: OK, Usuario creado correctamente.
+
 
 -------------------------------------------------------------------------------
 -- 1b) CrearUsuario: otro usuario para duplicados
@@ -165,4 +240,8 @@ GO
 PRINT 'Limpieza: reseteando identity';
 DBCC CHECKIDENT('usuarios.usuario',  RESEED, 0);
 DBCC CHECKIDENT('usuarios.persona',  RESEED, 0);
+GO
+
+select * 
+from usuarios.usuario
 GO

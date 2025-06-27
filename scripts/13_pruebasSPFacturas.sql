@@ -16,22 +16,6 @@ GO
 
 BEGIN TRAN TestFacturaAll;
 
--- Preparar persona con ID = 1
-SET IDENTITY_INSERT usuarios.persona ON;
-INSERT INTO usuarios.persona
-	(id_persona, dni, nombre, apellido, email, fecha_nac, telefono, fecha_alta, activo)
-VALUES
-	(1, '11111111', 'Test', 'Persona', 'test@prueba.com', '1990-01-01', '0000000000', GETDATE(), 1);
-SET IDENTITY_INSERT usuarios.persona OFF;
-
--- Preparar metodo de pago con ID = 1
-SET IDENTITY_INSERT facturacion.metodo_pago ON;
-INSERT INTO facturacion.metodo_pago
-	(id_metodo_pago, nombre)
-VALUES
-	(1, 'Efectivo');
-SET IDENTITY_INSERT facturacion.metodo_pago OFF;
-
 -- CrearFactura
 
 -- Casos normales
@@ -153,3 +137,6 @@ EXEC facturacion.EliminarFactura @id_factura = @fid1;
 
 ROLLBACK TRAN TestFacturaAll;
 GO
+
+SELECT *
+FROM facturacion.factura

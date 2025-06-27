@@ -28,6 +28,22 @@ EXEC actividades.CrearActividad @nombre_actividad = 'Tenis', @costo_mensual = 25
 EXEC actividades.CrearActividad @nombre_actividad = 'Voley', @costo_mensual = 1800.00;
 -- Resultado esperado: Exito, Actividad creada correctamente
 
+-- Otro caso normal
+EXEC actividades.CrearActividad @nombre_actividad = 'Remo', @costo_mensual = 1800.00;
+-- Resultado esperado: Exito, Actividad creada correctamente
+
+-- Otro caso normal
+EXEC actividades.CrearActividad @nombre_actividad = 'Rugby', @costo_mensual = 1800.00;
+-- Resultado esperado: Exito, Actividad creada correctamente
+
+-- Otro caso normal
+EXEC actividades.CrearActividad @nombre_actividad = 'Basket', @costo_mensual = 1800.00;
+-- Resultado esperado: Exito, Actividad creada correctamente
+
+-- Otro caso normal
+EXEC actividades.CrearActividad @nombre_actividad = 'FULBO', @costo_mensual = 1800.00;
+-- Resultado esperado: Exito, Actividad creada correctamente
+
 -- Nombre vacío
 EXEC actividades.CrearActividad @nombre_actividad = '', @costo_mensual = 9500.00;
 -- Resultado esperado: Error, El nombre de actividad no puede ser nulo
@@ -87,11 +103,11 @@ EXEC actividades.ModificarActividad @id = 1, @nombre_actividad = 'Natacion', @co
 -- Eliminar Actividad
 
 -- Caso normal: eliminar actividad activa
-EXEC actividades.EliminarActividad @id = 1;
+EXEC actividades.EliminarActividad @id = 7;
 -- Resultado esperado: Exito, Actividad eliminada lógicamente correctamente
 
 -- Caso normal: eliminar otra actividad activa
-EXEC actividades.EliminarActividad @id = 2;
+EXEC actividades.EliminarActividad @id = 6;
 -- Resultado esperado: Exito, Actividad eliminada lógicamente correctamente
 
 -- ID nulo
@@ -103,5 +119,9 @@ EXEC actividades.EliminarActividad @id = 99999;
 -- Resultado esperado: Error, id no existente o ya eliminada
 
 -- ID de actividad ya eliminada
-EXEC actividades.EliminarActividad @id = 1;
+EXEC actividades.EliminarActividad @id = 7;
 -- Resultado esperado: Error, id no existente o ya eliminada
+
+SELECT *
+FROM actividades.actividad
+GO

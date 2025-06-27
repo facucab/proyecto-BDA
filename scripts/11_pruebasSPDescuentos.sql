@@ -26,6 +26,36 @@ EXEC facturacion.CrearDescuento
 -- Resultado esperado: OK, Descuento creado correctamente.
 GO
 
+EXEC facturacion.CrearDescuento
+	@descripcion = 'Descuento B',
+	@cantidad    = 20.00;
+-- Resultado esperado: OK, Descuento creado correctamente.
+GO
+
+EXEC facturacion.CrearDescuento
+	@descripcion = 'Descuento C',
+	@cantidad    = 30.00;
+-- Resultado esperado: OK, Descuento creado correctamente.
+GO
+
+EXEC facturacion.CrearDescuento
+	@descripcion = 'Descuento D',
+	@cantidad    = 40.00;
+-- Resultado esperado: OK, Descuento creado correctamente.
+GO
+
+EXEC facturacion.CrearDescuento
+	@descripcion = 'Descuento 1',
+	@cantidad    = 50.00;
+-- Resultado esperado: OK, Descuento creado correctamente.
+GO
+
+EXEC facturacion.CrearDescuento
+	@descripcion = 'Descuento 2',
+	@cantidad    = 10.00;
+-- Resultado esperado: OK, Descuento creado correctamente.
+GO
+
 -- Caso normal 2 (cantidad = 0)
 EXEC facturacion.CrearDescuento
 	@descripcion = 'Descuento Cero',
@@ -125,3 +155,6 @@ GO
 
 ROLLBACK TRAN TestDescuento;
 GO
+
+SELECT * 
+FROM facturacion.descuento
