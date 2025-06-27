@@ -28,6 +28,7 @@ GO
 CREATE TABLE usuarios.persona(
 	id_persona INT IDENTITY(1,1) PRIMARY KEY,
 	dni VARCHAR(9) NOT NULL UNIQUE,
+	numero_socio VARCHAR(7) NOT NULL UNIQUE,
 	nombre VARCHAR(50) NOT NULL, 
 	apellido VARCHAR(50) NOT NULL,
 	email VARCHAR(320) NOT NULL UNIQUE, -- Estandar RFC 5321
@@ -35,7 +36,6 @@ CREATE TABLE usuarios.persona(
 	telefono VARCHAR(20) NOT NULL,
 	fecha_alta DATE NOT NULL DEFAULT GETDATE(),
 	activo BIT NOT NULL DEFAULT 1,
-
     CONSTRAINT CK_persona_email CHECK (email LIKE '%@%.%' AND email NOT LIKE '@%' AND email NOT LIKE '%@%@%'),
 	CONSTRAINT CK_persona_dni CHECK (dni LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
 	CONSTRAINT CK_persona_fecha_nac CHECK(fecha_nac < GETDATE()) 
