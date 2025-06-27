@@ -1713,6 +1713,10 @@ END;
 GO
 
 
+-- ############################################################
+-- ################### SP OBRA SOCIAL #########################
+-- ############################################################
+
 /*
 * Nombre: EliminacionObraSocial
 * Descripcion: Elimina una obra social de forma fisica.
@@ -1752,6 +1756,204 @@ AS BEGIN
 	BEGIN CATCH
 		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
 		RETURN -99;
+	END CATCH
+END;
+GO
+
+-- ############################################################
+-- ###################### ACTIVIDAD ###########################
+-- ############################################################
+
+
+/*
+* Nombre: CrearActividad
+* Descripcion: Crea una nueva actividad, validando que el nombre no exista y que el costo sea válido.
+* Parametros:
+*   @nombre_actividad VARCHAR(100) - Nombre de la actividad.
+*   @costo_mensual DECIMAL(10,2) - Costo mensual de la actividad.
+* Valores de retorno:
+*    0: Éxito.
+*   -1: El nombre de la actividad es nulo o vacío.
+*   -2: Ya existe una actividad con ese nombre.
+*   -3: El costo mensual es inválido.
+*  -999: Error desconocido.
+*/
+CREATE OR ALTER PROCEDURE manejo_actividades.CrearActividad
+	@nombre_actividad VARCHAR(100),
+	@costo_mensual DECIMAL(10,2)
+AS
+BEGIN
+	BEGIN TRY
+		-- Chequeo que el nombre no sea nulo ni vacio
+		IF @nombre_actividad IS NULL OR LTRIM(RTRIM(@nombre_actividad)) = ''
+		BEGIN
+			SELECT 'Error' AS Resultado, 'El nombre de actividad no puede ser nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que no exista ya en la tabla
+		IF EXISTS (SELECT 1 FROM actividades.actividad WHERE nombre = @nombre_actividad)
+		BEGIN
+			SELECT 'Error' AS Resultado, 'Ya existe una actividad con ese nombre' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- Verifico que el costo sea valido (>0)
+		IF @costo_mensual IS NULL OR @costo_mensual <= 0
+		BEGIN
+			SELECT 'Error' AS Resultado, 'El costo mensual debe ser mayor a cero' AS Mensaje;
+			RETURN -3;
+		END
+
+		INSERT INTO actividades.actividad(nombre, costo_mensual)
+		VALUES (@nombre_actividad, @costo_mensual);
+
+		SELECT 'Exito' AS Resultado, 'Actividad creada correctamente' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+
+	BEGIN CATCH
+		SELECT 
+			'Error' AS Resultado,
+			ERROR_MESSAGE() AS Mensaje,
+			ERROR_NUMBER() AS CodigoError,
+			ERROR_LINE() AS Linea,
+			ERROR_PROCEDURE() AS Procedimiento;
+		RETURN -999;
+	END CATCH
+END;
+GO
+
+
+/*
+* Nombre: ModificarActividad
+* Descripcion: Modifica el nombre y el costo mensual de una actividad existente, validando que el nombre no se repita y que el costo sea válido.
+* Parametros:
+*   @id INT - ID de la actividad a modificar.
+*   @nombre_actividad VARCHAR(100) - Nuevo nombre de la actividad.
+*   @costo_mensual DECIMAL(10,2) - Nuevo costo mensual de la actividad.
+* Valores de retorno:
+*    0: Éxito.
+*   -1: ID nulo.
+*   -2: ID no existente.
+*   -3: El nombre de la actividad es nulo o vacío.
+*   -4: Ya existe una actividad con ese nombre.
+*   -5: El costo mensual es inválido.
+*  -999: Error desconocido.
+*/
+CREATE OR ALTER PROCEDURE manejo_actividades.ModificarActividad
+	@id INT,
+	@nombre_actividad VARCHAR(100),
+	@costo_mensual DECIMAL(10,2)
+AS
+BEGIN
+	BEGIN TRY
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM actividades.actividad WHERE id_actividad = @id)
+		BEGIN
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- Chequeo que el nombre no sea nulo ni vacio
+		IF @nombre_actividad IS NULL OR LTRIM(RTRIM(@nombre_actividad)) = ''
+		BEGIN
+			SELECT 'Error' AS Resultado, 'El nombre de actividad no puede ser nulo o vacio' AS Mensaje;
+			RETURN -3;
+		END
+
+		-- Verifico que no exista ya en la tabla otro registro con mismo nombre
+		IF EXISTS (
+			SELECT 1 FROM actividades.actividad
+			WHERE nombre = @nombre_actividad AND id_actividad <> @id
+		)
+		BEGIN
+			SELECT 'Error' AS Resultado, 'Ya existe una actividad con ese nombre' AS Mensaje;
+			RETURN -4;
+		END
+
+		-- Verifico que el costo sea valido (>0)
+		IF @costo_mensual IS NULL OR @costo_mensual <= 0
+		BEGIN
+			SELECT 'Error' AS Resultado, 'El costo mensual debe ser mayor a cero' AS Mensaje;
+			RETURN -5;
+		END
+
+		UPDATE actividades.actividad
+		SET nombre = @nombre_actividad,
+			costo_mensual = @costo_mensual
+		WHERE id_actividad = @id;
+
+		SELECT 'Exito' AS Resultado, 'Actividad modificada correctamente' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+
+	BEGIN CATCH
+		SELECT 
+			'Error' AS Resultado,
+			ERROR_MESSAGE() AS Mensaje,
+			ERROR_NUMBER() AS CodigoError,
+			ERROR_LINE() AS Linea,
+			ERROR_PROCEDURE() AS Procedimiento;
+		RETURN -999;
+	END CATCH
+END;
+GO
+
+/*
+* Nombre: EliminarActividad
+* Descripcion: Realiza una eliminación lógica de una actividad, cambiando su estado a inactiva.
+* Parametros:
+*   @id INT - ID de la actividad a eliminar.
+* Valores de retorno:
+*    0: Éxito.
+*   -1: ID nulo.
+*   -2: ID no existente o ya eliminada.
+*  -999: Error desconocido.
+*/
+CREATE OR ALTER PROCEDURE actividades.EliminarActividad
+	@id INT
+AS
+BEGIN
+	BEGIN TRY
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Verifico que exista en la tabla y que esté activa
+		IF NOT EXISTS (SELECT 1 FROM actividades.actividad WHERE id_actividad = @id AND estado = 1)
+		BEGIN
+			SELECT 'Error' AS Resultado, 'id no existente o ya eliminada' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- Eliminación logica
+		UPDATE actividades.actividad SET estado = 0 WHERE id_actividad = @id;
+
+		SELECT 'Exito' AS Resultado, 'Actividad eliminada lógicamente correctamente' AS Mensaje;
+		RETURN 0;
+	END TRY
+
+	BEGIN CATCH
+		SELECT 
+			'Error' AS Resultado,
+			ERROR_MESSAGE() AS Mensaje,
+			ERROR_NUMBER() AS CodigoError,
+			ERROR_LINE() AS Linea,
+			ERROR_PROCEDURE() AS Procedimiento;
+		RETURN -999;
 	END CATCH
 END;
 GO
