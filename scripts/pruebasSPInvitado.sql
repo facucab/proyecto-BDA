@@ -1,110 +1,177 @@
-/*
-	Entrega 4 - Documento de instalación y configuración
+USE Com5600G01;
+GO
 
-	Trabajo Practico DDBBA Entrega 3 - Grupo 1
-	Comision 5600 - Viernes Tarde 
+/*
+	Entrega 4 – Pruebas para Crear, Modificar y Eliminar Invitado
+
+	Trabajo Practico DDBBA Entrega 3 – Grupo 1
+	Comision 5600 – Viernes Tarde 
 	43990422 | Aguirre, Alex Rubén 
 	45234709 | Gauto, Gastón Santiago 
 	44363498 | Caballero, Facundo 
 	40993965 | Cornara Perez, Tomás Andrés
-
-	Pruebas para Crear, Modificar y Eliminar Invitado
 */
 
-USE Com5600G01;
+DECLARE 
+    @pidSocio   INT,     -- para crear socios
+    @sid1       INT,     -- primer socio invitador
+    @sid2       INT,     -- segundo socio (reasignación)
+    @pidInv     INT,     -- persona invitada
+    @iid1       INT;     -- id_invitado
+
+-------------------------------------------------------------------------------
+-- 0) Crear categoría  (para que CrearSocio funcione)
+-------------------------------------------------------------------------------
+IF NOT EXISTS (SELECT 1 FROM actividades.categoria WHERE id_categoria = 1)
+BEGIN
+    INSERT INTO actividades.categoria (nombre_categoria, costo_membrecia, vigencia)
+    VALUES ('CatPrueba', 10.00, DATEADD(year,1,GETDATE()));
+END;
+
+-------------------------------------------------------------------------------
+-- 1) Preparación: crear dos socios de prueba
+-------------------------------------------------------------------------------
+
+-- Socio 1
+EXEC usuarios.CrearPersona
+    @dni        = '11111111',
+    @nombre     = 'Socio',
+    @apellido   = 'Uno',
+    @email      = 'socio.uno@example.com',
+    @fecha_nac  = '1980-01-01',
+    @telefono   = '100200300',
+    @id_persona = @pidSocio OUTPUT;
+
+EXEC usuarios.CrearSocio
+    @id_persona          = @pidSocio,
+    @dni                 = '11111111',
+    @nombre              = 'Socio',
+    @apellido            = 'Uno',
+    @email               = 'socio.uno@example.com',
+    @fecha_nac           = '1980-01-01',
+    @telefono            = '100200300',
+    @numero_socio        = 'S001',
+    @id_categoria        = 1;  
+SELECT @sid1 = id_socio FROM usuarios.socio WHERE numero_socio = 'S001';
+
+-- Socio 2 (para reasignar)
+EXEC usuarios.CrearPersona
+    @dni        = '22222222',
+    @nombre     = 'Socio',
+    @apellido   = 'Dos',
+    @email      = 'socio.dos@example.com',
+    @fecha_nac  = '1981-02-02',
+    @telefono   = '200300400',
+    @id_persona = @pidSocio OUTPUT;
+
+EXEC usuarios.CrearSocio
+    @id_persona          = @pidSocio,
+    @dni                 = '22222222',
+    @nombre              = 'Socio',
+    @apellido            = 'Dos',
+    @email               = 'socio.dos@example.com',
+    @fecha_nac           = '1981-02-02',
+    @telefono            = '200300400',
+    @numero_socio        = 'S002',
+    @id_categoria        = 1;
+SELECT @sid2 = id_socio FROM usuarios.socio WHERE numero_socio = 'S002';
+
+-------------------------------------------------------------------------------
+-- 2) CrearInvitado
+-------------------------------------------------------------------------------
+
+PRINT 'Caso normal: crear invitado con nueva persona';
+EXEC usuarios.CrearInvitado
+    @id_persona = NULL,
+    @dni        = '33333333',
+    @nombre     = 'Invitado',
+    @apellido   = 'Uno',
+    @email      = 'invitado.uno@example.com',
+    @fecha_nac  = '1995-03-03',
+    @telefono   = '300400500',
+    @id_socio   = @sid1;
+SELECT 
+    @pidInv = p.id_persona,
+    @iid1   = i.id_invitado
+  FROM usuarios.persona AS p
+  JOIN usuarios.invitado AS i ON i.id_persona = p.id_persona
+ WHERE p.dni = '33333333';
+
+PRINT 'Error duplicado: misma persona';
+EXEC usuarios.CrearInvitado
+    @id_persona = @pidInv,  -- ahora sí el id_persona correcto
+    @id_socio   = @sid1;
+-- Esperado: Error, La persona ya está invitada.
+
+PRINT 'Error: falta datos para crear persona';
+EXEC usuarios.CrearInvitado
+    @id_persona = NULL,
+    @dni        = NULL,
+    @id_socio   = @sid1;
+-- Esperado: Error, Faltan datos de persona para crearla.
+
+PRINT 'Error: socio no existe';
+EXEC usuarios.CrearInvitado
+    @id_persona = NULL,
+    @dni        = '44444444',
+    @nombre     = 'Invitado',
+    @apellido   = 'Dos',
+    @email      = 'invitado.dos@example.com',
+    @fecha_nac  = '1996-04-04',
+    @telefono   = '400500600',
+    @id_socio   = 99999;
+-- Esperado: Error, Socio no encontrado.
+
+-------------------------------------------------------------------------------
+-- 3) ModificarInvitado
+-------------------------------------------------------------------------------
+
+PRINT 'ModificarInvitado: cambiar datos de persona';
+EXEC usuarios.ModificarInvitado
+    @id_invitado = @iid1,
+    @nombre      = 'InvitadoMod',
+    @email       = 'invitado.mod@example.com';
+-- Esperado: OK, Invitado modificado correctamente.
+
+PRINT 'ModificarInvitado: reasignar a otro socio';
+EXEC usuarios.ModificarInvitado
+    @id_invitado  = @iid1,
+    @new_id_socio = @sid2;
+-- Esperado: OK, Invitado modificado correctamente.
+
+PRINT 'Error: invitado no existe';
+EXEC usuarios.ModificarInvitado
+    @id_invitado  = 99999,
+    @nombre       = 'X';
+-- Esperado: Error, Invitado no encontrado.
+
+-------------------------------------------------------------------------------
+-- 4) EliminarInvitado
+-------------------------------------------------------------------------------
+
+PRINT 'EliminarInvitado: caso normal';
+EXEC usuarios.EliminarInvitado
+    @id_invitado = @iid1;
+-- Esperado: OK, Invitado y persona eliminados correctamente.
+
+PRINT 'Error: id inexistente';
+EXEC usuarios.EliminarInvitado
+    @id_invitado = 99999;
+-- Esperado: Error, Invitado no encontrado.
+
+-------------------------------------------------------------------------------
+-- 5) Limpieza manual de todo lo creado
+-------------------------------------------------------------------------------
+
+PRINT 'Limpieza: borrando datos de prueba';
+DELETE FROM usuarios.invitado WHERE id_invitado = @iid1;
+DELETE FROM usuarios.socio   WHERE id_socio   IN (@sid1, @sid2);
+DELETE FROM usuarios.persona WHERE dni IN ('11111111','22222222','33333333','44444444');
+DELETE FROM actividades.categoria WHERE nombre_categoria = 'CatPrueba';
+
+PRINT 'Limpieza: reseteando identity';
+DBCC CHECKIDENT('usuarios.invitado', RESEED, 0);
+DBCC CHECKIDENT('usuarios.socio',   RESEED, 0);
+DBCC CHECKIDENT('usuarios.persona', RESEED, 0);
+DBCC CHECKIDENT('actividades.categoria', RESEED, 0);
 GO
-
---Creacion
-
---Casos normales
-EXEC manejo_personas.CrearInvitado
-	@id_persona =1,
-	@id_socio =1;
-EXEC manejo_personas.CrearInvitado
-	@id_persona =2,
-	@id_socio =1;
-EXEC manejo_personas.CrearInvitado
-	@id_persona =3,
-	@id_socio =2;
---Respuestas: Invitado creado
---Ids nulas
-EXEC manejo_personas.CrearInvitado
-	@id_persona =NULL,
-	@id_socio =1;
-EXEC manejo_personas.CrearInvitado
-	@id_persona =1,
-	@id_socio =NULL;
---Respuestas: Id de persona nulo
-
---Ids inexistentes
-EXEC manejo_personas.CrearInvitado
-	@id_persona =99999,
-	@id_socio =2;
---Respuesta: El invitado tiene que ser persona
-EXEC manejo_personas.CrearInvitado
-	@id_persona =3,
-	@id_socio =99999;
---Respuestas: Socio no existe
-
---Invitado ya registrado
-EXEC manejo_personas.CrearInvitado
-	@id_persona =3,
-	@id_socio =2;
---Respuesta: Ya existe invitado para esa persona
-
---Modificacion
-
---Casos normales
-EXEC manejo_personas.ModificarInvitado
-	@id_invitado =4,
-	@id_socio =3;
-EXEC manejo_personas.ModificarInvitado
-	@id_invitado =4,
-	@id_socio =7;
-EXEC manejo_personas.ModificarInvitado
-	@id_invitado =2,
-	@id_socio =6;
---Resultado: Invitado modificado
-
---Id inexistente de socio
-EXEC manejo_personas.CrearInvitado
-	@id_persona =4,
-	@id_socio =99999;
---Respuestas: Socio no existe
-
---Id inexistente de invitado
-EXEC manejo_personas.CrearInvitado
-	@id_persona =55555,
-	@id_socio =2;
---Respuestas: invitado no existe
-
---Ids nulas
-EXEC manejo_personas.CrearInvitado
-	@id_persona =NULL,
-	@id_socio =3;
-EXEC manejo_personas.CrearInvitado
-	@id_persona =2,
-	@id_socio =NULL;
---Respuestas: Parametros nulos
-
---Eliminacion:
-
--- Caso normal - Invitado sin referencias en otras tablas
-EXEC manejo_personas.EliminarInvitado 
-	@id_invitado = 1;
--- Resultado: Invitado y persona eliminados
-
--- Caso normal - Invitado con referencias en otras tablas (borrado lógico)
-EXEC manejo_personas.EliminarInvitado 
-	@id_invitado = 2;
--- Resultado: Invitado eliminado. Persona inactivada (borrado logico)
-
--- ID nulo
-EXEC manejo_personas.EliminarInvitado 
-	@id_invitado = NULL;
--- Resultado: id_invitado nulo
-
--- ID inexistente
-EXEC manejo_personas.EliminarInvitado 
-	@id_invitado = 99999;
--- Resultado: Invitado no existe

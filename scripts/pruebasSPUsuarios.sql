@@ -1,3 +1,6 @@
+USE Com5600G01;
+GO
+
 /*
 	Entrega 4 - Documento de instalación y configuración
 
@@ -8,139 +11,158 @@
 	44363498 | Caballero, Facundo 
 	40993965 | Cornara Perez, Tomás Andrés
 
-	Pruebas para Crear, Modificar y Eliminar Usuario
+    Pruebas para Crear, Modificar y Eliminar Usuario
 */
 
-USE Com5600G01;
+DECLARE @uid1 INT, @uid2 INT;
+
+-------------------------------------------------------------------------------
+-- 1) CrearUsuario: caso normal
+-------------------------------------------------------------------------------
+PRINT 'Caso normal 1: crear usuario Juan';
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '12345678',
+    @nombre        = 'Juan',
+    @apellido      = 'Perez',
+    @email         = 'juan.perez@example.com',
+    @fecha_nac     = '1985-05-05',
+    @telefono      = '555111222',
+    @username      = 'juanperez',
+    @password_hash = 'hash1';
+-- Esperado: OK, Usuario creado correctamente.
+
+SELECT @uid1 = id_usuario 
+  FROM usuarios.usuario 
+ WHERE username = 'juanperez';
+
+-------------------------------------------------------------------------------
+-- 1b) CrearUsuario: otro usuario para duplicados
+-------------------------------------------------------------------------------
+PRINT 'Caso normal 2: crear usuario Maria';
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '22223333',
+    @nombre        = 'Maria',
+    @apellido      = 'Gomez',
+    @email         = 'maria.gomez@example.com',
+    @fecha_nac     = '1992-02-02',
+    @telefono      = '555444555',
+    @username      = 'mariagomez',
+    @password_hash = 'hash2';
+-- Esperado: OK, Usuario creado correctamente.
+
+SELECT @uid2 = id_usuario 
+  FROM usuarios.usuario 
+ WHERE username = 'mariagomez';
+
+-------------------------------------------------------------------------------
+-- 2) CrearUsuario: duplicado de username
+-------------------------------------------------------------------------------
+PRINT 'Username duplicado';
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '33334444',
+    @nombre        = 'Luis',
+    @apellido      = 'Lopez',
+    @email         = 'luis.lopez@example.com',
+    @fecha_nac     = '1990-01-01',
+    @telefono      = '555333444',
+    @username      = 'juanperez',   -- ya existe Juan
+    @password_hash = 'hash3';
+-- Esperado: Error, Ya existe un usuario con ese username.
+
+-------------------------------------------------------------------------------
+-- 3) CrearUsuario: username vacío
+-------------------------------------------------------------------------------
+PRINT 'Username vacío';
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '44445555',
+    @nombre        = 'Ana',
+    @apellido      = 'Ruiz',
+    @email         = 'ana.ruiz@example.com',
+    @fecha_nac     = '1991-03-03',
+    @telefono      = '555666777',
+    @username      = '',
+    @password_hash = 'hash4';
+-- Esperado: Error, El username es obligatorio.
+
+-------------------------------------------------------------------------------
+-- 4) CrearUsuario: password_hash vacío
+-------------------------------------------------------------------------------
+PRINT 'Password_hash vacío';
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '55556666',
+    @nombre        = 'Pedro',
+    @apellido      = 'Diaz',
+    @email         = 'pedro.diaz@example.com',
+    @fecha_nac     = '1988-04-04',
+    @telefono      = '555888999',
+    @username      = 'pedrodiaz',
+    @password_hash = '';
+-- Esperado: Error, El password_hash es obligatorio.
+
+-------------------------------------------------------------------------------
+-- EliminarUsuario (antes de inactivar)
+-------------------------------------------------------------------------------
+PRINT 'EliminarUsuario: caso normal';
+EXEC usuarios.EliminarUsuario
+    @id_usuario = @uid2;  -- borramos a Maria
+-- Esperado: OK, Usuario dado de baja correctamente.
+
+PRINT 'EliminarUsuario: id inexistente';
+EXEC usuarios.EliminarUsuario
+    @id_usuario = 99999;
+-- Esperado: Error, Usuario no encontrado.
+
+-------------------------------------------------------------------------------
+-- ModificarUsuario
+-------------------------------------------------------------------------------
+PRINT 'ModificarUsuario: cambiar username válido';
+EXEC usuarios.ModificarUsuario
+    @id_usuario = @uid1,
+    @username   = 'juanperez2';
+-- Esperado: OK, Usuario modificado correctamente.
+
+PRINT 'ModificarUsuario: username duplicado';
+EXEC usuarios.ModificarUsuario
+    @id_usuario = @uid1,
+    @username   = 'mariagomez';   -- el username de Maria aún está en BD (aunque inactivo)
+-- Esperado: Error, Ya existe un usuario con ese username.
+
+PRINT 'ModificarUsuario: cambiar password_hash';
+EXEC usuarios.ModificarUsuario
+    @id_usuario    = @uid1,
+    @password_hash = 'nuevohash';
+-- Esperado: OK, Usuario modificado correctamente.
+
+PRINT 'ModificarUsuario: cambiar estado a inactivo';
+EXEC usuarios.ModificarUsuario
+    @id_usuario = @uid1,
+    @estado     = 0;
+-- Esperado: OK, Usuario modificado correctamente.
+
+PRINT 'ModificarUsuario: usuario no existe';
+EXEC usuarios.ModificarUsuario
+    @id_usuario = 99999,
+    @username   = 'ghost';
+-- Esperado: Error, Usuario no encontrado.
+
+-------------------------------------------------------------------------------
+-- Limpieza manual de todo lo creado
+-------------------------------------------------------------------------------
+PRINT 'Limpieza: borrando datos de prueba';
+DELETE FROM usuarios.usuario
+ WHERE id_usuario IN (@uid1, @uid2);
+
+DELETE FROM usuarios.persona
+ WHERE dni IN ('12345678','22223333','33334444','44445555','55556666');
+
 GO
 
---Creacion
-
---Casos Normales
--- Pruebas CrearUsuario
-EXEC manejo_personas.CrearUsuario 
-	@id_persona = 1,
-	@username = 'usuario1',
-	@password_hash = 'a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3a665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3',
-	@fecha_alta_contra = '2024-01-15';
-EXEC manejo_personas.CrearUsuario 
-	@id_persona = 2,
-	@username = 'usuario2',
-	@password_hash = 'b665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3b665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3b665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3b665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3';
--- Resultado: Usuario creado correctamente
-
--- ID persona nulo
-EXEC manejo_personas.CrearUsuario 
-	@id_persona = NULL,
-	@username = 'usuario3',
-	@password_hash = 'c665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3c665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3c665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3c665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3';
--- Resultado: id_persona nulo
-
--- Username nulo
-EXEC manejo_personas.CrearUsuario 
-	@id_persona = 3,
-	@username = NULL,
-	@password_hash = 'd665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3d665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3d665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3d665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3';
--- Resultado: username nulo
-
--- Password hash nulo
-EXEC manejo_personas.CrearUsuario 
-	@id_persona = 4,
-	@username = 'usuario4',
-	@password_hash = NULL;
--- Resultado: password_hash nulo
-
--- Password hash con menos de 256 caracteres
-EXEC manejo_personas.CrearUsuario 
-	@id_persona = 5,
-	@username = 'usuario5',
-	@password_hash = 'hashcorto';
--- Resultado: password_hash debe tener 256 caracteres
-
--- Password hash con más de 256 caracteres
-EXEC manejo_personas.CrearUsuario 
-	@id_persona = 6,
-	@username = 'usuario6',
-	@password_hash = 'e665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3e665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3e665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3e665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3extra';
--- Resultado: password_hash debe tener 256 caracteres
-
--- Persona inexistente
-EXEC manejo_personas.CrearUsuario 
-	@id_persona = 99999,
-	@username = 'usuario_inexistente',
-	@password_hash = 'f665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3f665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3f665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3f665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3';
--- Resultado: La persona especificada no existe
-
--- Persona que ya tiene usuario
-EXEC manejo_personas.CrearUsuario 
-	@id_persona = 1,
-	@username = 'usuario_duplicado',
-	@password_hash = '1665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae31665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae31665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae31665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3';
--- Resultado: La persona ya tiene un usuario asignado
-
--- Username ya en uso
-EXEC manejo_personas.CrearUsuario 
-	@id_persona = 7,
-	@username = 'usuario1',
-	@password_hash = '2665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae32665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae32665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae32665a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3';
--- Resultado: El nombre de usuario ya esta en uso
-
---Modificacion
-
--- Caso normal 
-EXEC manejo_personas.ModificarUsuario 
-	@id_usuario = 1,
-	@username = 'nuevo_usuario1';
-
-EXEC manejo_personas.ModificarUsuario 
-	@id_usuario = 1,
-	@password_hash = 'a775a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3a775a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3a775a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3a775a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3';
-
-EXEC manejo_personas.ModificarUsuario 
-	@id_usuario = 1,
-	@fecha_alta_contra = '2024-02-15';
-
-EXEC manejo_personas.ModificarUsuario 
-	@id_usuario = 2,
-	@username = 'usuario_completo',
-	@password_hash = 'b775a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3b775a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3b775a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3b775a45920422f9d417e4867efdc4fb8a04a1f3fff1fa07e998e86f7f7a27ae3',
-	@fecha_alta_contra = '2024-03-10';
--- Resultado: Usuario modificado correctamente
-
--- ID usuario nulo
-EXEC manejo_personas.ModificarUsuario 
-	@id_usuario = NULL,
-	@username = 'test_usuario';
--- Resultado: id_usuario nulo
-
--- Usuario inexistente
-EXEC manejo_personas.ModificarUsuario 
-	@id_usuario = 99999,
-	@username = 'usuario_inexistente';
--- Resultado: El usuario especificado no existe
-
--- Username ya en uso por otro usuario
-EXEC manejo_personas.ModificarUsuario 
-	@id_usuario = 1,
-	@username = 'usuario2';
--- Resultado: El nombre de usuario ya esta en uso por otro usuario
-
---Eliminacion
-
---Casos Normales
-EXEC manejo_personas.EliminarUsuario @id_usuario =1;
-EXEC manejo_personas.EliminarUsuario @id_usuario =2;
-EXEC manejo_personas.EliminarUsuario @id_usuario =3;
---Resultados: Usuario borrado, persona inactivada
-
---Id null
-EXEC manejo_personas.EliminarUsuario @id_usuario =NULL;
---Resultado: id_usuario nulo
-
---Id inexistente
-EXEC manejo_personas.EliminarUsuario @id_usuario =9;
---Resultado: El usuario especificado no existe
-
---Clases asignadas
-EXEC manejo_personas.EliminarUsuario @id_usuario =12;
---Resultado: No se puede eliminar el usuario porque tiene clases asignadas
+PRINT 'Limpieza: reseteando identity';
+DBCC CHECKIDENT('usuarios.usuario',  RESEED, 0);
+DBCC CHECKIDENT('usuarios.persona',  RESEED, 0);
+GO
