@@ -1601,7 +1601,6 @@ GO
 -- #################### SP CATEGORIA ##########################
 -- ############################################################
 
-
 /*
 * Nombre: CrearCategoria
 * Descripcion: Inserta una nueva categoría en la tabla actividades.categoria, validando su información.
@@ -1753,5 +1752,161 @@ BEGIN
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
     END CATCH;
 
+/*
+* Nombre: CreacionObraSocial
+* Descripcion: Crea una nueva obra social.
+* Parametros:
+*	@nombre VARCHAR(50) - Nombre de la obra social. 
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: @nombre es nulo. 
+*	-2: El nombre ya esta en uso.
+*	-99: Error desconocido.
+*/
+CREATE OR ALTER PROCEDURE usuarios.CreacionObraSocial
+	@nombre VARCHAR(50)
+AS
+BEGIN
+	BEGIN TRY
+		-- Verifico que no sea nulo
+		IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+		BEGIN
+			SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Normalizo el nombre
+		SET @nombre = LTRIM(RTRIM(@nombre));
+
+		-- Verifico que el nombre no exista ya
+		IF EXISTS (SELECT 1 FROM usuarios.obra_social WHERE descripcion = @nombre)
+		BEGIN
+			SELECT 'Error' AS Resultado, 'Ya hay una obra social con ese nombre' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- Inserto los datos
+		INSERT INTO usuarios.obra_social(descripcion)
+		VALUES (@nombre);
+
+		SELECT 'Exito' AS Resultado, 'Obra Social Ingresada' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+	BEGIN CATCH
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+GO
+
+
+/*
+* Nombre: ModificacionObraSocial
+* Descripcion: Permite modificar el nombre de una obra social.
+* Parametros:
+*	@id INT - id de la obra social. (DEBE SER NO NULO)
+*	@nombre_nuevo VARCHAR(50) - Nuevo nombre de la obra social.
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: @id o @nombre_nuevo son nulo. 
+*	-2: Obra social no encontrada.
+*	-3: Nombre esta en uso. 
+*	-99: Error desconocido.
+*/
+CREATE OR ALTER PROCEDURE usuarios.ModificacionObraSocial
+	@id INT,
+	@nombre_nuevo VARCHAR(50)
+AS
+BEGIN
+	BEGIN TRY
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+		
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM usuarios.obra_social WHERE id_obra_social = @id)
+		BEGIN
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- Verifico que el nombre no sea nulo
+		IF @nombre_nuevo IS NULL OR LTRIM(RTRIM(@nombre_nuevo)) = ''
+		BEGIN
+			SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Normalizo el nombre
+		SET @nombre_nuevo = LTRIM(RTRIM(@nombre_nuevo));
+
+		-- Verifico que el nombre no exista ya en la tabla
+		IF EXISTS (SELECT 1 FROM usuarios.obra_social WHERE descripcion = @nombre_nuevo)
+		BEGIN
+			SELECT 'Error' AS Resultado, 'La obra social ya esta registrada' AS Mensaje;
+			RETURN -3;
+		END
+
+		-- Actualizo los datos
+		UPDATE usuarios.obra_social
+		SET descripcion = @nombre_nuevo
+		WHERE id_obra_social = @id;
+
+		SELECT 'Exito' AS Resultado, 'Obra Social Modificada' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+	BEGIN CATCH
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+GO
+
+
+/*
+* Nombre: EliminacionObraSocial
+* Descripcion: Elimina una obra social de forma fisica.
+* Parametros:
+*	@id INT - id de la obra social. (DEBE SER NO NULO)
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: @id es nulo o no existente.
+*	-99: Error desconocido.
+*/
+CREATE OR ALTER PROCEDURE usuarios.EliminacionObraSocial
+	@id INT
+AS BEGIN
+	BEGIN TRY
+		-- Verifico que el ID no sea nulo
+		IF @id IS NULL
+		BEGIN
+			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje;
+			RETURN -1;
+		END
+		
+		-- Verifico que exista en la tabla
+		IF NOT EXISTS (SELECT 1 FROM usuarios.obra_social WHERE id_obra_social = @id)
+		BEGIN
+			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- Borrado fisico
+		DELETE FROM usuarios.obra_social
+		WHERE id_obra_social = @id;
+
+		SELECT 'Exito' AS Resultado, 'Obra Social eliminada' AS Mensaje;
+		RETURN 0;
+
+	END TRY
+	BEGIN CATCH
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
 END;
 GO
