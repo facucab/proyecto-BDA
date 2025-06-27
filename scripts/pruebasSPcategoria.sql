@@ -8,112 +8,157 @@
 	44363498 | Caballero, Facundo 
 	40993965 | Cornara Perez, Tomás Andrés
 
-	Pruebas para Crear, Modificar y Eliminar Categoria
+	Pruebas para Crear, Modificar y Eliminar Categoría
 */
 
-USE Com5600G01
+USE Com5600G01;
 GO
 
---creacion
+BEGIN TRAN TestCategoria;
+GO
 
---Caso normal
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Menor', @costo_membrecia = 1500.00,@edad_maxima = 12;
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Cadete', @costo_membrecia = 2000.00,@edad_maxima = 17;
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Mayor', @costo_membrecia = 2500.00,@edad_maxima = 50;
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Veterano', @costo_membrecia = 2000.00,@edad_maxima = 70;
--- Resultado: Categoria crada correctamente
+-- CrearCategoria
 
---Nombre vacio
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = '', @costo_membrecia = 900.00,@edad_maxima = 40;--Resultado: El nombre de la categora no puede estar vaco
+-- Caso normal 1
+EXEC actividades.CrearCategoria
+	@nombre_categoria = 'Básica',
+	@costo_membrecia  = 100.00,
+	@vigencia         = GETDATE();
+-- Resultado esperado: OK, Categoría creada correctamente.
+GO
 
--- costo de membresia menor o igual a 0
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Adulto Joven', @costo_membrecia = -900.00,@edad_maxima = 40;
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Jubilado', @costo_membrecia = 0,@edad_maxima = 40;
--- Resultado: El costo de membresa debe ser mayor a cero
+-- Caso normal 2
+EXEC actividades.CrearCategoria
+	@nombre_categoria = 'Premium',
+	@costo_membrecia  = 200.00,
+	@vigencia         = GETDATE();
+-- Resultado esperado: OK, Categoría creada correctamente.
+GO
 
--- Edad menor o igual a 0
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Bebe', @costo_membrecia = 900.00,@edad_maxima = 0;
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Bebe', @costo_membrecia = 900.00,@edad_maxima = -5;
--- Resultado: La edad maxima debe estar entre 1 y 120 años
-
--- Edad mayor a 120
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Super Centenario', @costo_membrecia = 900.00,@edad_maxima = 150;
--- Resultado: La edad maxima debe estar entre 1 y 120 años
-
--- Nombre duplicado (considerando normalización a mayúsculas)
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'menor', @costo_membrecia = 1800.00,@edad_maxima = 13;-- Resultado: Ya existe una categora con ese nombre
-
--- Solapamiento de edades - edad mxima dentro del rango existente
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Pre-adolescente', @costo_membrecia = 1800.00, @edad_maxima = 14;
--- Resultado: El rango de edad se solapa con otra categoria existente
-
--- Hueco en rangos - intentar crear 30-40 cuando tenemos hasta 25
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Adulto', @costo_membrecia = 3000.00, @edad_maxima = 40;
--- Resultado: Hay un hueco en el rango de edades entre esta categoria y la siguiente
-
---Modificacion
-
---Caso normal
-EXEC manejo_actividades.ModificarCategoria 
-	@id_categoria = 1,
-	@nombre_categoria = 'Adolecente',
-	@costo_membrecia = 1900.00;
--- Resultado: Categoria modificada correctamente
-
--- Id inexistente
-EXEC manejo_actividades.ModificarCategoria 
-	@id_categoria = 99999,
-	@nombre_categoria = 'adulto',
-	@costo_membrecia = 1900.00;
---Resultado: La categoria no existe
-
---Nombre vacio
-EXEC manejo_actividades.ModificarCategoria 
-	@id_categoria = 1,
+-- Nombre vacío
+EXEC actividades.CrearCategoria
 	@nombre_categoria = '',
-	@costo_membrecia = 1400.00;
---Resultado: El nombre de la categoria no puede estar vacio
+	@costo_membrecia  = 50.00,
+	@vigencia         = GETDATE();
+-- Resultado esperado: Error, El nombre de la categoría es obligatorio.
+GO
 
---Costo menor o igual a 0
-EXEC manejo_actividades.ModificarCategoria 
-	@id_categoria = 1,
-	@nombre_categoria = 'Adulto',
-	@costo_membrecia = 0;
--- Resultado: El costo de membresa debe ser mayor a cero
+-- Costo inválido (<= 0)
+EXEC actividades.CrearCategoria
+	@nombre_categoria = 'DescuentoTest',
+	@costo_membrecia  = 0.00,
+	@vigencia         = GETDATE();
+-- Resultado esperado: Error, El costo de membresía debe ser mayor a 0.
+GO
 
---Nombre ya usado (considerando normalización a mayúsculas)
-EXEC manejo_actividades.ModificarCategoria 
-	@id_categoria = 1,
-	@nombre_categoria = 'cadete',
-	@costo_membrecia = 1000.00;
---Resultado: Ya existe otra categora con ese nombre
+-- Vigencia nula
+EXEC actividades.CrearCategoria
+	@nombre_categoria = 'TestNulVig',
+	@costo_membrecia  = 75.00,
+	@vigencia         = NULL;
+-- Resultado esperado: Error, La fecha de vigencia es obligatoria.
+GO
 
---Eliminacion
+-- Nombre duplicado
+EXEC actividades.CrearCategoria
+	@nombre_categoria = 'Básica',
+	@costo_membrecia  = 120.00,
+	@vigencia         = GETDATE();
+-- Resultado esperado: Error, Ya existe una categoría con ese nombre.
+GO
 
---Caso normal
-EXEC manejo_actividades.EliminarCategoria @id_categoria = 4;
--- Resultado: Categoria eliminada correctamente
 
--- Id inexistente
-EXEC manejo_actividades.EliminarCategoria @id_categoria = 99999;
---Resultado: La categoria no existe
+-- ModificarCategoria
 
--- Intentar eliminar categoría ya eliminada (borrado lógico)
-EXEC manejo_actividades.EliminarCategoria @id_categoria = 4;
---Resultado: La categoria no existe
+-- Caso normal 1
+EXEC actividades.ModificarCategoria
+	@id_categoria     = 1,
+	@nombre_categoria = 'BásicaMod',
+	@costo_membrecia  = 150.00,
+	@vigencia         = GETDATE();
+-- Resultado esperado: OK, Categoría modificada correctamente.
+GO
 
--- Intentar modificar categoría ya eliminada (borrado lógico)
-EXEC manejo_actividades.ModificarCategoria 
-	@id_categoria = 4,
-	@nombre_categoria = 'Eliminada',
-	@costo_membrecia = 1000.00;
---Resultado: La categoria no existe
+-- Caso normal 2
+EXEC actividades.ModificarCategoria
+	@id_categoria     = 2,
+	@nombre_categoria = 'PremiumMod',
+	@costo_membrecia  = 250.00,
+	@vigencia         = GETDATE();
+-- Resultado esperado: OK, Categoría modificada correctamente.
+GO
 
--- Intentar crear una categoría con el mismo nombre de una eliminada lógicamente (debería permitirlo si solo se consideran activas)
-EXEC manejo_actividades.CrearCategoria @nombre_categoria = 'Veterano', @costo_membrecia = 2100.00,@edad_maxima = 80;
--- Resultado: Categoria creada correctamente (si la anterior fue eliminada lógicamente)
+-- ID inexistente
+EXEC actividades.ModificarCategoria
+	@id_categoria     = 99999,
+	@nombre_categoria = 'X',
+	@costo_membrecia  = 10.00,
+	@vigencia         = GETDATE();
+-- Resultado esperado: Error, Categoría no encontrada.
+GO
 
--- Intentar eliminar categoría con socios asignados (asumiendo que hay socios en categoría 1)
--- EXEC manejo_actividades.EliminarCategoria @id_categoria = 1;
---Resultado: No se puede eliminar la categoría porque hay socios asignados a ella
+-- Nombre vacío
+EXEC actividades.ModificarCategoria
+	@id_categoria     = 1,
+	@nombre_categoria = '',
+	@costo_membrecia  = 150.00,
+	@vigencia         = GETDATE();
+-- Resultado esperado: Error, El nombre de la categoría es obligatorio.
+GO
 
+-- Costo inválido
+EXEC actividades.ModificarCategoria
+	@id_categoria     = 1,
+	@nombre_categoria = 'Valido',
+	@costo_membrecia  = 0.00,
+	@vigencia         = GETDATE();
+-- Resultado esperado: Error, El costo de membresía debe ser mayor a 0.
+GO
+
+-- Vigencia nula
+EXEC actividades.ModificarCategoria
+	@id_categoria     = 1,
+	@nombre_categoria = 'Valido2',
+	@costo_membrecia  = 120.00,
+	@vigencia         = NULL;
+-- Resultado esperado: Error, La fecha de vigencia es obligatoria.
+GO
+
+-- Nombre duplicado en otro registro
+EXEC actividades.ModificarCategoria
+	@id_categoria     = 1,
+	@nombre_categoria = 'PremiumMod',
+	@costo_membrecia  = 150.00,
+	@vigencia         = GETDATE();
+-- Resultado esperado: Error, Ya existe otra categoría con ese nombre.
+GO
+
+
+-- EliminarCategoria
+
+-- Caso normal 1
+EXEC actividades.EliminarCategoria
+	@id_categoria = 1;
+-- Resultado esperado: OK, Categoría eliminada correctamente.
+GO
+
+-- Caso normal 2
+EXEC actividades.EliminarCategoria
+	@id_categoria = 2;
+-- Resultado esperado: OK, Categoría eliminada correctamente.
+GO
+
+-- ID inexistente
+EXEC actividades.EliminarCategoria
+	@id_categoria = 99999;
+-- Resultado esperado: Error, Categoría no encontrada.
+GO
+
+-- Intentar eliminar nuevamente
+EXEC actividades.EliminarCategoria
+	@id_categoria = 1;
+-- Resultado esperado: Error, Categoría no encontrada.
+GO
+
+ROLLBACK TRAN TestCategoria;
+GO
