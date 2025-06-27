@@ -186,11 +186,11 @@ CREATE TABLE facturacion.factura_descuento (
 	CONSTRAINT FK_factura_descuento_factura FOREIGN KEY(id_factura) REFERENCES facturacion.factura(id_factura),
 	CONSTRAINT FK_factura_descuento_descuento FOREIGN KEY(id_descuento) REFERENCES facturacion.descuento(id_descuento)
 );
-
+GO
 -- ############################################################
 -- ######################## SP PERSONA ########################
 -- ############################################################
-GO 
+
 /*
 * Nombre: CrearPersona
 * Descripcion: Inserta una nueva persona en la tabla persona, validando su informacion. 
@@ -1596,6 +1596,166 @@ BEGIN
 
 END;
 GO
+
+-- ############################################################
+-- #################### SP CATEGORIA ##########################
+-- ############################################################
+
+/*
+* Nombre: CrearCategoria
+* Descripcion: Inserta una nueva categoría en la tabla actividades.categoria, validando su información.
+* Parametros:
+*   @nombre_categoria VARCHAR(50) - Nombre de la categoría.
+*   @costo_membrecia  DECIMAL(10,2) - Costo de membresía (debe ser > 0).
+*   @vigencia         DATE - Fecha de vigencia de la categoría.
+* Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
+*/
+
+CREATE OR ALTER PROCEDURE actividades.CrearCategoria
+    @nombre_categoria VARCHAR(50),
+    @costo_membrecia  DECIMAL(10,2),
+    @vigencia         DATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Valido nombre
+    IF @nombre_categoria IS NULL OR LTRIM(RTRIM(@nombre_categoria)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El nombre de la categoría es obligatorio' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    -- Valido costo
+    IF @costo_membrecia <= 0
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El costo de membresía debe ser mayor a 0' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    -- Valido vigencia
+    IF @vigencia IS NULL
+    BEGIN
+        SELECT 'Error' AS Resultado, 'La fecha de vigencia es obligatoria' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    -- Valido duplicado
+    IF EXISTS (
+        SELECT 1 FROM actividades.categoria
+        WHERE nombre_categoria = LTRIM(RTRIM(@nombre_categoria))
+    )
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Ya existe una categoría con ese nombre' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    BEGIN TRY
+        INSERT INTO actividades.categoria(nombre_categoria, costo_membrecia, vigencia)
+        VALUES (LTRIM(RTRIM(@nombre_categoria)), @costo_membrecia, @vigencia);
+        SELECT 'OK' AS Resultado, 'Categoría creada correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+
+/*
+* Nombre: ModificarCategoria
+* Descripcion: Modifica los datos de una categoría existente, validando su información.
+* Parametros:
+*   @id_categoria     INT - ID de la categoría a modificar.
+*   @nombre_categoria VARCHAR(50) - Nuevo nombre de la categoría.
+*   @costo_membrecia  DECIMAL(10,2) - Nuevo costo de membresía (debe ser > 0).
+*   @vigencia         DATE - Nueva fecha de vigencia.
+* Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
+*/
+
+CREATE OR ALTER PROCEDURE actividades.ModificarCategoria
+    @id_categoria     INT,
+    @nombre_categoria VARCHAR(50),
+    @costo_membrecia  DECIMAL(10,2),
+    @vigencia         DATE
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Valido existencia
+    IF NOT EXISTS (SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Categoría no encontrada' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+    -- Valido nombre
+    IF @nombre_categoria IS NULL OR LTRIM(RTRIM(@nombre_categoria)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El nombre de la categoría es obligatorio' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    -- Valido costo
+    IF @costo_membrecia <= 0
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El costo de membresía debe ser mayor a 0' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    -- Valido vigencia
+    IF @vigencia IS NULL
+    BEGIN
+        SELECT 'Error' AS Resultado, 'La fecha de vigencia es obligatoria' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    -- Valido duplicado en otro registro
+    IF EXISTS (
+        SELECT 1 FROM actividades.categoria
+        WHERE nombre_categoria = LTRIM(RTRIM(@nombre_categoria)) AND id_categoria <> @id_categoria)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Ya existe otra categoría con ese nombre' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    BEGIN TRY
+        UPDATE actividades.categoria
+        SET
+            nombre_categoria = LTRIM(RTRIM(@nombre_categoria)),
+            costo_membrecia  = @costo_membrecia,
+            vigencia         = @vigencia
+        WHERE id_categoria = @id_categoria;
+        SELECT 'OK' AS Resultado, 'Categoría modificada correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+
+END;
+GO
+
+/*
+* Nombre: EliminarCategoria
+* Descripcion: Elimina físicamente una categoría de la tabla actividades.categoria.
+* Parametros:
+*   @id_categoria INT - ID de la categoría a eliminar.
+* Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
+*/
+CREATE OR ALTER PROCEDURE actividades.EliminarCategoria
+    @id_categoria INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Valido existencia
+    IF NOT EXISTS (SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Categoría no encontrada' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+    BEGIN TRY
+        DELETE FROM actividades.categoria
+        WHERE id_categoria = @id_categoria;
+        SELECT 'OK' AS Resultado, 'Categoría eliminada correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+
+-- ############################################################
+-- #################### SP ObraSocial #########################
+-- ############################################################
+
 
 /*
 * Nombre: CreacionObraSocial
