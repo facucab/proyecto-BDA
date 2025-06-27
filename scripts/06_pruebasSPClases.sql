@@ -1,12 +1,12 @@
 /*
-	Entrega 4 - Documento de instalación y configuración
+	Entrega 4 - Documento de instalaciï¿½n y configuraciï¿½n
 
 	Trabajo Practico DDBBA Entrega 3 - Grupo 1
 	Comision 5600 - Viernes Tarde 
-	43990422 | Aguirre, Alex Rubén 
-	45234709 | Gauto, Gastón Santiago 
+	43990422 | Aguirre, Alex Rubï¿½n 
+	45234709 | Gauto, Gastï¿½n Santiago 
 	44363498 | Caballero, Facundo 
-	40993965 | Cornara Perez, Tomás Andrés
+	40993965 | Cornara Perez, Tomï¿½s Andrï¿½s
 
 	Pruebas para Crear, Modificar y Eliminar Clase
 */
@@ -14,24 +14,42 @@
 USE Com5600G01;
 GO
 
+-- Busqueda de IDs validos
+DECLARE @id_actividad1 INT, @id_actividad2 INT;
+DECLARE @id_categoria1 INT, @id_categoria2 INT;
+DECLARE @id_usuario1 INT, @id_usuario2 INT, @id_usuario3 INT;
+
+-- Buscar dos actividades distintas activas
+SELECT TOP 1 @id_actividad1 = id_actividad FROM actividades.actividad WHERE estado = 1;
+SELECT TOP 1 @id_actividad2 = id_actividad FROM actividades.actividad WHERE estado = 1 AND id_actividad <> @id_actividad1;
+
+-- Buscar dos categorÃ­as distintas
+SELECT TOP 1 @id_categoria1 = id_categoria FROM actividades.categoria;
+SELECT TOP 1 @id_categoria2 = id_categoria FROM actividades.categoria WHERE id_categoria <> @id_categoria1;
+
+-- Buscar tres usuarios distintos activos
+SELECT TOP 1 @id_usuario1 = id_usuario FROM usuarios.usuario WHERE estado = 1;
+SELECT TOP 1 @id_usuario2 = id_usuario FROM usuarios.usuario WHERE estado = 1 AND id_usuario <> @id_usuario1;
+SELECT TOP 1 @id_usuario3 = id_usuario FROM usuarios.usuario WHERE estado = 1 AND id_usuario NOT IN (@id_usuario1, @id_usuario2);
+
 -- CrearClase
 
 -- Caso normal 1
 EXEC actividades.CrearClase 
-	@id_actividad = 3, 
-	@id_categoria = 1, 
+	@id_actividad = @id_actividad1, 
+	@id_categoria = @id_categoria1, 
 	@dia         = 'lunes', 
 	@horario     = '08:00:00', 
-	@id_usuario  = 2;
+	@id_usuario  = @id_usuario1;
 -- Resultado esperado: OK, Clase creada correctamente.
 
 -- Caso normal 2
 EXEC actividades.CrearClase 
-	@id_actividad = 2, 
-	@id_categoria = 2, 
+	@id_actividad = @id_actividad2, 
+	@id_categoria = @id_categoria2, 
 	@dia         = 'MIERCOLES', 
 	@horario     = '18:30:00', 
-	@id_usuario  = 2;
+	@id_usuario  = @id_usuario1;
 -- Resultado esperado: OK, Clase creada correctamente.
 
 -- Actividad inexistente
