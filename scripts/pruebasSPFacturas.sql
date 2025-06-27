@@ -8,124 +8,148 @@
 	44363498 | Caballero, Facundo 
 	40993965 | Cornara Perez, Tomás Andrés
 
-	Pruebas para Crear, Modificar y Eliminar Factura
+	Pruebas para Stored Procedures de Factura
 */
 
 USE Com5600G01;
 GO
 
---Creacion
+BEGIN TRAN TestFacturaAll;
 
---Caso normal
-EXEC pagos_y_facturas.CreacionFactura 
-    @estado_pago = 'Pendiente', 
-    @monto_a_pagar = 1500.50, 
-    @id_persona = 1, 
-    @id_metodo_pago = 1;
-EXEC pagos_y_facturas.CreacionFactura 
-    @estado_pago = 'Pagado', 
-    @monto_a_pagar = 2000.00, 
-    @id_persona = 2, 
-    @id_metodo_pago = 2;
-EXEC pagos_y_facturas.CreacionFactura 
-    @estado_pago = 'Vencido', 
-    @monto_a_pagar = 750.25, 
-    @id_persona = 3, 
-    @id_metodo_pago = 3;
--- Resultado: Factura creada correctamente
+-- Preparar persona con ID = 1
+SET IDENTITY_INSERT usuarios.persona ON;
+INSERT INTO usuarios.persona
+	(id_persona, dni, nombre, apellido, email, fecha_nac, telefono, fecha_alta, activo)
+VALUES
+	(1, '11111111', 'Test', 'Persona', 'test@prueba.com', '1990-01-01', '0000000000', GETDATE(), 1);
+SET IDENTITY_INSERT usuarios.persona OFF;
 
---Metodo de pago inexistente
-EXEC pagos_y_facturas.CreacionFactura 
-    @estado_pago = 'Vencido', 
-    @monto_a_pagar = 750.25, 
-    @id_persona = 3, 
-    @id_metodo_pago = 99999;
---Resultado: Método de pago no valido
+-- Preparar metodo de pago con ID = 1
+SET IDENTITY_INSERT facturacion.metodo_pago ON;
+INSERT INTO facturacion.metodo_pago
+	(id_metodo_pago, nombre)
+VALUES
+	(1, 'Efectivo');
+SET IDENTITY_INSERT facturacion.metodo_pago OFF;
 
---Persona inexistente
-EXEC pagos_y_facturas.CreacionFactura 
-    @estado_pago = 'Pagado', 
-    @monto_a_pagar = 2000.00, 
-    @id_persona = 999999, 
-    @id_metodo_pago = 2;
---Resultado: Persona no existente
+-- CrearFactura
 
---Monto invalido
-EXEC pagos_y_facturas.CreacionFactura 
-    @estado_pago = 'Pendiente', 
-    @monto_a_pagar = -10.25, 
-    @id_persona = 1, 
-    @id_metodo_pago = 1;
---Resultado: Monto invalido
+-- Casos normales
+EXEC facturacion.CrearFactura
+	@id_persona     = 1,
+	@id_metodo_pago = 1,
+	@estado_pago    = 'Pendiente',
+	@monto_a_pagar  = 150.75,
+	@detalle        = 'Factura test 1';
+-- Resultado esperado: OK, Factura creada correctamente.
 
---Estado invalido
-EXEC pagos_y_facturas.CreacionFactura 
-    @estado_pago = '', 
-    @monto_a_pagar = 1000.25, 
-    @id_persona = 1, 
-    @id_metodo_pago = 1;
---Resultado: Estado de pago no puede ser nulo o vacio
+EXEC facturacion.CrearFactura
+	@id_persona     = 1,
+	@id_metodo_pago = NULL,
+	@estado_pago    = 'Pagado',
+	@monto_a_pagar  = 200.00,
+	@detalle        = NULL;
+-- Resultado esperado: OK, Factura creada correctamente.
 
---Modificacion
+-- Persona inexistente
+EXEC facturacion.CrearFactura
+	@id_persona     = 99999,
+	@id_metodo_pago = 1,
+	@estado_pago    = 'Pendiente',
+	@monto_a_pagar  = 50.00,
+	@detalle        = NULL;
+-- Resultado esperado: Error, Persona no encontrada.
 
---Caso normal
-EXEC pagos_y_facturas.ModificacionFactura
-    @id_factura = 1,
-    @nuevo_estado_pago = 'Pendiente',
-    @nuevo_monto = 1000.00,
-    @nuevo_metodo_pago =1;
-EXEC pagos_y_facturas.ModificacionFactura
-    @id_factura = 2,
-    @nuevo_estado_pago = 'Pagado',
-    @nuevo_monto = 2000.00,
-    @nuevo_metodo_pago =2;
-EXEC pagos_y_facturas.ModificacionFactura
-    @id_factura = 3,
-    @nuevo_estado_pago = 'Pendiente',
-    @nuevo_monto = 3000.00,
-    @nuevo_metodo_pago =3;
---Resultado: Factura actualizada correctamente
+-- Metodo de pago inexistente
+EXEC facturacion.CrearFactura
+	@id_persona     = 1,
+	@id_metodo_pago = 999,
+	@estado_pago    = 'Pendiente',
+	@monto_a_pagar  = 75.00,
+	@detalle        = NULL;
+-- Resultado esperado: Error, Metodo de pago no existe.
 
---Metodo de pago inexistente
-EXEC pagos_y_facturas.ModificacionFactura
-    @id_factura = 3,
-    @nuevo_estado_pago = 'Pendiente',
-    @nuevo_monto = 3000.00,
-    @nuevo_metodo_pago =99993;
---Resultado: Metodo de pago invalido
+-- Estado de pago vacío
+EXEC facturacion.CrearFactura
+	@id_persona     = 1,
+	@id_metodo_pago = 1,
+	@estado_pago    = '',
+	@monto_a_pagar  = 60.00,
+	@detalle        = NULL;
+-- Resultado esperado: Error, El estado de pago es obligatorio.
 
---Monto invalido
-EXEC pagos_y_facturas.ModificacionFactura
-    @id_factura = 3,
-    @nuevo_estado_pago = 'Pendiente',
-    @nuevo_monto = 0,
-    @nuevo_metodo_pago =3;
---Resultado: Monto invalido
+-- Monto a pagar inválido (<= 0)
+EXEC facturacion.CrearFactura
+	@id_persona     = 1,
+	@id_metodo_pago = 1,
+	@estado_pago    = 'Pendiente',
+	@monto_a_pagar  = 0,
+	@detalle        = NULL;
+-- Resultado esperado: Error, El monto a pagar debe ser mayor a 0.
 
---Estado vacio
-EXEC pagos_y_facturas.ModificacionFactura
-    @id_factura = 3,
-    @nuevo_estado_pago = '',
-    @nuevo_monto = 4000.00,
-    @nuevo_metodo_pago =2;
---Resultado: Estado invalido
+-- Capturar IDs de factura creadas
+DECLARE @fid1 INT, @fid2 INT;
+SELECT
+	@fid1 = MIN(id_factura),
+	@fid2 = MAX(id_factura)
+  FROM facturacion.factura;
 
---Id inexistente
-EXEC pagos_y_facturas.ModificacionFactura
-    @id_factura = 99999,
-    @nuevo_estado_pago = 'Pendiente',
-    @nuevo_monto = 3000.00,
-    @nuevo_metodo_pago =3;
---Resultado: Factura no existente
+-- ModificarFactura
 
---Eliminacion
+-- Caso normal: cambiar estado
+EXEC facturacion.ModificarFactura
+	@id_factura  = @fid1,
+	@estado_pago = 'Cancelado';
+-- Resultado esperado: OK, Factura modificada correctamente.
 
---Casos Normales
-EXEC pagos_y_facturas.EliminacionFactura @id_factura =1;
-EXEC pagos_y_facturas.EliminacionFactura @id_factura =3;
-EXEC pagos_y_facturas.EliminacionFactura @id_factura =2;
---Resultado: Factura eliminada correctamente
+-- Caso normal: cambiar metodo de pago y monto
+EXEC facturacion.ModificarFactura
+	@id_factura     = @fid2,
+	@id_metodo_pago = 1,
+	@monto_a_pagar  = 250.00;
+-- Resultado esperado: OK, Factura modificada correctamente.
 
---Id invalido
-EXEC pagos_y_facturas.EliminacionFactura @id_factura =99999;
---Resultado: La factura no existe
+-- Factura inexistente
+EXEC facturacion.ModificarFactura
+	@id_factura  = 99999,
+	@estado_pago = 'X';
+-- Resultado esperado: Error, Factura no encontrada.
+
+-- Metodo de pago inválido
+EXEC facturacion.ModificarFactura
+	@id_factura     = @fid1,
+	@id_metodo_pago = 999;
+-- Resultado esperado: Error, Metodo de pago no existe.
+
+-- Estado de pago vacío
+EXEC facturacion.ModificarFactura
+	@id_factura  = @fid1,
+	@estado_pago = '';
+-- Resultado esperado: Error, El estado de pago no puede estar vacio.
+
+-- Monto inválido
+EXEC facturacion.ModificarFactura
+	@id_factura    = @fid1,
+	@monto_a_pagar = -10.00;
+-- Resultado esperado: Error, El monto a pagar debe ser mayor a 0.
+
+-- EliminarFactura
+
+-- Caso normal 1
+EXEC facturacion.EliminarFactura @id_factura = @fid1;
+-- Resultado esperado: OK, Factura eliminada correctamente.
+
+-- Caso normal 2
+EXEC facturacion.EliminarFactura @id_factura = @fid2;
+-- Resultado esperado: OK, Factura eliminada correctamente.
+
+-- Factura inexistente
+EXEC facturacion.EliminarFactura @id_factura = 99999;
+-- Resultado esperado: Error, Factura no encontrada.
+
+-- Intentar eliminar nuevamente
+EXEC facturacion.EliminarFactura @id_factura = @fid1;
+-- Resultado esperado: Error, Factura no encontrada.
+
+ROLLBACK TRAN TestFacturaAll;
+GO

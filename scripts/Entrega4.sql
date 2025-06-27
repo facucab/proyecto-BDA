@@ -158,7 +158,34 @@ CREATE TABLE facturacion.metodo_pago (
 	id_metodo_pago INT IDENTITY(1,1) PRIMARY KEY,
 	nombre VARCHAR(50) NOT NULL UNIQUE
 );
-
+GO
+CREATE TABLE facturacion.descuento (
+	id_descuento INT IDENTITY(1,1) PRIMARY KEY,
+	descripcion  VARCHAR(100) NOT NULL,
+	cantidad     DECIMAL(10,2) NOT NULL,
+	CONSTRAINT CK_descuento_cantidad CHECK(cantidad >= 0)
+);
+GO
+CREATE TABLE facturacion.factura (
+	id_factura    INT IDENTITY(1,1) PRIMARY KEY,
+	id_persona    INT NOT NULL,
+	id_metodo_pago INT NULL,
+	estado_pago   VARCHAR(20) NOT NULL,
+	fecha_emision DATE NOT NULL DEFAULT GETDATE(),
+	monto_a_pagar DECIMAL(10,2) NOT NULL,
+	detalle       VARCHAR(200) NULL,
+	CONSTRAINT FK_factura_persona FOREIGN KEY(id_persona) REFERENCES usuarios.persona(id_persona),
+	CONSTRAINT FK_factura_metodo_pago FOREIGN KEY(id_metodo_pago) REFERENCES facturacion.metodo_pago(id_metodo_pago),
+	CONSTRAINT CK_factura_monto CHECK(monto_a_pagar > 0)
+);
+GO
+CREATE TABLE facturacion.factura_descuento (
+	id_factura    INT NOT NULL,
+	id_descuento  INT NOT NULL,
+	PRIMARY KEY (id_factura, id_descuento),
+	CONSTRAINT FK_factura_descuento_factura FOREIGN KEY(id_factura) REFERENCES facturacion.factura(id_factura),
+	CONSTRAINT FK_factura_descuento_descuento FOREIGN KEY(id_descuento) REFERENCES facturacion.descuento(id_descuento)
+);
 -- QUEDAN LAS TABLAS DE FACTURA: 
 
 -- ############################################################
@@ -1135,5 +1162,172 @@ BEGIN
 	BEGIN CATCH
 		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
 	END CATCH;
+END;
+GO
+
+
+-- ############################################################
+-- ###################### SP FACTURA ##########################
+-- ############################################################
+
+
+/*
+* Nombre: CrearFactura
+* Descripcion: Inserta una nueva factura en la tabla facturacion.factura, validando su informacion.
+* Parametros:
+*   @id_persona    INT             - ID de la persona que paga.
+*   @id_metodo_pago INT   = NULL   - Metodo de pago. Opcional.
+*   @estado_pago   VARCHAR(20)     - Estado del pago.
+*   @monto_a_pagar DECIMAL(10,2)   - Monto a pagar.
+*   @detalle       VARCHAR(200) = NULL - Detalle de la factura. Opcional.
+* Aclaracion: No se utilizan transacciones explicitas ya que:
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE facturacion.CrearFactura
+	@id_persona    INT,
+	@id_metodo_pago INT    = NULL,
+	@estado_pago   VARCHAR(20),
+	@monto_a_pagar DECIMAL(10,2),
+	@detalle       VARCHAR(200) = NULL
+AS
+BEGIN
+	SET NOCOUNT ON;
+	-- Valido persona:
+	IF NOT EXISTS (SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
+	BEGIN
+		SELECT 'Error' AS Resultado, 'Persona no encontrada' AS Mensaje, '404' AS Estado;
+		RETURN;
+	END;
+	-- Valido metodo de pago:
+	IF @id_metodo_pago IS NOT NULL
+	   AND NOT EXISTS (SELECT 1 FROM facturacion.metodo_pago WHERE id_metodo_pago = @id_metodo_pago)
+	BEGIN
+		SELECT 'Error' AS Resultado, 'Metodo de pago no existe' AS Mensaje, '404' AS Estado;
+		RETURN;
+	END;
+	-- Valido estado de pago:
+	IF @estado_pago IS NULL OR LTRIM(RTRIM(@estado_pago)) = ''
+	BEGIN
+		SELECT 'Error' AS Resultado, 'El estado de pago es obligatorio' AS Mensaje, '400' AS Estado;
+		RETURN;
+	END;
+	-- Valido monto a pagar:
+	IF @monto_a_pagar <= 0
+	BEGIN
+		SELECT 'Error' AS Resultado, 'El monto a pagar debe ser mayor a 0' AS Mensaje, '400' AS Estado;
+		RETURN;
+	END;
+	BEGIN TRY
+		INSERT INTO facturacion.factura(id_persona, id_metodo_pago, estado_pago, monto_a_pagar, detalle)
+		VALUES(@id_persona, @id_metodo_pago, @estado_pago, @monto_a_pagar, @detalle);
+		SELECT 'OK' AS Resultado, 'Factura creada correctamente' AS Mensaje, '200' AS Estado;
+	END TRY 
+	BEGIN CATCH
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+	END CATCH; 
+END;
+GO
+
+/*
+* Nombre: ModificarFactura
+* Descripcion: Modifica los campos de una factura existente, validando su informacion.
+* Parametros:
+*   @id_factura    INT             - ID de la factura a modificar.
+*   @id_persona    INT         = NULL - Nueva persona. Opcional.
+*   @id_metodo_pago INT   = NULL - Nuevo metodo de pago. Opcional.
+*   @estado_pago   VARCHAR(20)= NULL - Nuevo estado de pago. Opcional.
+*   @monto_a_pagar DECIMAL(10,2)= NULL - Nuevo monto a pagar. Opcional.
+*   @detalle       VARCHAR(200)= NULL - Nuevo detalle. Opcional.
+* Aclaracion: No se utilizan transacciones explicitas ya que:
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE facturacion.ModificarFactura
+	@id_factura    INT,
+	@id_persona    INT             = NULL,
+	@id_metodo_pago INT           = NULL,
+	@estado_pago   VARCHAR(20)     = NULL,
+	@monto_a_pagar DECIMAL(10,2)   = NULL,
+	@detalle       VARCHAR(200)    = NULL
+AS
+BEGIN
+	SET NOCOUNT ON;
+	-- Valido existencia de factura:
+	IF NOT EXISTS (SELECT 1 FROM facturacion.factura WHERE id_factura = @id_factura)
+	BEGIN
+		SELECT 'Error' AS Resultado, 'Factura no encontrada' AS Mensaje, '404' AS Estado;
+		RETURN;
+	END;
+	-- Valido persona:
+	IF @id_persona IS NOT NULL
+	   AND NOT EXISTS (SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
+	BEGIN
+		SELECT 'Error' AS Resultado, 'Persona no encontrada' AS Mensaje, '404' AS Estado;
+		RETURN;
+	END;
+	-- Valido metodo de pago:
+	IF @id_metodo_pago IS NOT NULL
+	   AND NOT EXISTS (SELECT 1 FROM facturacion.metodo_pago WHERE id_metodo_pago = @id_metodo_pago)
+	BEGIN
+		SELECT 'Error' AS Resultado, 'Metodo de pago no existe' AS Mensaje, '404' AS Estado;
+		RETURN;
+	END;
+	-- Valido estado de pago:
+	IF @estado_pago IS NOT NULL
+	   AND LTRIM(RTRIM(@estado_pago)) = ''
+	BEGIN
+		SELECT 'Error' AS Resultado, 'El estado de pago no puede estar vacio' AS Mensaje, '400' AS Estado;
+		RETURN;
+	END;
+	-- Valido monto a pagar:
+	IF @monto_a_pagar IS NOT NULL
+	   AND @monto_a_pagar <= 0
+	BEGIN
+		SELECT 'Error' AS Resultado, 'El monto a pagar debe ser mayor a 0' AS Mensaje, '400' AS Estado;
+		RETURN;
+	END;
+	BEGIN TRY
+		UPDATE facturacion.factura
+		SET
+			id_persona    = ISNULL(@id_persona,    id_persona),
+			id_metodo_pago = ISNULL(@id_metodo_pago, id_metodo_pago),
+			estado_pago   = ISNULL(@estado_pago,    estado_pago),
+			monto_a_pagar = ISNULL(@monto_a_pagar,  monto_a_pagar),
+			detalle       = ISNULL(@detalle,        detalle)
+		WHERE id_factura = @id_factura;
+		SELECT 'OK' AS Resultado, 'Factura modificada correctamente' AS Mensaje, '200' AS Estado;
+	END TRY 
+	BEGIN CATCH
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+	END CATCH; 
+END;
+GO
+
+/*
+* Nombre: EliminarFactura
+* Descripcion: Elimina fisicamente una factura de la tabla facturacion.factura.
+* Parametros:
+*   @id_factura INT - ID de la factura a eliminar.
+* Aclaracion: No se utilizan transacciones explicitas ya que:
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE facturacion.EliminarFactura
+	@id_factura INT
+AS
+BEGIN
+	SET NOCOUNT ON;
+	-- Valido existencia de factura:
+	IF NOT EXISTS (SELECT 1 FROM facturacion.factura WHERE id_factura = @id_factura)
+	BEGIN
+		SELECT 'Error' AS Resultado, 'Factura no encontrada' AS Mensaje, '404' AS Estado;
+		RETURN;
+	END;
+	BEGIN TRY
+		DELETE FROM facturacion.factura
+		WHERE id_factura = @id_factura;
+		SELECT 'OK' AS Resultado, 'Factura eliminada correctamente' AS Mensaje, '200' AS Estado;
+	END TRY 
+	BEGIN CATCH
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+	END CATCH; 
 END;
 GO
