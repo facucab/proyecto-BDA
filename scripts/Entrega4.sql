@@ -235,6 +235,14 @@ CREATE TABLE facturacion.nota_credito(
 	ON DELETE SET NULL
 ); 
 GO
+CREATE TABLE facturacion.datos_empresa (
+	id_empresa INT IDENTITY(1,1) PRIMARY KEY,
+	cuit_emisor VARCHAR(20) NOT NULL,
+	domicilio_comercial VARCHAR(25) NOT NULL,
+	condicion_IVA VARCHAR(25) NOT NULL,
+	nombre VARCHAR(35)
+);
+GO
 CREATE TABLE facturacion.detalle(
 	id_detalle INT IDENTITY(1,1) PRIMARY KEY,
 	tipo_comprobante CHAR(1) NOT NULL, -- A,B,C,M
@@ -243,9 +251,11 @@ CREATE TABLE facturacion.detalle(
 	cantidad VARCHAR(5),
 	precio_unitario DECIMAL(10,2) NOT NULL,
 	id_factura INT NOT NULL,
+	id_empresa INT NOT NULL,
 	CONSTRAINT FK_detalle_factura FOREIGN KEY (id_factura) REFERENCES facturacion.factura(id_factura)
 	ON DELETE CASCADE,
-	CONSTRAINT CK_precio_unitario CHECK(precio_unitario > 0)
+	CONSTRAINT CK_precio_unitario CHECK(precio_unitario > 0),
+	CONSTRAINT FK_detalle_empresa FOREIGN KEY (id_empresa) REFERENCES facturacion.datos_empresa(id_empresa)
 );
 GO
 -- ############################################################
