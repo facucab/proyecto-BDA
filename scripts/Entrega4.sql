@@ -248,14 +248,15 @@ CREATE TABLE facturacion.detalle(
 	tipo_comprobante CHAR(1) NOT NULL, -- A,B,C,M
 	numero_comprobante VARCHAR(20),
 	descripcion VARCHAR(50) NULL,
-	cantidad VARCHAR(5),
+	cantidad SMALLINT,
 	precio_unitario DECIMAL(10,2) NOT NULL,
 	id_factura INT NOT NULL,
 	id_empresa INT NOT NULL,
 	CONSTRAINT FK_detalle_factura FOREIGN KEY (id_factura) REFERENCES facturacion.factura(id_factura)
 	ON DELETE CASCADE,
 	CONSTRAINT CK_precio_unitario CHECK(precio_unitario > 0),
-	CONSTRAINT FK_detalle_empresa FOREIGN KEY (id_empresa) REFERENCES facturacion.datos_empresa(id_empresa)
+	CONSTRAINT FK_detalle_empresa FOREIGN KEY (id_empresa) REFERENCES facturacion.datos_empresa(id_empresa),
+	CONSTRAINT CK_tipo_comprobante CHECK (tipo_comprobante IN ('A', 'B', 'C', 'M'))
 );
 GO
 CREATE TABLE actividades.actividad_socio(
