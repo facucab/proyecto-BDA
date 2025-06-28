@@ -234,7 +234,19 @@ CREATE TABLE facturacion.nota_credito(
 	CONSTRAINT FK_nota_credito_clima FOREIGN KEY (id_clima) REFERENCES facturacion.clima(id_clima)
 	ON DELETE SET NULL
 ); 
-
+GO
+CREATE TABLE facturacion.detalle(
+	id_detalle INT IDENTITY(1,1) PRIMARY KEY,
+	tipo_comprobante CHAR(1) NOT NULL, -- A,B,C,M
+	numero_comprobante VARCHAR(20),
+	descripcion VARCHAR(50) NULL,
+	cantidad VARCHAR(5),
+	precio_unitario DECIMAL(10,2) NOT NULL,
+	id_factura INT NOT NULL,
+	CONSTRAINT FK_detalle_factura FOREIGN KEY (id_factura) REFERENCES facturacion.factura(id_factura)
+	ON DELETE CASCADE,
+	CONSTRAINT CK_precio_unitario CHECK(precio_unitario > 0)
+);
 GO
 -- ############################################################
 -- ######################## SP PERSONA ########################
