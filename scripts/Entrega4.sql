@@ -166,13 +166,13 @@ CREATE TABLE actividades.clase(
 	CONSTRAINT CK_dia CHECK(dia IN('lunes', 'martes', 'miercoles', 'jueves', 'viernes','sabado', 'domingo'))
 ); 
 GO
-CREATE TABLE usuarios.Rol (
+CREATE TABLE usuarios.rol (
     id_rol INT IDENTITY(1,1) PRIMARY KEY,
 	nombre VARCHAR(50) NOT NULL UNIQUE,
     descripcion VARCHAR(100) NOT NULL
 );
 GO
-CREATE TABLE usuarios.Usuario_Rol(
+CREATE TABLE usuarios.usuario_Rol(
 	id_usuario INT NOT NULL,
     id_rol INT NOT NULL,
     PRIMARY KEY (id_usuario, id_rol),
@@ -2014,6 +2014,101 @@ BEGIN
     END CATCH;
 END;
 GO
+-- ############################################################
+-- ######################## SP usuario_rol ############################
+-- ############################################################
+GO
+CREATE OR ALTER PROCEDURE usuarios.asignarRolUsuario
+	@id_usuario INT,
+	@id_rol INT
+AS
+BEGIN 
+	SET NOCOUNT ON;
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- Validar si existe el usuario
+		IF @id_usuario IS NULL OR NOT EXISTS (
+			SELECT 1 FROM usuarios.usuario WHERE id_usuario = @id_usuario
+		)
+		BEGIN
+			SELECT 'Error' AS Resultado, 'Usuario no encontrado' AS Mensaje, '404' AS Estado;
+			ROLLBACK;
+			RETURN;
+		END;
+
+		-- Validar si existe el rol
+		IF @id_rol IS NULL OR NOT EXISTS (
+			SELECT 1 FROM usuarios.rol WHERE id_rol = @id_rol
+		)
+		BEGIN
+			SELECT 'Error' AS Resultado, 'Rol no encontrado' AS Mensaje, '404' AS Estado;
+			ROLLBACK;
+			RETURN;
+		END;
+
+		-- Validar que el rol ya no fue asignado a la persona
+		IF EXISTS (
+			SELECT 1 FROM usuarios.usuario_rol 
+			WHERE id_usuario = @id_usuario AND id_rol = @id_rol
+		)
+		BEGIN
+			SELECT 'Error' AS Resultado, 'El rol ya está asignado al usuario' AS Mensaje, '409' AS Estado;
+			ROLLBACK;
+			RETURN;
+		END;
+
+		-- Insertar asignación
+		INSERT INTO usuarios.usuario_rol (id_usuario, id_rol)
+		VALUES (@id_usuario, @id_rol);
+
+		COMMIT;
+		SELECT 'OK' AS Resultado, 'Rol asignado al usuario' AS Mensaje, '200' AS Estado;
+	END TRY
+
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0 ROLLBACK;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+	END CATCH;
+END;
+GO
+CREATE OR ALTER PROCEDURE usuarios.eliminarRolUsuario
+    @id_usuario INT,
+    @id_rol INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- validaciones de entrada
+    IF @id_usuario IS NULL OR @id_rol IS NULL
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El id_usuario y el id_rol no pueden ser nulos.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    -- verificar que exista la asocacion 
+    IF NOT EXISTS (
+        SELECT 1 FROM usuarios.Usuario_Rol 
+        WHERE id_usuario = @id_usuario AND id_rol = @id_rol
+    )
+    BEGIN
+        SELECT 'Error' AS Resultado, 'La relacion entre el usuario y el rol no existe.' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        DELETE FROM usuarios.Usuario_Rol 
+        WHERE id_usuario = @id_usuario AND id_rol = @id_rol;
+
+        SELECT 'OK' AS Resultado, 'Rol eliminado correctamente del usuario' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
 
 
 
@@ -2042,9 +2137,7 @@ GO
 
 
 
-
-
-
+GO
 -- ############################################################
 -- ######################## SP CLASE ##########################
 -- ############################################################
