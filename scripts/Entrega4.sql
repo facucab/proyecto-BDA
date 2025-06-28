@@ -258,6 +258,15 @@ CREATE TABLE facturacion.detalle(
 	CONSTRAINT FK_detalle_empresa FOREIGN KEY (id_empresa) REFERENCES facturacion.datos_empresa(id_empresa)
 );
 GO
+CREATE TABLE actividades.actividad_socio(
+	id_socio INT NOT NULL,
+	id_actividad INT NOT NULL,
+	PRIMARY KEY (id_socio, id_actividad),
+	CONSTRAINT FK_socio FOREIGN KEY (id_socio) REFERENCES usuarios.socio(id_socio),
+	CONSTRAINT FK_actividad FOREIGN KEY (id_actividad) REFERENCES actividades.actividad(id_actividad)
+);
+
+GO
 -- ############################################################
 -- ######################## SP PERSONA ########################
 -- ############################################################
