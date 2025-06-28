@@ -267,7 +267,6 @@ CREATE TABLE actividades.actividad_socio(
 	CONSTRAINT FK_actividad FOREIGN KEY (id_actividad) REFERENCES actividades.actividad(id_actividad)
 );
 
-
 -- ############################################################
 -- ######################## SP PERSONA ########################
 -- ############################################################
@@ -336,6 +335,7 @@ BEGIN
 		SELECT 'OK' as Resultado, 'La persona fue creada correctamente' AS Mensaje, '200' AS Estado;
 	END TRY 
 	BEGIN CATCH
+		SET @id_persona = NULL; 
 		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
     END CATCH; 
 END; 
@@ -434,7 +434,7 @@ BEGIN
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
     END CATCH
 END;
-
+GO
 -- ############################################################
 -- #################### SP ObraSocial #########################
 -- ############################################################
@@ -577,6 +577,379 @@ AS BEGIN
 		RETURN;
 	END CATCH
 END;
+GO
+-- ############################################################
+-- ################### SP GrupoFamiliar #######################
+-- ############################################################
+GO
+/*
+* Nombre: CrearGrupoFamiliar
+* Descripcion: Crea un nuevo grupo familiar con la fecha de alta actual y estado activo.
+* Parametros: Ninguno.
+* Aclaracion: No se utilizan transacciones explicitas ya que:
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE usuarios.CrearGrupoFamiliar
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        INSERT INTO usuarios.grupo_familiar(fecha_alta, estado)
+        VALUES (GETDATE(), 1);
+        SELECT 'OK' AS Resultado, 'Grupo familiar creado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: ModificarEstadoGrupoFamiliar
+* Descripcion: Modifica el estado (activo/inactivo) de un grupo familiar existente.
+* Parametros:
+*   @id_grupo INT      - ID del grupo familiar a modificar.
+*   @estado   BIT = NULL - Nuevo estado: 1 (activo) o 0 (inactivo). Opcional.
+* Aclaracion: No se utilizan transacciones explicitas ya que:
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE usuarios.ModificarEstadoGrupoFamiliar
+    @id_grupo INT,
+    @estado   BIT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Valido existencia del grupo:
+    IF NOT EXISTS (SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+    -- Valido estado si se proporciona:
+    IF @estado IS NOT NULL AND @estado NOT IN (0,1)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Estado debe ser 0 (inactivo) o 1 (activo)' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    BEGIN TRY
+        UPDATE usuarios.grupo_familiar
+        SET estado = ISNULL(@estado, estado)
+        WHERE id_grupo_familiar = @id_grupo;
+        SELECT 'OK' AS Resultado, 'Estado del grupo familiar actualizado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: EliminarGrupoFamiliar
+* Descripcion: Realiza la eliminacion logica de un grupo familiar si no tiene responsables ni socios asignados.
+* Parametros:
+*   @id_grupo INT - ID del grupo familiar a eliminar.
+* Aclaracion: No se utilizan transacciones explicitas ya que:
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE usuarios.EliminarGrupoFamiliar
+    @id_grupo INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Valido existencia del grupo:
+    IF NOT EXISTS (SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+    -- Verifico responsables asignados:
+    IF EXISTS (SELECT 1 FROM usuarios.responsable WHERE id_grupo = @id_grupo)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'No se puede eliminar: grupo tiene responsables asignados' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    -- Verifico socios asignados:
+    IF EXISTS (SELECT 1 FROM usuarios.socio WHERE id_grupo = @id_grupo)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'No se puede eliminar: grupo tiene socios asignados' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+    BEGIN TRY
+        UPDATE usuarios.grupo_familiar
+        SET estado = 0
+        WHERE id_grupo_familiar = @id_grupo;
+        SELECT 'OK' AS Resultado, 'Grupo familiar inactivado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+
+GO
+-- ############################################################
+-- ######################## SP SOCIO ##########################
+-- ############################################################
+GO
+/*
+* Nombre: CrearSocio
+* Descripcion: Crea un socio, reutilizando o creando la persona asociada.
+* Parametros:
+*   @id_persona           INT           = NULL - Si existe, se reutiliza; si no, se crea.
+*   @dni                  VARCHAR(9)       - DNI de la persona.
+*   @nombre               VARCHAR(50)      - Nombre de la persona.
+*   @apellido             VARCHAR(50)      - Apellido de la persona.
+*   @email                VARCHAR(320)     - Email de la persona.
+*   @fecha_nac            DATE             - Fecha de nacimiento de la persona.
+*   @telefono             VARCHAR(20)      - Telefono de la persona.
+*   @numero_socio         VARCHAR(7)       - Numero de socio (único).
+*   @telefono_emergencia  VARCHAR(20) = NULL - Teléfono de emergencia.
+*   @obra_nro_socio       VARCHAR(20) = NULL - Numero en obra social.
+*   @id_obra_social       INT         = NULL - FK a usuarios.obra_social.
+*   @id_categoria         INT               - FK a actividades.categoria.
+*   @id_grupo             INT         = NULL - FK a usuarios.grupo_familiar.
+* Aclaracion: Se utiliza transaccion explicita porque se afectan multiple tablas.
+*/
+CREATE OR ALTER PROCEDURE usuarios.CrearSocio
+    @id_persona          INT           = NULL,
+    @dni                 VARCHAR(9),
+    @nombre              VARCHAR(50),
+    @apellido            VARCHAR(50),
+    @email               VARCHAR(320),
+    @fecha_nac           DATE,
+    @telefono            VARCHAR(20),
+    @numero_socio        VARCHAR(7),
+    @telefono_emergencia VARCHAR(20)   = NULL,
+    @obra_nro_socio      VARCHAR(20)   = NULL,
+    @id_obra_social      INT           = NULL,
+    @id_categoria        INT,
+    @id_grupo            INT           = NULL
+AS
+BEGIN
+	SET NOCOUNT ON;
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED; -- Evita lecturas sucias
+	DECLARE @new_persona INT;
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- 1) Reutilizar o crear persona: Si la persona existe, se reutiliza y se asocia a un socio
+		IF @id_persona IS NOT NULL
+			AND EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
+		BEGIN
+			SET @new_persona = @id_persona;
+		END
+		ELSE
+		BEGIN
+			-- Si no por defecto se crea la persona 
+			EXEC usuarios.CrearPersona
+				@dni, @nombre, @apellido, @email, @fecha_nac, @telefono,
+				@id_persona = @new_persona OUTPUT;
+			IF @new_persona IS NULL
+			BEGIN
+					ROLLBACK TRANSACTION;
+					RETURN;
+			END
+		END;
+
+		-- 2) Valido numero_socio unico
+		IF EXISTS(SELECT 1 FROM usuarios.socio WHERE numero_socio = @numero_socio)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Numero de socio duplicado' AS Mensaje, '400' AS Estado;
+			RETURN;
+		END;
+
+		-- 3) FK obra_social
+		IF @id_obra_social IS NOT NULL
+		   AND NOT EXISTS(SELECT 1 FROM usuarios.obra_social WHERE id_obra_social = @id_obra_social)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Obra social no existe' AS Mensaje, '404' AS Estado;
+			RETURN;
+		END;
+
+		-- 4) FK categoria
+		IF NOT EXISTS(SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Categoria no existe' AS Mensaje, '404' AS Estado;
+			RETURN;
+		END;
+
+		-- 5) FK grupo (opcional)
+		IF @id_grupo IS NOT NULL
+		   AND NOT EXISTS(SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Grupo familiar no existe' AS Mensaje, '404' AS Estado;
+			RETURN;
+		END;
+
+		-- 6) Inserto socio
+		INSERT INTO usuarios.socio
+			(numero_socio, id_persona, telefono_emergencia, obra_nro_socio,
+			 id_obra_social, id_categoria, id_grupo)
+		VALUES
+			(@numero_socio, @new_persona, @telefono_emergencia, @obra_nro_socio,
+			 @id_obra_social, @id_categoria, @id_grupo);
+
+		COMMIT TRANSACTION;
+		SELECT 'OK' AS Resultado, 'Socio creado correctamente' AS Mensaje, '200' AS Estado;
+	END TRY
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION; -- VALIDO SI ES CORRECTO LANZAR ROLLBACK
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+	END CATCH;
+END;
+GO
+/*
+* Nombre: ModificarSocio
+* Descripcion: Modifica un socio y, opcionalmente, la persona asociada.
+* Parametros:
+*   @id_socio            INT             - ID del socio a modificar.
+*   @id_persona          INT         = NULL - Si se proporciona y existe, se reutiliza; si no existe, se crea.
+*   @dni                 VARCHAR(9)      = NULL - DNI (para crear/nuevo).
+*   @nombre              VARCHAR(50)     = NULL - Nombre (para crear/nuevo).
+*   @apellido            VARCHAR(50)     = NULL - Apellido (para crear/nuevo).
+*   @email               VARCHAR(320)    = NULL - Email (para crear/nuevo).
+*   @fecha_nac           DATE            = NULL - Fecha de nacimiento (para crear/nuevo).
+*   @telefono            VARCHAR(20)     = NULL - Telefono (para crear/nuevo).
+*   @numero_socio        VARCHAR(7)      = NULL - Nuevo numero de socio.
+*   @telefono_emergencia VARCHAR(20)     = NULL - Nuevo telefono de emergencia.
+*   @obra_nro_socio      VARCHAR(20)     = NULL - Nuevo numero en obra social.
+*   @id_obra_social      INT         = NULL - Nueva FK obra_social.
+*   @id_categoria        INT         = NULL - Nueva FK categoria.
+*   @id_grupo            INT         = NULL - Nueva FK grupo.
+* Aclaracion: Se utiliza transaccion explicita porque se afectan persona y socio.
+*/
+CREATE OR ALTER PROCEDURE usuarios.ModificarSocio
+    @id_socio            INT,
+    @id_persona          INT           = NULL,
+    @dni                 VARCHAR(9)    = NULL,
+    @nombre              VARCHAR(50)   = NULL,
+    @apellido            VARCHAR(50)   = NULL,
+    @email               VARCHAR(320)  = NULL,
+    @fecha_nac           DATE          = NULL,
+    @telefono            VARCHAR(20)   = NULL,
+    @numero_socio        VARCHAR(7)    = NULL,
+    @telefono_emergencia VARCHAR(20)   = NULL,
+    @obra_nro_socio      VARCHAR(20)   = NULL,
+    @id_obra_social      INT           = NULL,
+    @id_categoria        INT           = NULL,
+    @id_grupo            INT           = NULL
+AS
+BEGIN
+	SET NOCOUNT ON;
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	DECLARE @new_persona INT;
+	BEGIN TRY
+		BEGIN TRANSACTION;
+
+		-- 1) Verifico socio
+		IF NOT EXISTS(SELECT 1 FROM usuarios.socio WHERE id_socio = @id_socio AND activo = 1) BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Socio no encontrado' AS Mensaje, '404' AS Estado;
+			RETURN;
+		END;
+
+		-- 2) Reutilizar o crear persona si alguno de los campos viene
+		IF @id_persona IS NOT NULL
+			AND EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
+		BEGIN
+			SET @new_persona = @id_persona;
+		END
+		ELSE IF @dni IS NOT NULL OR @nombre IS NOT NULL OR @apellido IS NOT NULL OR @email IS NOT NULL OR @fecha_nac IS NOT NULL OR @telefono IS NOT NULL
+		BEGIN
+			EXEC usuarios.CrearPersona
+				@dni, @nombre, @apellido, @email, @fecha_nac, @telefono,
+				@id_persona = @new_persona OUTPUT;
+		END;
+
+		-- 3) Numero_socio único
+		IF @numero_socio IS NOT NULL
+		   AND EXISTS(SELECT 1 FROM usuarios.socio WHERE numero_socio = @numero_socio AND id_socio <> @id_socio) 
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Numero de socio duplicado' AS Mensaje, '400' AS Estado;
+			RETURN;
+		END;
+
+		-- 4) FK obra_social
+		IF @id_obra_social IS NOT NULL
+		   AND NOT EXISTS(SELECT 1 FROM usuarios.obra_social WHERE id_obra_social = @id_obra_social)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Obra social no existe' AS Mensaje, '404' AS Estado;
+			RETURN;
+		END;
+
+		-- 5) FK categoria
+		IF @id_categoria IS NOT NULL
+		   AND NOT EXISTS(SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Categoria no existe' AS Mensaje, '404' AS Estado;
+			RETURN;
+		END;
+
+		-- 6) FK grupo
+		IF @id_grupo IS NOT NULL
+		   AND NOT EXISTS(SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Grupo familiar no existe' AS Mensaje, '404' AS Estado;
+			RETURN;
+		END;
+
+		-- 7) Update socio
+		UPDATE usuarios.socio
+		SET
+			id_persona          = ISNULL(@new_persona, id_persona),
+			numero_socio        = ISNULL(@numero_socio, numero_socio),
+			telefono_emergencia = ISNULL(@telefono_emergencia, telefono_emergencia),
+			obra_nro_socio      = ISNULL(@obra_nro_socio, obra_nro_socio),
+			id_obra_social      = ISNULL(@id_obra_social, id_obra_social),
+			id_categoria        = ISNULL(@id_categoria, id_categoria),
+			id_grupo            = ISNULL(@id_grupo, id_grupo)
+		WHERE id_socio = @id_socio;
+
+		COMMIT TRANSACTION;
+		SELECT 'OK' AS Resultado, 'Socio modificado correctamente' AS Mensaje, '200' AS Estado;
+	END TRY
+	BEGIN CATCH
+		IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+	END CATCH;
+END;
+GO
+/*
+* Nombre: EliminarSocio
+* Descripcion: Realiza eliminacion logica de un socio.
+* Parametros:
+*   @id_socio INT - ID del socio a eliminar.
+* Aclaracion: No se utiliza transacciones explicitas ya que:
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE usuarios.EliminarSocio
+    @id_socio INT
+AS
+BEGIN
+	SET NOCOUNT ON;
+	-- Verifico existencia y activo
+	IF NOT EXISTS(SELECT 1 FROM usuarios.socio WHERE id_socio = @id_socio AND activo = 1) BEGIN
+		SELECT 'Error' AS Resultado, 'Socio no encontrado' AS Mensaje, '404' AS Estado;
+		RETURN;
+	END;
+	BEGIN TRY
+		UPDATE usuarios.socio
+		SET
+			activo    = 0,
+			fecha_baja = GETDATE()
+		WHERE id_socio = @id_socio;
+		SELECT 'OK' AS Resultado, 'Socio dado de baja correctamente' AS Mensaje, '200' AS Estado;
+	END TRY
+	BEGIN CATCH
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+	END CATCH;
+END;
+GO
 
 
 
@@ -589,6 +962,9 @@ END;
 
 
 
+
+
+go
 -- ############################################################
 -- ######################## SP ROL ############################
 -- ############################################################
@@ -602,6 +978,8 @@ END;
 * Aclaracion: No se utiliza transacciones explicitas ya que: 
 *   Solo se trabaja con una unica tabla y ejecutando sentencia DML
 */
+
+
 
 GO
 CREATE OR ALTER PROCEDURE usuarios.CrearRol
@@ -1021,379 +1399,8 @@ END;
 GO
 
 
--- ############################################################
--- ################### SP GrupoFamiliar #######################
--- ############################################################
 
-/*
-* Nombre: CrearGrupoFamiliar
-* Descripcion: Crea un nuevo grupo familiar con la fecha de alta actual y estado activo.
-* Parametros: Ninguno.
-* Aclaracion: No se utilizan transacciones explicitas ya que:
-*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
-*/
-CREATE OR ALTER PROCEDURE usuarios.CrearGrupoFamiliar
-AS
-BEGIN
-    SET NOCOUNT ON;
-    BEGIN TRY
-        INSERT INTO usuarios.grupo_familiar(fecha_alta, estado)
-        VALUES (GETDATE(), 1);
-        SELECT 'OK' AS Resultado, 'Grupo familiar creado correctamente' AS Mensaje, '200' AS Estado;
-    END TRY
-    BEGIN CATCH
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-    END CATCH;
-END;
-GO
 
-/*
-* Nombre: ModificarEstadoGrupoFamiliar
-* Descripcion: Modifica el estado (activo/inactivo) de un grupo familiar existente.
-* Parametros:
-*   @id_grupo INT      - ID del grupo familiar a modificar.
-*   @estado   BIT = NULL - Nuevo estado: 1 (activo) o 0 (inactivo). Opcional.
-* Aclaracion: No se utilizan transacciones explicitas ya que:
-*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
-*/
-CREATE OR ALTER PROCEDURE usuarios.ModificarEstadoGrupoFamiliar
-    @id_grupo INT,
-    @estado   BIT = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    -- Valido existencia del grupo:
-    IF NOT EXISTS (SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo)
-    BEGIN
-        SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje, '404' AS Estado;
-        RETURN;
-    END;
-    -- Valido estado si se proporciona:
-    IF @estado IS NOT NULL AND @estado NOT IN (0,1)
-    BEGIN
-        SELECT 'Error' AS Resultado, 'Estado debe ser 0 (inactivo) o 1 (activo)' AS Mensaje, '400' AS Estado;
-        RETURN;
-    END;
-    BEGIN TRY
-        UPDATE usuarios.grupo_familiar
-        SET estado = ISNULL(@estado, estado)
-        WHERE id_grupo_familiar = @id_grupo;
-        SELECT 'OK' AS Resultado, 'Estado del grupo familiar actualizado correctamente' AS Mensaje, '200' AS Estado;
-    END TRY
-    BEGIN CATCH
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-    END CATCH;
-END;
-GO
-
-/*
-* Nombre: EliminarGrupoFamiliar
-* Descripcion: Realiza la eliminacion logica de un grupo familiar si no tiene responsables ni socios asignados.
-* Parametros:
-*   @id_grupo INT - ID del grupo familiar a eliminar.
-* Aclaracion: No se utilizan transacciones explicitas ya que:
-*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
-*/
-CREATE OR ALTER PROCEDURE usuarios.EliminarGrupoFamiliar
-    @id_grupo INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    -- Valido existencia del grupo:
-    IF NOT EXISTS (SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo)
-    BEGIN
-        SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje, '404' AS Estado;
-        RETURN;
-    END;
-    -- Verifico responsables asignados:
-    IF EXISTS (SELECT 1 FROM usuarios.responsable WHERE id_grupo = @id_grupo)
-    BEGIN
-        SELECT 'Error' AS Resultado, 'No se puede eliminar: grupo tiene responsables asignados' AS Mensaje, '400' AS Estado;
-        RETURN;
-    END;
-    -- Verifico socios asignados:
-    IF EXISTS (SELECT 1 FROM usuarios.socio WHERE id_grupo = @id_grupo)
-    BEGIN
-        SELECT 'Error' AS Resultado, 'No se puede eliminar: grupo tiene socios asignados' AS Mensaje, '400' AS Estado;
-        RETURN;
-    END;
-    BEGIN TRY
-        UPDATE usuarios.grupo_familiar
-        SET estado = 0
-        WHERE id_grupo_familiar = @id_grupo;
-        SELECT 'OK' AS Resultado, 'Grupo familiar inactivado correctamente' AS Mensaje, '200' AS Estado;
-    END TRY
-    BEGIN CATCH
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-    END CATCH;
-END;
-GO
-
--- ############################################################
--- ######################## SP SOCIO ##########################
--- ############################################################
-
-/*
-* Nombre: CrearSocio
-* Descripcion: Crea un socio, reutilizando o creando la persona asociada.
-* Parametros:
-*   @id_persona           INT           = NULL - Si existe, se reutiliza; si no, se crea.
-*   @dni                  VARCHAR(9)       - DNI de la persona.
-*   @nombre               VARCHAR(50)      - Nombre de la persona.
-*   @apellido             VARCHAR(50)      - Apellido de la persona.
-*   @email                VARCHAR(320)     - Email de la persona.
-*   @fecha_nac            DATE             - Fecha de nacimiento de la persona.
-*   @telefono             VARCHAR(20)      - Telefono de la persona.
-*   @numero_socio         VARCHAR(7)       - Numero de socio (único).
-*   @telefono_emergencia  VARCHAR(20) = NULL - Teléfono de emergencia.
-*   @obra_nro_socio       VARCHAR(20) = NULL - Numero en obra social.
-*   @id_obra_social       INT         = NULL - FK a usuarios.obra_social.
-*   @id_categoria         INT               - FK a actividades.categoria.
-*   @id_grupo             INT         = NULL - FK a usuarios.grupo_familiar.
-* Aclaracion: Se utiliza transaccion explicita porque se afectan multiple tablas.
-*/
-CREATE OR ALTER PROCEDURE usuarios.CrearSocio
-    @id_persona          INT           = NULL,
-    @dni                 VARCHAR(9),
-    @nombre              VARCHAR(50),
-    @apellido            VARCHAR(50),
-    @email               VARCHAR(320),
-    @fecha_nac           DATE,
-    @telefono            VARCHAR(20),
-    @numero_socio        VARCHAR(7),
-    @telefono_emergencia VARCHAR(20)   = NULL,
-    @obra_nro_socio      VARCHAR(20)   = NULL,
-    @id_obra_social      INT           = NULL,
-    @id_categoria        INT,
-    @id_grupo            INT           = NULL
-AS
-BEGIN
-	SET NOCOUNT ON;
-	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-	DECLARE @new_persona INT;
-	BEGIN TRY
-		BEGIN TRANSACTION;
-
-		-- 1) Reutilizar o crear persona
-		IF @id_persona IS NOT NULL
-			AND EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
-		BEGIN
-			SET @new_persona = @id_persona;
-		END
-		ELSE
-		BEGIN
-			EXEC usuarios.CrearPersona
-				@dni, @nombre, @apellido, @email, @fecha_nac, @telefono,
-				@id_persona = @new_persona OUTPUT;
-			IF @new_persona IS NULL
-			BEGIN
-					ROLLBACK TRANSACTION;
-					RETURN;
-			END
-		END;
-
-		-- 2) Valido numero_socio unico
-		IF EXISTS(SELECT 1 FROM usuarios.socio WHERE numero_socio = @numero_socio)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Numero de socio duplicado' AS Mensaje, '400' AS Estado;
-			RETURN;
-		END;
-
-		-- 3) FK obra_social
-		IF @id_obra_social IS NOT NULL
-		   AND NOT EXISTS(SELECT 1 FROM usuarios.obra_social WHERE id_obra_social = @id_obra_social)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Obra social no existe' AS Mensaje, '404' AS Estado;
-			RETURN;
-		END;
-
-		-- 4) FK categoria
-		IF NOT EXISTS(SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Categoria no existe' AS Mensaje, '404' AS Estado;
-			RETURN;
-		END;
-
-		-- 5) FK grupo (opcional)
-		IF @id_grupo IS NOT NULL
-		   AND NOT EXISTS(SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Grupo familiar no existe' AS Mensaje, '404' AS Estado;
-			RETURN;
-		END;
-
-		-- 6) Inserto socio
-		INSERT INTO usuarios.socio
-			(numero_socio, id_persona, telefono_emergencia, obra_nro_socio,
-			 id_obra_social, id_categoria, id_grupo)
-		VALUES
-			(@numero_socio, @new_persona, @telefono_emergencia, @obra_nro_socio,
-			 @id_obra_social, @id_categoria, @id_grupo);
-
-		COMMIT TRANSACTION;
-		SELECT 'OK' AS Resultado, 'Socio creado correctamente' AS Mensaje, '200' AS Estado;
-	END TRY
-	BEGIN CATCH
-		IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-	END CATCH;
-END;
-GO
-/*
-* Nombre: ModificarSocio
-* Descripcion: Modifica un socio y, opcionalmente, la persona asociada.
-* Parametros:
-*   @id_socio            INT             - ID del socio a modificar.
-*   @id_persona          INT         = NULL - Si se proporciona y existe, se reutiliza; si no existe, se crea.
-*   @dni                 VARCHAR(9)      = NULL - DNI (para crear/nuevo).
-*   @nombre              VARCHAR(50)     = NULL - Nombre (para crear/nuevo).
-*   @apellido            VARCHAR(50)     = NULL - Apellido (para crear/nuevo).
-*   @email               VARCHAR(320)    = NULL - Email (para crear/nuevo).
-*   @fecha_nac           DATE            = NULL - Fecha de nacimiento (para crear/nuevo).
-*   @telefono            VARCHAR(20)     = NULL - Telefono (para crear/nuevo).
-*   @numero_socio        VARCHAR(7)      = NULL - Nuevo numero de socio.
-*   @telefono_emergencia VARCHAR(20)     = NULL - Nuevo telefono de emergencia.
-*   @obra_nro_socio      VARCHAR(20)     = NULL - Nuevo numero en obra social.
-*   @id_obra_social      INT         = NULL - Nueva FK obra_social.
-*   @id_categoria        INT         = NULL - Nueva FK categoria.
-*   @id_grupo            INT         = NULL - Nueva FK grupo.
-* Aclaracion: Se utiliza transaccion explicita porque se afectan persona y socio.
-*/
-CREATE OR ALTER PROCEDURE usuarios.ModificarSocio
-    @id_socio            INT,
-    @id_persona          INT           = NULL,
-    @dni                 VARCHAR(9)    = NULL,
-    @nombre              VARCHAR(50)   = NULL,
-    @apellido            VARCHAR(50)   = NULL,
-    @email               VARCHAR(320)  = NULL,
-    @fecha_nac           DATE          = NULL,
-    @telefono            VARCHAR(20)   = NULL,
-    @numero_socio        VARCHAR(7)    = NULL,
-    @telefono_emergencia VARCHAR(20)   = NULL,
-    @obra_nro_socio      VARCHAR(20)   = NULL,
-    @id_obra_social      INT           = NULL,
-    @id_categoria        INT           = NULL,
-    @id_grupo            INT           = NULL
-AS
-BEGIN
-	SET NOCOUNT ON;
-	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-	DECLARE @new_persona INT;
-	BEGIN TRY
-		BEGIN TRANSACTION;
-
-		-- 1) Verifico socio
-		IF NOT EXISTS(SELECT 1 FROM usuarios.socio WHERE id_socio = @id_socio AND activo = 1) BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Socio no encontrado' AS Mensaje, '404' AS Estado;
-			RETURN;
-		END;
-
-		-- 2) Reutilizar o crear persona si alguno de los campos viene
-		IF @id_persona IS NOT NULL
-			AND EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
-		BEGIN
-			SET @new_persona = @id_persona;
-		END
-		ELSE IF @dni IS NOT NULL OR @nombre IS NOT NULL OR @apellido IS NOT NULL OR @email IS NOT NULL OR @fecha_nac IS NOT NULL OR @telefono IS NOT NULL
-		BEGIN
-			EXEC usuarios.CrearPersona
-				@dni, @nombre, @apellido, @email, @fecha_nac, @telefono,
-				@id_persona = @new_persona OUTPUT;
-		END;
-
-		-- 3) Numero_socio único
-		IF @numero_socio IS NOT NULL
-		   AND EXISTS(SELECT 1 FROM usuarios.socio WHERE numero_socio = @numero_socio AND id_socio <> @id_socio) 
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Numero de socio duplicado' AS Mensaje, '400' AS Estado;
-			RETURN;
-		END;
-
-		-- 4) FK obra_social
-		IF @id_obra_social IS NOT NULL
-		   AND NOT EXISTS(SELECT 1 FROM usuarios.obra_social WHERE id_obra_social = @id_obra_social)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Obra social no existe' AS Mensaje, '404' AS Estado;
-			RETURN;
-		END;
-
-		-- 5) FK categoria
-		IF @id_categoria IS NOT NULL
-		   AND NOT EXISTS(SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Categoria no existe' AS Mensaje, '404' AS Estado;
-			RETURN;
-		END;
-
-		-- 6) FK grupo
-		IF @id_grupo IS NOT NULL
-		   AND NOT EXISTS(SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Grupo familiar no existe' AS Mensaje, '404' AS Estado;
-			RETURN;
-		END;
-
-		-- 7) Update socio
-		UPDATE usuarios.socio
-		SET
-			id_persona          = ISNULL(@new_persona, id_persona),
-			numero_socio        = ISNULL(@numero_socio, numero_socio),
-			telefono_emergencia = ISNULL(@telefono_emergencia, telefono_emergencia),
-			obra_nro_socio      = ISNULL(@obra_nro_socio, obra_nro_socio),
-			id_obra_social      = ISNULL(@id_obra_social, id_obra_social),
-			id_categoria        = ISNULL(@id_categoria, id_categoria),
-			id_grupo            = ISNULL(@id_grupo, id_grupo)
-		WHERE id_socio = @id_socio;
-
-		COMMIT TRANSACTION;
-		SELECT 'OK' AS Resultado, 'Socio modificado correctamente' AS Mensaje, '200' AS Estado;
-	END TRY
-	BEGIN CATCH
-		IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-	END CATCH;
-END;
-GO
-/*
-* Nombre: EliminarSocio
-* Descripcion: Realiza eliminacion logica de un socio.
-* Parametros:
-*   @id_socio INT - ID del socio a eliminar.
-* Aclaracion: No se utiliza transacciones explicitas ya que:
-*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
-*/
-CREATE OR ALTER PROCEDURE usuarios.EliminarSocio
-    @id_socio INT
-AS
-BEGIN
-	SET NOCOUNT ON;
-	-- Verifico existencia y activo
-	IF NOT EXISTS(SELECT 1 FROM usuarios.socio WHERE id_socio = @id_socio AND activo = 1) BEGIN
-		SELECT 'Error' AS Resultado, 'Socio no encontrado' AS Mensaje, '404' AS Estado;
-		RETURN;
-	END;
-	BEGIN TRY
-		UPDATE usuarios.socio
-		SET
-			activo    = 0,
-			fecha_baja = GETDATE()
-		WHERE id_socio = @id_socio;
-		SELECT 'OK' AS Resultado, 'Socio dado de baja correctamente' AS Mensaje, '200' AS Estado;
-	END TRY
-	BEGIN CATCH
-		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-	END CATCH;
-END;
-GO
 
 -- ############################################################
 -- ###################### SP FACTURA ##########################
