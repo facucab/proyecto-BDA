@@ -219,6 +219,21 @@ CREATE TABLE facturacion.factura_descuento (
 	CONSTRAINT FK_factura_descuento_descuento FOREIGN KEY(id_descuento) REFERENCES facturacion.descuento(id_descuento)
 );
 GO
+CREATE TABLE facturacion.nota_credito(
+	id_nota_credito INT IDENTITY(1,1) PRIMARY KEY,
+	fecha_emision DATE NOT NULL,
+	monto DECIMAL(10,2) NOT NULL,
+	motivo VARCHAR(40) NULL,
+	id_factura INT NOT NULL,
+	id_clima INT NULL,
+
+	CONSTRAINT CK_fecha_emision CHECK(fecha_emision <= GETDATE()),
+	CONSTRAINT CK_monto CHECK(monto > 0),
+	CONSTRAINT FK_nota_credito_factura FOREIGN KEY (id_factura) REFERENCES facturacion.factura(id_factura)
+	ON DELETE CASCADE,
+	CONSTRAINT FK_nota_credito_clima FOREIGN KEY (id_clima) REFERENCES facturacion.clima(id_clima)
+	ON DELETE SET NULL
+); 
 
 GO
 -- ############################################################
