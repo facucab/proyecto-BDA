@@ -185,6 +185,12 @@ CREATE TABLE facturacion.metodo_pago (
 	nombre VARCHAR(50) NOT NULL UNIQUE
 );
 GO
+CREATE TABLE facturacion.clima(
+	id_clima INT IDENTITY(1,1) PRIMARY KEY,
+	fecha DATE NOT NULL,
+	lluvia DECIMAL(5,2) NOT NULL --limite 999,99
+);
+GO
 CREATE TABLE facturacion.descuento (
 	id_descuento INT IDENTITY(1,1) PRIMARY KEY,
 	descripcion  VARCHAR(100) NOT NULL,
@@ -215,7 +221,6 @@ CREATE TABLE facturacion.factura_descuento (
 GO
 
 GO
-
 -- ############################################################
 -- ######################## SP PERSONA ########################
 -- ############################################################
