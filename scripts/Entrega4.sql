@@ -88,17 +88,21 @@ CREATE TABLE usuarios.socio(
 	CONSTRAINT FK_socio_grupo_familiar FOREIGN KEY (id_grupo) REFERENCES usuarios.grupo_familiar(id_grupo_familiar)
 	ON DELETE SET NULL, -- Si se elimina el grupo familiar, se asigna NULL
 	CONSTRAINT FK_socio_Categoria FOREIGN KEY (id_categoria) REFERENCES actividades.categoria(id_categoria),
-	CONSTRAINT FK_socio_pileta FOREIGN KEY (id_pileta) REFERENCES actividades.pileta(id_pileta)
+	CONSTRAINT FK_socio_pileta FOREIGN KEY (id_pileta) REFERENCES actividades.pileta(id_pileta) 
+	ON DELETE SET NULL
 );
 GO
 CREATE TABLE usuarios.invitado(
 	id_invitado INT IDENTITY(1,1) PRIMARY KEY,
     id_persona INT NOT NULL UNIQUE,
 	id_socio INT NOT NULL,
-	fecha_invitacion DATE NOT NULL DEFAULT GETDATE()
+	fecha_invitacion DATE NOT NULL DEFAULT GETDATE(),
+	id_pileta INT NULL,
 	CONSTRAINT FK_invitado_persona FOREIGN KEY (id_persona) REFERENCES usuarios.persona(id_persona)
 	ON DELETE CASCADE, 
-	CONSTRAINT FK_invitado_socio FOREIGN KEY (id_socio) REFERENCES usuarios.socio(id_socio)
+	CONSTRAINT FK_invitado_socio FOREIGN KEY (id_socio) REFERENCES usuarios.socio(id_socio),
+	CONSTRAINT FK_invitado_pileta FOREIGN KEY (id_pileta) REFERENCES actividades.pileta(id_pileta)
+	ON DELETE SET NULL
 );
 GO
 CREATE TABLE usuarios.usuario(
@@ -132,6 +136,21 @@ CREATE TABLE actividades.actividad (
 	estado BIT NOT NULL DEFAULT 1,
 	CONSTRAINT CK_costo_mensual CHECK(costo_mensual > 0)
 );
+GO
+CREATE TABLE actividades.costo(
+	id_costo INT IDENTITY(1,1) PRIMARY KEY,
+	tipo CHAR(3) NOT NULL, -- dia/tem(Temporada)/mes
+	tipo_grupo CHAR(3) NOT NULL, -- adu (Adultos)/men (Menores)
+	precio_socios DECIMAL(10, 2) NOT NULL,
+	precio_invitados DECIMAL(10, 2) NOT NULL,
+	id_pileta INT NOT NULL,
+	CONSTRAINT FK_costo_pileta	FOREIGN KEY (id_pileta) REFERENCES actividades.pileta(id_pileta)
+	ON DELETE CASCADE,
+	CONSTRAINT CK_tipo CHECK(tipo IN ('dia', 'tem', 'mes')),
+	CONSTRAINT CK_tipo_grupo CHECK(tipo_grupo IN ('adu','men')),
+	CONSTRAINT CK_precios_socios CHECK(precio_socios > 0),
+	CONSTRAINT CK_precios_invitados CHECK(precio_invitados > 0),
+); 
 GO
 CREATE TABLE actividades.clase(
 	id_clase INT IDENTITY(1,1) PRIMARY KEY,
