@@ -804,7 +804,6 @@ GO
 * Descripcion: Modifica un socio y, opcionalmente, la persona asociada.
 * Parametros:
 *   @id_socio            INT             - ID del socio a modificar.
-*   @id_persona          INT         = NULL - Si se proporciona y existe, se reutiliza; si no existe, se crea.
 *   @dni                 VARCHAR(9)      = NULL - DNI (para crear/nuevo).
 *   @nombre              VARCHAR(50)     = NULL - Nombre (para crear/nuevo).
 *   @apellido            VARCHAR(50)     = NULL - Apellido (para crear/nuevo).
@@ -821,7 +820,6 @@ GO
 */
 CREATE OR ALTER PROCEDURE usuarios.ModificarSocio
     @id_socio            INT,
-    @id_persona          INT           = NULL,
     @dni                 VARCHAR(9)    = NULL,
     @nombre              VARCHAR(50)   = NULL,
     @apellido            VARCHAR(50)   = NULL,
@@ -833,90 +831,139 @@ CREATE OR ALTER PROCEDURE usuarios.ModificarSocio
     @obra_nro_socio      VARCHAR(20)   = NULL,
     @id_obra_social      INT           = NULL,
     @id_categoria        INT           = NULL,
-    @id_grupo            INT           = NULL
+    @id_grupo            INT           = NULL,
+    @id_pileta           INT           = NULL
 AS
 BEGIN
-	SET NOCOUNT ON;
-	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-	DECLARE @new_persona INT;
-	BEGIN TRY
-		BEGIN TRANSACTION;
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRY
+        BEGIN TRANSACTION;
 
-		-- 1) Verifico socio
-		IF NOT EXISTS(SELECT 1 FROM usuarios.socio WHERE id_socio = @id_socio AND activo = 1) BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Socio no encontrado' AS Mensaje, '404' AS Estado;
-			RETURN;
-		END;
+        -- 1) Verificar socio existente y activo
+        DECLARE @persona_id INT;
+        SELECT @persona_id = id_persona 
+        FROM usuarios.socio 
+        WHERE id_socio = @id_socio AND activo = 1;
+        
+        IF @persona_id IS NULL BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Socio no encontrado o inactivo' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
 
-		-- 2) Reutilizar o crear persona si alguno de los campos viene
-		IF @id_persona IS NOT NULL
-			AND EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
-		BEGIN
-			SET @new_persona = @id_persona;
-		END
-		ELSE IF @dni IS NOT NULL OR @nombre IS NOT NULL OR @apellido IS NOT NULL OR @email IS NOT NULL OR @fecha_nac IS NOT NULL OR @telefono IS NOT NULL
-		BEGIN
-			EXEC usuarios.CrearPersona
-				@dni, @nombre, @apellido, @email, @fecha_nac, @telefono,
-				@id_persona = @new_persona OUTPUT;
-		END;
+        -- 2) Verificar que la persona existe si se proporciona DNI
+        IF @dni IS NOT NULL
+        BEGIN
+            -- Buscar persona por DNI
+            DECLARE @persona_con_dni INT;
+            SELECT @persona_con_dni = id_persona 
+            FROM usuarios.persona 
+            WHERE dni = @dni AND activo = 1;
+            
+            -- Si no existe persona con ese DNI
+            IF @persona_con_dni IS NULL
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'No existe persona con el DNI proporcionado' AS Mensaje, '404' AS Estado;
+                RETURN;
+            END
+            
+            -- Si existe pero es diferente a la persona actual del socio
+            IF @persona_con_dni <> @persona_id
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El DNI proporcionado pertenece a otra persona' AS Mensaje, '400' AS Estado;
+                RETURN;
+            END
+        END
 
-		-- 3) Numero_socio único
-		IF @numero_socio IS NOT NULL
-		   AND EXISTS(SELECT 1 FROM usuarios.socio WHERE numero_socio = @numero_socio AND id_socio <> @id_socio) 
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Numero de socio duplicado' AS Mensaje, '400' AS Estado;
-			RETURN;
-		END;
+        -- 3) Validar email único si se proporciona
+        IF @email IS NOT NULL
+           AND EXISTS(SELECT 1 FROM usuarios.persona WHERE email = @email AND id_persona <> @persona_id) 
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Email ya existe para otra persona' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
 
-		-- 4) FK obra_social
-		IF @id_obra_social IS NOT NULL
-		   AND NOT EXISTS(SELECT 1 FROM usuarios.obra_social WHERE id_obra_social = @id_obra_social)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Obra social no existe' AS Mensaje, '404' AS Estado;
-			RETURN;
-		END;
+        -- 4) Numero_socio único
+        IF @numero_socio IS NOT NULL
+           AND EXISTS(SELECT 1 FROM usuarios.socio WHERE numero_socio = @numero_socio AND id_socio <> @id_socio) 
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Numero de socio duplicado' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
 
-		-- 5) FK categoria
-		IF @id_categoria IS NOT NULL
-		   AND NOT EXISTS(SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Categoria no existe' AS Mensaje, '404' AS Estado;
-			RETURN;
-		END;
+        -- 5) Validar FK obra_social
+        IF @id_obra_social IS NOT NULL
+           AND NOT EXISTS(SELECT 1 FROM usuarios.obra_social WHERE id_obra_social = @id_obra_social)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Obra social no existe' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
 
-		-- 6) FK grupo
-		IF @id_grupo IS NOT NULL
-		   AND NOT EXISTS(SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo)
-		BEGIN
-			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'Grupo familiar no existe' AS Mensaje, '404' AS Estado;
-			RETURN;
-		END;
+        -- 6) Validar FK categoria (obligatoria)
+        IF @id_categoria IS NOT NULL
+           AND NOT EXISTS(SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Categoria no existe' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
 
-		-- 7) Update socio
-		UPDATE usuarios.socio
-		SET
-			id_persona          = ISNULL(@new_persona, id_persona),
-			numero_socio        = ISNULL(@numero_socio, numero_socio),
-			telefono_emergencia = ISNULL(@telefono_emergencia, telefono_emergencia),
-			obra_nro_socio      = ISNULL(@obra_nro_socio, obra_nro_socio),
-			id_obra_social      = ISNULL(@id_obra_social, id_obra_social),
-			id_categoria        = ISNULL(@id_categoria, id_categoria),
-			id_grupo            = ISNULL(@id_grupo, id_grupo)
-		WHERE id_socio = @id_socio;
+        -- 7) Validar FK grupo familiar
+        IF @id_grupo IS NOT NULL
+           AND NOT EXISTS(SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo AND estado = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Grupo familiar no existe o está inactivo' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
 
-		COMMIT TRANSACTION;
-		SELECT 'OK' AS Resultado, 'Socio modificado correctamente' AS Mensaje, '200' AS Estado;
-	END TRY
-	BEGIN CATCH
-		IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-	END CATCH;
+        -- 8) Validar FK pileta
+        IF @id_pileta IS NOT NULL
+           AND NOT EXISTS(SELECT 1 FROM actividades.pileta WHERE id_pileta = @id_pileta)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Pileta no existe' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- 9) Actualizar datos de persona
+        UPDATE usuarios.persona
+        SET
+            dni = ISNULL(@dni, dni),
+            nombre = ISNULL(@nombre, nombre),
+            apellido = ISNULL(@apellido, apellido),
+            email = ISNULL(@email, email),
+            fecha_nac = ISNULL(@fecha_nac, fecha_nac),
+            telefono = ISNULL(@telefono, telefono)
+        WHERE id_persona = @persona_id;
+
+        -- 10) Actualizar datos de socio
+        UPDATE usuarios.socio
+        SET
+            numero_socio = ISNULL(@numero_socio, numero_socio),
+            telefono_emergencia = ISNULL(@telefono_emergencia, telefono_emergencia),
+            obra_nro_socio = ISNULL(@obra_nro_socio, obra_nro_socio),
+            id_obra_social = ISNULL(@id_obra_social, id_obra_social),
+            id_categoria = ISNULL(@id_categoria, id_categoria),
+            id_grupo = ISNULL(@id_grupo, id_grupo),
+            id_pileta = ISNULL(@id_pileta, id_pileta)
+        WHERE id_socio = @id_socio;
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Socio modificado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, 
+               'Error al modificar socio: ' + ERROR_MESSAGE() AS Mensaje, 
+               '500' AS Estado;
+    END CATCH;
 END;
 GO
 /*
