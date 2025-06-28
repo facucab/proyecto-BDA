@@ -997,25 +997,892 @@ BEGIN
 	END CATCH;
 END;
 GO
+-- ############################################################
+-- #################### SP INVITADO ###########################
+-- ############################################################
+GO
+/*
+* Nombre: CrearInvitado
+* Descripcion: Crea un invitado, reutilizando o creando la persona asociada.
+*   - @id_socio es obligatorio y debe existir y estar activo.
+*   - Si se pasa @id_persona y existe y está activa, se reutiliza.
+*   - Si no, se requieren todos los datos de persona para crearla.
+*   - Verifica que la persona no esté ya invitada.
+* Transacción explícita porque afecta a dos tablas: persona e invitado.
+*/
+CREATE OR ALTER PROCEDURE usuarios.CrearInvitado
+    @id_persona     INT           = NULL,
+    @dni            VARCHAR(9)    = NULL,
+    @nombre         VARCHAR(50)   = NULL,
+    @apellido       VARCHAR(50)   = NULL,
+    @email          VARCHAR(320)  = NULL,
+    @fecha_nac      DATE          = NULL,
+    @telefono       VARCHAR(20)   = NULL,
+    @id_socio       INT,
+    @id_pileta      INT           = NULL  
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+    -- 0) Validar socio obligatorio
+    IF @id_socio IS NULL
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El id_socio es obligatorio' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END
+
+    DECLARE @new_persona INT;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        
+        -- 1) Verificar socio existe y activo
+        IF NOT EXISTS(SELECT 1 FROM usuarios.socio WHERE id_socio = @id_socio AND activo = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Socio no encontrado o inactivo' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- 2) Reutilizar o crear persona
+        IF @id_persona IS NOT NULL
+           AND EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
+        BEGIN
+            SET @new_persona = @id_persona;
+        END
+        ELSE
+        BEGIN
+            -- Validar que todos los campos obligatorios estén presentes
+            IF @dni IS NULL OR @nombre IS NULL OR @apellido IS NULL
+               OR @email IS NULL OR @fecha_nac IS NULL OR @telefono IS NULL
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'Faltan datos obligatorios para crear la persona' AS Mensaje, '400' AS Estado;
+                RETURN;
+            END
+
+            -- Verificar que el DNI no exista ya
+            IF EXISTS(SELECT 1 FROM usuarios.persona WHERE dni = @dni)
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El DNI ya existe en el sistema' AS Mensaje, '400' AS Estado;
+                RETURN;
+            END
+
+            -- Verificar que el email no exista ya
+            IF EXISTS(SELECT 1 FROM usuarios.persona WHERE email = @email)
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El email ya existe en el sistema' AS Mensaje, '400' AS Estado;
+                RETURN;
+            END
+
+            -- Crear la nueva persona
+            INSERT INTO usuarios.persona (dni, nombre, apellido, email, fecha_nac, telefono)
+            VALUES (@dni, @nombre, @apellido, @email, @fecha_nac, @telefono);
+            
+            SET @new_persona = SCOPE_IDENTITY();
+        END;
+
+        -- 3) Verificar que la persona no esté ya invitada por el mismo socio
+        IF EXISTS(
+            SELECT 1 
+            FROM usuarios.invitado 
+            WHERE id_persona = @new_persona 
+            AND id_socio = @id_socio
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La persona ya está invitada por este socio' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+
+        -- 4) Verificar que la pileta exista (si se proporcionó)
+        IF @id_pileta IS NOT NULL 
+           AND NOT EXISTS(SELECT 1 FROM actividades.pileta WHERE id_pileta = @id_pileta)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La pileta especificada no existe' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- 5) Crear invitado
+        INSERT INTO usuarios.invitado(id_persona, id_socio, id_pileta)
+        VALUES(@new_persona, @id_socio, @id_pileta);
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Invitado creado correctamente' AS Mensaje, '200' AS Estado, @new_persona AS id_persona;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: ModificarInvitado
+* Descripcion: Modifica un invitado y/o sus datos de persona asociados.
+*   - @id_invitado obligatorio.
+*   - Permite cambiar datos de la persona (dni, nombre, apellido, email, fecha_nac, telefono).
+*   - Permite cambiar el socio invitador (@new_id_socio).
+*   - No crea nuevas personas: actualiza la existente vía usuarios.ModificarPersona.
+* Transacción explícita porque puede afectar persona e invitado.
+*/
+CREATE OR ALTER PROCEDURE usuarios.ModificarInvitado
+    @id_invitado    INT,             
+    @dni            VARCHAR(9)    = NULL,  
+    @nombre         VARCHAR(50)   = NULL,  
+    @apellido       VARCHAR(50)   = NULL,  
+    @email          VARCHAR(320)  = NULL,  
+    @fecha_nac      DATE          = NULL,  
+    @telefono       VARCHAR(20)   = NULL,  
+    @new_id_socio   INT           = NULL   
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    DECLARE @cur_persona INT, @cur_socio INT;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- 1) Verificar invitado existe
+        IF NOT EXISTS (SELECT 1 FROM usuarios.invitado WHERE id_invitado = @id_invitado)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Invitado no encontrado' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- 2) Obtener persona y socio actuales
+        SELECT 
+            @cur_persona = id_persona,
+            @cur_socio   = id_socio
+          FROM usuarios.invitado
+         WHERE id_invitado = @id_invitado;
+
+         -- 3) Actualizar DNI si se pide
+		IF @dni IS NOT NULL
+		BEGIN
+			-- 3.1) Formato y rango
+			IF LEN(@dni) < 7 OR LEN(@dni) > 8 OR @dni LIKE '%[^0-9]%'
+			BEGIN
+				ROLLBACK TRANSACTION;
+				SELECT 'Error' AS Resultado, 'DNI inválido. Debe contener entre 7 y 8 dígitos numéricos.' AS Mensaje, '400' AS Estado;
+				RETURN;
+			END;
+			-- 4.2) Unicidad
+			IF EXISTS(SELECT 1 FROM usuarios.persona WHERE dni = @dni AND id_persona <> @cur_persona)
+			BEGIN
+				ROLLBACK TRANSACTION;
+				SELECT 'Error' AS Resultado, 'DNI duplicado.' AS Mensaje, '400' AS Estado;
+				RETURN;
+			END;
+			-- 4.3) Update
+			UPDATE usuarios.persona
+			   SET dni = @dni
+			 WHERE id_persona = @cur_persona;
+		END;
+
+        -- 3) Actualizar otros campos de persona si se piden
+        IF  @nombre     IS NOT NULL
+        OR  @apellido   IS NOT NULL
+        OR  @email      IS NOT NULL
+        OR  @fecha_nac  IS NOT NULL
+        OR  @telefono   IS NOT NULL
+        BEGIN
+            SELECT
+                @nombre     = COALESCE(@nombre, nombre),
+                @apellido   = COALESCE(@apellido, apellido),
+                @email      = COALESCE(@email, email),
+                @fecha_nac  = COALESCE(@fecha_nac, fecha_nac),
+                @telefono   = COALESCE(@telefono, telefono)
+              FROM usuarios.persona
+             WHERE id_persona = @cur_persona;
+
+            EXEC usuarios.ModificarPersona
+                @id_persona = @cur_persona,
+                @nombre     = @nombre,
+                @apellido   = @apellido,
+                @email      = @email,
+                @fecha_nac  = @fecha_nac,
+                @telefono   = @telefono;
+        END;
+
+        -- 4) Cambiar socio invitador si se pide
+        IF @new_id_socio IS NOT NULL
+        BEGIN
+            IF NOT EXISTS (
+                SELECT 1 FROM usuarios.socio WHERE id_socio = @new_id_socio AND activo = 1
+            )
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'Socio no encontrado' AS Mensaje, '404' AS Estado;
+                RETURN;
+            END
+            SET @cur_socio = @new_id_socio;
+        END;
+
+        -- 5) Guardar cambios en invitado
+        UPDATE usuarios.invitado
+           SET id_socio = @cur_socio
+         WHERE id_invitado = @id_invitado;
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Invitado modificado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+
+END;
+GO
+/*
+* Nombre: EliminarInvitado
+* Descripcion: Elimina un invitado y desactiva su persona asociada.
+*   - @id_invitado obligatorio.
+*   - Marca activo=0 a la persona usando usuarios.EliminarPersona.
+*   - Luego elimina el registro de invitado.
+* Transacción explícita porque afecta invitado y persona.
+*/
+CREATE OR ALTER PROCEDURE usuarios.EliminarInvitado
+    @id_invitado INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    DECLARE @cur_persona INT;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- 1) Verificar invitado existe
+        SELECT @cur_persona = id_persona
+          FROM usuarios.invitado
+         WHERE id_invitado = @id_invitado;
+
+        IF @cur_persona IS NULL
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Invitado no encontrado' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- 2) Dar de baja la persona (activo = 0)
+        EXEC usuarios.EliminarPersona @id_persona = @cur_persona;
+
+        -- 3) Eliminar registro de invitado
+        DELETE FROM usuarios.invitado
+         WHERE id_invitado = @id_invitado;
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Invitado y persona eliminados correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+
+END;
+GO
+-- ############################################################
+-- ###################### SP USUARIO ##########################
+-- ############################################################
+GO
+/*
+* Nombre: CrearUsuario
+* Descripcion: Crea un usuario reutilizando o creando la persona asociada.
+* Parametros:
+*   @id_persona    INT           = NULL  – Si existe y activo, se reutiliza; si no, se crea.
+*   @dni           VARCHAR(9)           – DNI de la persona.
+*   @nombre        VARCHAR(50)          – Nombre de la persona.
+*   @apellido      VARCHAR(50)          – Apellido de la persona.
+*   @email         VARCHAR(320)         – Email de la persona.
+*   @fecha_nac     DATE                 – Fecha de nacimiento de la persona.
+*   @telefono      VARCHAR(20)          – Teléfono de la persona.
+*   @username      VARCHAR(50)          – Nombre de usuario (único, sin espacios, minúsculas).
+*   @password_hash VARCHAR(256)         – Hash de la contraseña.
+*/
+CREATE OR ALTER PROCEDURE usuarios.CrearUsuario
+    @id_persona    INT           = NULL,
+    @dni           VARCHAR(9),
+    @nombre        VARCHAR(50),
+    @apellido      VARCHAR(50),
+    @email         VARCHAR(320),
+    @fecha_nac     DATE,
+    @telefono      VARCHAR(20),
+    @username      VARCHAR(50),
+    @password_hash VARCHAR(256)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    DECLARE @new_persona INT;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- 1) Reutilizar o crear persona
+        IF @id_persona IS NOT NULL
+           AND EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
+        BEGIN
+            SET @new_persona = @id_persona;
+        END
+        ELSE
+        BEGIN
+            EXEC usuarios.CrearPersona
+                @dni, @nombre, @apellido, @email, @fecha_nac, @telefono,
+                @id_persona = @new_persona OUTPUT;
+            IF @new_persona IS NULL
+            BEGIN
+                ROLLBACK TRANSACTION; 
+                RETURN;
+            END
+        END;
+
+        -- 2) Validar username
+        IF @username IS NULL OR LTRIM(RTRIM(@username)) = ''
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El username es obligatorio' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END
+        IF @username LIKE '% %' OR @username <> LOWER(@username)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El username no debe tener espacios y debe estar en minúsculas' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END
+        IF EXISTS(SELECT 1 FROM usuarios.usuario WHERE LOWER(username) = LOWER(@username))
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Ya existe un usuario con ese username' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+
+        -- 3) Validar hash
+        IF @password_hash IS NULL OR LEN(@password_hash) = 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El password_hash es obligatorio' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END
+
+        -- 4) Insertar usuario
+        INSERT INTO usuarios.usuario(id_persona, username, password_hash)
+        VALUES(@new_persona, @username, @password_hash);
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Usuario creado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: ModificarUsuario
+* Descripcion: Modifica un usuario y/o sus datos de persona asociados.
+* Parametros:
+*   @id_usuario     INT             – ID del usuario a modificar.
+*   @new_id_persona INT           = NULL – (Opcional) Reasignar o crear nueva persona.
+*   @dni            VARCHAR(9)    = NULL – (Opcional) Nuevo DNI.
+*   @nombre         VARCHAR(50)   = NULL – (Opcional) Nuevo nombre.
+*   @apellido       VARCHAR(50)   = NULL – (Opcional) Nuevo apellido.
+*   @email          VARCHAR(320)  = NULL – (Opcional) Nuevo email.
+*   @fecha_nac      DATE          = NULL – (Opcional) Nueva fecha de nacimiento.
+*   @telefono       VARCHAR(20)   = NULL – (Opcional) Nuevo teléfono.
+*   @username       VARCHAR(50)   = NULL – (Opcional) Nuevo username.
+*   @password_hash  VARCHAR(256)  = NULL – (Opcional) Nuevo hash de contraseña.
+*   @estado         BIT           = NULL – (Opcional) Nuevo estado (1=activo,0=inactivo).
+*/
+CREATE OR ALTER PROCEDURE usuarios.ModificarUsuario
+    @id_usuario     INT,
+    @new_id_persona INT           = NULL,
+    @dni            VARCHAR(9)    = NULL,
+    @nombre         VARCHAR(50)   = NULL,
+    @apellido       VARCHAR(50)   = NULL,
+    @email          VARCHAR(320)  = NULL,
+    @fecha_nac      DATE          = NULL,
+    @telefono       VARCHAR(20)   = NULL,
+    @username       VARCHAR(50)   = NULL,
+    @password_hash  VARCHAR(256)  = NULL,
+    @estado         BIT           = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    DECLARE @cur_persona INT;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- 1) Verificar usuario existe y activo
+        IF NOT EXISTS(SELECT 1 FROM usuarios.usuario WHERE id_usuario = @id_usuario AND estado = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Usuario no encontrado' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- 2) Obtener persona actual
+        SELECT @cur_persona = id_persona
+          FROM usuarios.usuario
+         WHERE id_usuario = @id_usuario;
+
+        -- 3) Reasignar o crear persona si se pidió
+        IF @new_id_persona IS NOT NULL
+        BEGIN
+            IF EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @new_id_persona AND activo = 1)
+                SET @cur_persona = @new_id_persona;
+            ELSE IF @dni IS NOT NULL 
+                 AND @nombre IS NOT NULL 
+                 AND @apellido IS NOT NULL 
+                 AND @email IS NOT NULL 
+                 AND @fecha_nac IS NOT NULL 
+                 AND @telefono IS NOT NULL
+            BEGIN
+                EXEC usuarios.CrearPersona
+                    @dni, @nombre, @apellido, @email, @fecha_nac, @telefono,
+                    @id_persona = @cur_persona OUTPUT;
+                IF @cur_persona IS NULL
+                BEGIN
+                    ROLLBACK TRANSACTION;
+                    RETURN;
+                END
+            END
+            ELSE
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 
+                       'La persona a reasignar no existe y no hay datos para crearla' AS Mensaje, 
+                       '400' AS Estado;
+                RETURN;
+            END;
+        END;
+
+        -- 4) Actualizar DNI si se pide
+        IF @dni IS NOT NULL
+        BEGIN
+            IF LEN(@dni) < 7 OR LEN(@dni) > 8 OR @dni LIKE '%[^0-9]%'
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'DNI inválido. Debe contener entre 7 y 8 dígitos numéricos.' AS Mensaje, '400' AS Estado;
+                RETURN;
+            END;
+            IF EXISTS(SELECT 1 FROM usuarios.persona WHERE dni = @dni AND id_persona <> @cur_persona)
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'DNI duplicado.' AS Mensaje, '400' AS Estado;
+                RETURN;
+            END;
+            UPDATE usuarios.persona
+               SET dni = @dni
+             WHERE id_persona = @cur_persona;
+        END;
+
+        -- 5) Actualizar otros campos de persona si se piden
+        IF @nombre IS NOT NULL OR @apellido IS NOT NULL OR @email IS NOT NULL OR @fecha_nac IS NOT NULL OR @telefono IS NOT NULL
+        BEGIN
+            SELECT
+                @nombre    = COALESCE(@nombre, nombre),
+                @apellido  = COALESCE(@apellido, apellido),
+                @email     = COALESCE(@email, email),
+                @fecha_nac = COALESCE(@fecha_nac, fecha_nac),
+                @telefono  = COALESCE(@telefono, telefono)
+              FROM usuarios.persona
+             WHERE id_persona = @cur_persona;
+
+            EXEC usuarios.ModificarPersona
+                @id_persona = @cur_persona,
+                @nombre     = @nombre,
+                @apellido   = @apellido,
+                @email      = @email,
+                @fecha_nac  = @fecha_nac,
+                @telefono   = @telefono;
+        END;
+
+        -- 6) Validar username si se pide
+        IF @username IS NOT NULL
+        BEGIN
+            IF LTRIM(@username) = '' 
+               OR @username LIKE '% %' 
+               OR @username <> LOWER(@username)
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'Username inválido (espacios o mayúsculas)' AS Mensaje, '400' AS Estado;
+                RETURN;
+            END;
+            IF EXISTS(SELECT 1 FROM usuarios.usuario WHERE username = @username AND id_usuario <> @id_usuario)
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'Username duplicado' AS Mensaje, '409' AS Estado;
+                RETURN;
+            END;
+        END;
+
+        -- 7) Validar hash si se pide
+        IF @password_hash IS NOT NULL AND LEN(@password_hash) = 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Password_hash inválido' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+
+        -- 8) Actualizar usuario
+        UPDATE usuarios.usuario
+           SET id_persona    = @cur_persona,
+               username      = COALESCE(@username, username),
+               password_hash = COALESCE(@password_hash, password_hash),
+               estado        = COALESCE(@estado, estado)
+         WHERE id_usuario = @id_usuario;
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Usuario modificado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: EliminarUsuario
+* Descripcion: Realiza eliminación lógica de un usuario (marca estado=0).
+* Parametros:
+*   @id_usuario INT – ID del usuario a eliminar.
+*/
+CREATE OR ALTER PROCEDURE usuarios.EliminarUsuario
+    @id_usuario INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- 1) Verificar existencia y activo
+    IF NOT EXISTS(SELECT 1 FROM usuarios.usuario WHERE id_usuario = @id_usuario AND estado = 1)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Usuario no encontrado' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+    BEGIN TRY
+        UPDATE usuarios.usuario
+           SET estado = 0
+         WHERE id_usuario = @id_usuario;
+        SELECT 'OK' AS Resultado, 'Usuario dado de baja correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+-- ############################################################
+-- ##################### SP RESPONSABLE [REVISAR LOGICA] #######################
+-- ############################################################
+GO
+/*
+* Nombre: CrearResponsable
+* Descripcion: Crea un responsable, reutilizando o creando la persona asociada.
+* Parametros:
+*   @id_persona  INT           = NULL  – Si existe y activo, se reutiliza; si no, se crea.
+*   @dni         VARCHAR(9)           – DNI de la persona.
+*   @nombre      VARCHAR(50)          – Nombre de la persona.
+*   @apellido    VARCHAR(50)          – Apellido de la persona.
+*   @email       VARCHAR(320)         – Email de la persona.
+*   @fecha_nac   DATE                 – Fecha de nacimiento.
+*   @telefono    VARCHAR(20)          – Teléfono de la persona.
+*   @id_grupo    INT                  – FK a usuarios.grupo_familiar.
+*   @parentesco  VARCHAR(10)          – Parentesco de la persona con el grupo.
+* Aclaracion: Se utiliza transacción explícita porque se afectan dos tablas.
+*/
+CREATE OR ALTER PROCEDURE usuarios.CrearResponsable
+    @id_persona  INT = NULL,
+    @dni         VARCHAR(9),
+    @nombre      VARCHAR(50),
+    @apellido    VARCHAR(50),
+    @email       VARCHAR(320),
+    @fecha_nac   DATE,
+    @telefono    VARCHAR(20),
+    @id_grupo    INT,
+    @parentesco  VARCHAR(10)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    DECLARE @new_persona INT;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- 1) Reutilizar persona existente o crear nueva
+        IF @id_persona IS NOT NULL
+        BEGIN
+            -- Si me pasaron un ID, debe existir
+            IF EXISTS (SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
+                SET @new_persona = @id_persona;
+            ELSE
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 
+                       'La persona a reasignar no existe' AS Mensaje, 
+                       '404' AS Estado;
+                RETURN;
+            END
+        END
+        ELSE
+        BEGIN
+            -- No me pasaron ID: creo una nueva persona
+            EXEC usuarios.CrearPersona
+                @dni, @nombre, @apellido, @email, @fecha_nac, @telefono,
+                @id_persona = @new_persona OUTPUT;
+            IF @new_persona IS NULL
+            BEGIN
+                ROLLBACK TRANSACTION;
+                RETURN;
+            END
+        END;
 
 
+        -- 2) Verificar grupo existente y activo
+        IF NOT EXISTS(SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo AND estado = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
 
+        -- 3) Validar parentesco
+        IF @parentesco IS NULL OR LTRIM(RTRIM(@parentesco)) = ''
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El parentesco es obligatorio' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
 
+        -- 4) Verificar que la persona no sea ya responsable
+        IF EXISTS(SELECT 1 FROM usuarios.responsable WHERE id_persona = @new_persona)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La persona ya es responsable de otro grupo' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
 
+        -- 5) Inserto responsable
+        INSERT INTO usuarios.responsable(id_grupo, id_persona, parentesco)
+        VALUES(@id_grupo, @new_persona, LTRIM(RTRIM(@parentesco)));
 
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Responsable creado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
 
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
 
+END;
+GO
+/*
+* Nombre: ModificarResponsable
+* Descripcion: Modifica un responsable y/o sus datos de persona asociados.
+* Parametros:
+*   @id_responsable INT           – ID del responsable a modificar.
+*   @new_id_persona  INT     = NULL – (Opcional) Reasignar o crear nueva persona.
+*   @dni             VARCHAR(9)    = NULL – (Opcional) Nuevo DNI.
+*   @nombre          VARCHAR(50)   = NULL – (Opcional) Nuevo nombre.
+*   @apellido        VARCHAR(50)   = NULL – (Opcional) Nuevo apellido.
+*   @email           VARCHAR(320)  = NULL – (Opcional) Nuevo email.
+*   @fecha_nac       DATE          = NULL – (Opcional) Nueva fecha de nacimiento.
+*   @telefono        VARCHAR(20)   = NULL – (Opcional) Nuevo teléfono.
+*   @new_id_grupo    INT           = NULL – (Opcional) Nuevo grupo familiar.
+*   @parentesco      VARCHAR(10)   = NULL – (Opcional) Nuevo parentesco.
+* Aclaracion: Se utiliza transacción explícita porque puede afectar varias tablas.
+*/
+CREATE OR ALTER PROCEDURE usuarios.ModificarResponsable
+    @id_responsable INT,
+    @new_id_persona  INT           = NULL,
+    @dni             VARCHAR(9)    = NULL,
+    @nombre          VARCHAR(50)   = NULL,
+    @apellido        VARCHAR(50)   = NULL,
+    @email           VARCHAR(320)  = NULL,
+    @fecha_nac       DATE          = NULL,
+    @telefono        VARCHAR(20)   = NULL,
+    @new_id_grupo    INT           = NULL,
+    @parentesco      VARCHAR(10)   = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    DECLARE @cur_persona INT;
 
+    BEGIN TRY
+        BEGIN TRANSACTION;
 
+        -- 1) Verificar responsable existe
+        IF NOT EXISTS(SELECT 1 FROM usuarios.responsable WHERE id_responsable = @id_responsable)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Responsable no encontrado' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
 
+        -- 2) Obtener persona actual
+        SELECT @cur_persona = id_persona
+          FROM usuarios.responsable
+         WHERE id_responsable = @id_responsable;
 
+        -- 3) Reasignar o crear persona si se pidió
+        IF @new_id_persona IS NOT NULL
+        BEGIN
+            IF EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @new_id_persona AND activo = 1)
+                SET @cur_persona = @new_id_persona;
+            ELSE IF @dni IS NOT NULL AND @nombre IS NOT NULL AND @apellido IS NOT NULL AND @email IS NOT NULL AND @fecha_nac IS NOT NULL AND @telefono IS NOT NULL
+                EXEC usuarios.CrearPersona @dni, @nombre, @apellido, @email, @fecha_nac, @telefono, @id_persona = @cur_persona OUTPUT;
+            ELSE
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'La persona a reasignar no existe y no hay datos para crearla' AS Mensaje, '400' AS Estado;
+                RETURN;
+            END;
+            IF @cur_persona IS NULL
+            BEGIN
+                ROLLBACK TRANSACTION;
+                RETURN;
+            END;
+        END;
 
+		-- 4) Actualizar DNI si se pide
+		IF @dni IS NOT NULL
+		BEGIN
+			-- 4.1) Formato y rango
+			IF LEN(@dni) < 7 OR LEN(@dni) > 8 OR @dni LIKE '%[^0-9]%'
+			BEGIN
+				ROLLBACK TRANSACTION;
+				SELECT 'Error' AS Resultado, 'DNI inválido. Debe contener entre 7 y 8 dígitos numéricos.' AS Mensaje, '400' AS Estado;
+				RETURN;
+			END;
+			-- 4.2) Unicidad
+			IF EXISTS(SELECT 1 FROM usuarios.persona WHERE dni = @dni AND id_persona <> @cur_persona)
+			BEGIN
+				ROLLBACK TRANSACTION;
+				SELECT 'Error' AS Resultado, 'DNI duplicado.' AS Mensaje, '400' AS Estado;
+				RETURN;
+			END;
+			-- 4.3) Update
+			UPDATE usuarios.persona
+			   SET dni = @dni
+			 WHERE id_persona = @cur_persona;
+		END;
 
-go
+        -- 5) Actualizar otros campos de persona si se piden
+        IF  @nombre    IS NOT NULL
+        OR  @apellido  IS NOT NULL
+        OR  @email     IS NOT NULL
+        OR  @fecha_nac IS NOT NULL
+        OR  @telefono  IS NOT NULL
+        BEGIN
+            SELECT
+                @nombre     = COALESCE(@nombre, nombre), -- coalesce agarra el primer NO-NULL
+                @apellido   = COALESCE(@apellido, apellido),
+                @email      = COALESCE(@email, email),
+                @fecha_nac  = COALESCE(@fecha_nac, fecha_nac),
+                @telefono   = COALESCE(@telefono, telefono)
+            FROM usuarios.persona
+            WHERE id_persona = @cur_persona;
+
+            EXEC usuarios.ModificarPersona
+                @id_persona = @cur_persona,
+                @nombre     = @nombre,
+                @apellido   = @apellido,
+                @email      = @email,
+                @fecha_nac  = @fecha_nac,
+                @telefono   = @telefono;
+        END;
+
+        -- 6) Validar grupo si se pidió
+        IF @new_id_grupo IS NOT NULL
+        BEGIN
+            IF NOT EXISTS(SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @new_id_grupo AND estado = 1)
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje, '404' AS Estado;
+                RETURN;
+            END;
+            IF EXISTS(SELECT 1 FROM usuarios.responsable WHERE id_grupo = @new_id_grupo AND id_responsable <> @id_responsable)
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'Ya existe otro responsable para ese grupo' AS Mensaje, '400' AS Estado;
+                RETURN;
+            END;
+        END;
+
+        -- 7) Validar parentesco si se pidió
+        IF @parentesco IS NOT NULL
+        BEGIN
+            IF LTRIM(RTRIM(@parentesco)) = ''
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El parentesco no puede estar vacío' AS Mensaje, '400' AS Estado;
+                RETURN;
+            END;
+        END;
+
+        -- 8) Actualizar responsable
+        UPDATE usuarios.responsable
+        SET
+            id_persona = @cur_persona,
+            id_grupo   = COALESCE(@new_id_grupo, id_grupo),
+            parentesco = COALESCE(LTRIM(RTRIM(@parentesco)), parentesco)
+        WHERE id_responsable = @id_responsable;
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Responsable modificado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+
+END;
+GO
+/*
+* Nombre: EliminarResponsable
+* Descripcion: Realiza eliminación física de un responsable.
+* Parametros:
+*   @id_responsable INT – ID del responsable a eliminar.
+* Aclaracion: No se utiliza transacción explícita ya que solo se trabaja con una única tabla.
+*/
+CREATE OR ALTER PROCEDURE usuarios.EliminarResponsable
+    @id_responsable INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF NOT EXISTS (SELECT 1 FROM usuarios.responsable WHERE id_responsable = @id_responsable)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Responsable no encontrado' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        DELETE FROM usuarios.responsable WHERE id_responsable = @id_responsable;
+        SELECT 'OK' AS Resultado, 'Responsable eliminado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+
+END;
+GO
 -- ############################################################
 -- ######################## SP ROL ############################
 -- ############################################################
-
+GO
 /*
 * Nombre: CrearRol
 * Descripcion: Inserta un nuevo rol en la tabla usuarios.Rol, validando su informacion.
@@ -1025,9 +1892,6 @@ go
 * Aclaracion: No se utiliza transacciones explicitas ya que: 
 *   Solo se trabaja con una unica tabla y ejecutando sentencia DML
 */
-
-
-
 GO
 CREATE OR ALTER PROCEDURE usuarios.CrearRol
     @nombre VARCHAR(50),
@@ -1048,22 +1912,20 @@ BEGIN
         RETURN;
     END;
     -- Verifico duplicado de nombre:
-    IF EXISTS (SELECT 1 FROM usuarios.Rol WHERE nombre = LTRIM(RTRIM(@nombre)))
+    IF EXISTS (SELECT 1 FROM usuarios.Rol WHERE LOWER(nombre) = LOWER(LTRIM(RTRIM(@nombre))))
     BEGIN
         SELECT 'Error' AS Resultado, 'Ya existe un rol con ese nombre.' AS Mensaje, '400' AS Estado;
         RETURN;
     END;
     BEGIN TRY
         INSERT INTO usuarios.Rol (nombre, descripcion)
-        VALUES (LTRIM(RTRIM(@nombre)), LTRIM(RTRIM(@descripcion)));
+        VALUES (LOWER(LTRIM(RTRIM(@nombre))), LTRIM(RTRIM(@descripcion)));
         SELECT 'OK' AS Resultado, 'Rol creado correctamente.' AS Mensaje, '200' AS Estado;
     END TRY
     BEGIN CATCH
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
     END CATCH;
 END;
-
-
 GO
 /*
 * Nombre: ModificarRol
@@ -1104,7 +1966,7 @@ BEGIN
     IF EXISTS (
         SELECT 1
           FROM usuarios.Rol
-         WHERE nombre = LTRIM(RTRIM(@nombre))
+         WHERE LOWER(nombre) = LOWER(LTRIM(RTRIM(@nombre)))
            AND id_rol <> @id_rol
     )
     BEGIN
@@ -1113,7 +1975,7 @@ BEGIN
     END;
     BEGIN TRY
         UPDATE usuarios.Rol
-           SET nombre      = LTRIM(RTRIM(@nombre)),
+           SET nombre      = LOWER(LTRIM(RTRIM(@nombre))),
                descripcion = LTRIM(RTRIM(@descripcion))
          WHERE id_rol = @id_rol;
         SELECT 'OK' AS Resultado, 'Rol modificado correctamente.' AS Mensaje, '200' AS Estado;
@@ -1123,7 +1985,6 @@ BEGIN
     END CATCH;
 END;
 GO
-
 /*
 * Nombre: EliminarRol
 * Descripcion: Elimina fisicamente un rol de la tabla usuarios.Rol.
@@ -1154,10 +2015,40 @@ BEGIN
 END;
 GO
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 -- ############################################################
 -- ######################## SP CLASE ##########################
 -- ############################################################
-
+GO
 /*
 * Nombre: CrearClase
 * Descripcion: Crea una nueva clase, validando que no haya conflictos de horarios.
@@ -2218,860 +3109,3 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
-GO
--- ############################################################
--- ##################### SP RESPONSABLE #######################
--- ############################################################
-
-/*
-* Nombre: CrearResponsable
-* Descripcion: Crea un responsable, reutilizando o creando la persona asociada.
-* Parametros:
-*   @id_persona  INT           = NULL  – Si existe y activo, se reutiliza; si no, se crea.
-*   @dni         VARCHAR(9)           – DNI de la persona.
-*   @nombre      VARCHAR(50)          – Nombre de la persona.
-*   @apellido    VARCHAR(50)          – Apellido de la persona.
-*   @email       VARCHAR(320)         – Email de la persona.
-*   @fecha_nac   DATE                 – Fecha de nacimiento.
-*   @telefono    VARCHAR(20)          – Teléfono de la persona.
-*   @id_grupo    INT                  – FK a usuarios.grupo_familiar.
-*   @parentesco  VARCHAR(10)          – Parentesco de la persona con el grupo.
-* Aclaracion: Se utiliza transacción explícita porque se afectan dos tablas.
-*/
-CREATE OR ALTER PROCEDURE usuarios.CrearResponsable
-    @id_persona  INT = NULL,
-    @dni         VARCHAR(9),
-    @nombre      VARCHAR(50),
-    @apellido    VARCHAR(50),
-    @email       VARCHAR(320),
-    @fecha_nac   DATE,
-    @telefono    VARCHAR(20),
-    @id_grupo    INT,
-    @parentesco  VARCHAR(10)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-    DECLARE @new_persona INT;
-
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        -- 1) Reutilizar persona existente o crear nueva
-        IF @id_persona IS NOT NULL
-        BEGIN
-            -- Si me pasaron un ID, debe existir
-            IF EXISTS (SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
-                SET @new_persona = @id_persona;
-            ELSE
-            BEGIN
-                ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 
-                       'La persona a reasignar no existe' AS Mensaje, 
-                       '404' AS Estado;
-                RETURN;
-            END
-        END
-        ELSE
-        BEGIN
-            -- No me pasaron ID: creo una nueva persona
-            EXEC usuarios.CrearPersona
-                @dni, @nombre, @apellido, @email, @fecha_nac, @telefono,
-                @id_persona = @new_persona OUTPUT;
-            IF @new_persona IS NULL
-            BEGIN
-                ROLLBACK TRANSACTION;
-                RETURN;
-            END
-        END;
-
-
-        -- 2) Verificar grupo existente y activo
-        IF NOT EXISTS(SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo AND estado = 1)
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje, '404' AS Estado;
-            RETURN;
-        END;
-
-        -- 3) Validar parentesco
-        IF @parentesco IS NULL OR LTRIM(RTRIM(@parentesco)) = ''
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'El parentesco es obligatorio' AS Mensaje, '400' AS Estado;
-            RETURN;
-        END;
-
-        -- 4) Verificar que la persona no sea ya responsable
-        IF EXISTS(SELECT 1 FROM usuarios.responsable WHERE id_persona = @new_persona)
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'La persona ya es responsable de otro grupo' AS Mensaje, '400' AS Estado;
-            RETURN;
-        END;
-
-        -- 5) Inserto responsable
-        INSERT INTO usuarios.responsable(id_grupo, id_persona, parentesco)
-        VALUES(@id_grupo, @new_persona, LTRIM(RTRIM(@parentesco)));
-
-        COMMIT TRANSACTION;
-        SELECT 'OK' AS Resultado, 'Responsable creado correctamente' AS Mensaje, '200' AS Estado;
-    END TRY
-
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-    END CATCH;
-
-END;
-GO
-/*
-* Nombre: ModificarResponsable
-* Descripcion: Modifica un responsable y/o sus datos de persona asociados.
-* Parametros:
-*   @id_responsable INT           – ID del responsable a modificar.
-*   @new_id_persona  INT     = NULL – (Opcional) Reasignar o crear nueva persona.
-*   @dni             VARCHAR(9)    = NULL – (Opcional) Nuevo DNI.
-*   @nombre          VARCHAR(50)   = NULL – (Opcional) Nuevo nombre.
-*   @apellido        VARCHAR(50)   = NULL – (Opcional) Nuevo apellido.
-*   @email           VARCHAR(320)  = NULL – (Opcional) Nuevo email.
-*   @fecha_nac       DATE          = NULL – (Opcional) Nueva fecha de nacimiento.
-*   @telefono        VARCHAR(20)   = NULL – (Opcional) Nuevo teléfono.
-*   @new_id_grupo    INT           = NULL – (Opcional) Nuevo grupo familiar.
-*   @parentesco      VARCHAR(10)   = NULL – (Opcional) Nuevo parentesco.
-* Aclaracion: Se utiliza transacción explícita porque puede afectar varias tablas.
-*/
-CREATE OR ALTER PROCEDURE usuarios.ModificarResponsable
-    @id_responsable INT,
-    @new_id_persona  INT           = NULL,
-    @dni             VARCHAR(9)    = NULL,
-    @nombre          VARCHAR(50)   = NULL,
-    @apellido        VARCHAR(50)   = NULL,
-    @email           VARCHAR(320)  = NULL,
-    @fecha_nac       DATE          = NULL,
-    @telefono        VARCHAR(20)   = NULL,
-    @new_id_grupo    INT           = NULL,
-    @parentesco      VARCHAR(10)   = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-    DECLARE @cur_persona INT;
-
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        -- 1) Verificar responsable existe
-        IF NOT EXISTS(SELECT 1 FROM usuarios.responsable WHERE id_responsable = @id_responsable)
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Responsable no encontrado' AS Mensaje, '404' AS Estado;
-            RETURN;
-        END;
-
-        -- 2) Obtener persona actual
-        SELECT @cur_persona = id_persona
-          FROM usuarios.responsable
-         WHERE id_responsable = @id_responsable;
-
-        -- 3) Reasignar o crear persona si se pidió
-        IF @new_id_persona IS NOT NULL
-        BEGIN
-            IF EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @new_id_persona AND activo = 1)
-                SET @cur_persona = @new_id_persona;
-            ELSE IF @dni IS NOT NULL AND @nombre IS NOT NULL AND @apellido IS NOT NULL AND @email IS NOT NULL AND @fecha_nac IS NOT NULL AND @telefono IS NOT NULL
-                EXEC usuarios.CrearPersona @dni, @nombre, @apellido, @email, @fecha_nac, @telefono, @id_persona = @cur_persona OUTPUT;
-            ELSE
-            BEGIN
-                ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'La persona a reasignar no existe y no hay datos para crearla' AS Mensaje, '400' AS Estado;
-                RETURN;
-            END;
-            IF @cur_persona IS NULL
-            BEGIN
-                ROLLBACK TRANSACTION;
-                RETURN;
-            END;
-        END;
-
-		-- 4) Actualizar DNI si se pide
-		IF @dni IS NOT NULL
-		BEGIN
-			-- 4.1) Formato y rango
-			IF LEN(@dni) < 7 OR LEN(@dni) > 8 OR @dni LIKE '%[^0-9]%'
-			BEGIN
-				ROLLBACK TRANSACTION;
-				SELECT 'Error' AS Resultado, 'DNI inválido. Debe contener entre 7 y 8 dígitos numéricos.' AS Mensaje, '400' AS Estado;
-				RETURN;
-			END;
-			-- 4.2) Unicidad
-			IF EXISTS(SELECT 1 FROM usuarios.persona WHERE dni = @dni AND id_persona <> @cur_persona)
-			BEGIN
-				ROLLBACK TRANSACTION;
-				SELECT 'Error' AS Resultado, 'DNI duplicado.' AS Mensaje, '400' AS Estado;
-				RETURN;
-			END;
-			-- 4.3) Update
-			UPDATE usuarios.persona
-			   SET dni = @dni
-			 WHERE id_persona = @cur_persona;
-		END;
-
-        -- 5) Actualizar otros campos de persona si se piden
-        IF  @nombre    IS NOT NULL
-        OR  @apellido  IS NOT NULL
-        OR  @email     IS NOT NULL
-        OR  @fecha_nac IS NOT NULL
-        OR  @telefono  IS NOT NULL
-        BEGIN
-            SELECT
-                @nombre     = COALESCE(@nombre, nombre), -- coalesce agarra el primer NO-NULL
-                @apellido   = COALESCE(@apellido, apellido),
-                @email      = COALESCE(@email, email),
-                @fecha_nac  = COALESCE(@fecha_nac, fecha_nac),
-                @telefono   = COALESCE(@telefono, telefono)
-            FROM usuarios.persona
-            WHERE id_persona = @cur_persona;
-
-            EXEC usuarios.ModificarPersona
-                @id_persona = @cur_persona,
-                @nombre     = @nombre,
-                @apellido   = @apellido,
-                @email      = @email,
-                @fecha_nac  = @fecha_nac,
-                @telefono   = @telefono;
-        END;
-
-        -- 6) Validar grupo si se pidió
-        IF @new_id_grupo IS NOT NULL
-        BEGIN
-            IF NOT EXISTS(SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @new_id_grupo AND estado = 1)
-            BEGIN
-                ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'Grupo familiar no encontrado' AS Mensaje, '404' AS Estado;
-                RETURN;
-            END;
-            IF EXISTS(SELECT 1 FROM usuarios.responsable WHERE id_grupo = @new_id_grupo AND id_responsable <> @id_responsable)
-            BEGIN
-                ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'Ya existe otro responsable para ese grupo' AS Mensaje, '400' AS Estado;
-                RETURN;
-            END;
-        END;
-
-        -- 7) Validar parentesco si se pidió
-        IF @parentesco IS NOT NULL
-        BEGIN
-            IF LTRIM(RTRIM(@parentesco)) = ''
-            BEGIN
-                ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'El parentesco no puede estar vacío' AS Mensaje, '400' AS Estado;
-                RETURN;
-            END;
-        END;
-
-        -- 8) Actualizar responsable
-        UPDATE usuarios.responsable
-        SET
-            id_persona = @cur_persona,
-            id_grupo   = COALESCE(@new_id_grupo, id_grupo),
-            parentesco = COALESCE(LTRIM(RTRIM(@parentesco)), parentesco)
-        WHERE id_responsable = @id_responsable;
-
-        COMMIT TRANSACTION;
-        SELECT 'OK' AS Resultado, 'Responsable modificado correctamente' AS Mensaje, '200' AS Estado;
-    END TRY
-
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-    END CATCH;
-
-END;
-GO
-/*
-* Nombre: EliminarResponsable
-* Descripcion: Realiza eliminación física de un responsable.
-* Parametros:
-*   @id_responsable INT – ID del responsable a eliminar.
-* Aclaracion: No se utiliza transacción explícita ya que solo se trabaja con una única tabla.
-*/
-CREATE OR ALTER PROCEDURE usuarios.EliminarResponsable
-    @id_responsable INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-
-    IF NOT EXISTS (SELECT 1 FROM usuarios.responsable WHERE id_responsable = @id_responsable)
-    BEGIN
-        SELECT 'Error' AS Resultado, 'Responsable no encontrado' AS Mensaje, '404' AS Estado;
-        RETURN;
-    END;
-
-    BEGIN TRY
-        DELETE FROM usuarios.responsable WHERE id_responsable = @id_responsable;
-        SELECT 'OK' AS Resultado, 'Responsable eliminado correctamente' AS Mensaje, '200' AS Estado;
-    END TRY
-
-    BEGIN CATCH
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-    END CATCH;
-
-END;
-GO
--- ############################################################
--- ###################### SP USUARIO ##########################
--- ############################################################
-
-/*
-* Nombre: CrearUsuario
-* Descripcion: Crea un usuario reutilizando o creando la persona asociada.
-* Parametros:
-*   @id_persona    INT           = NULL  – Si existe y activo, se reutiliza; si no, se crea.
-*   @dni           VARCHAR(9)           – DNI de la persona.
-*   @nombre        VARCHAR(50)          – Nombre de la persona.
-*   @apellido      VARCHAR(50)          – Apellido de la persona.
-*   @email         VARCHAR(320)         – Email de la persona.
-*   @fecha_nac     DATE                 – Fecha de nacimiento de la persona.
-*   @telefono      VARCHAR(20)          – Teléfono de la persona.
-*   @username      VARCHAR(50)          – Nombre de usuario (único, sin espacios, minúsculas).
-*   @password_hash VARCHAR(256)         – Hash de la contraseña.
-*/
-CREATE OR ALTER PROCEDURE usuarios.CrearUsuario
-    @id_persona    INT           = NULL,
-    @dni           VARCHAR(9),
-    @nombre        VARCHAR(50),
-    @apellido      VARCHAR(50),
-    @email         VARCHAR(320),
-    @fecha_nac     DATE,
-    @telefono      VARCHAR(20),
-    @username      VARCHAR(50),
-    @password_hash VARCHAR(256)
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-    DECLARE @new_persona INT;
-
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        -- 1) Reutilizar o crear persona
-        IF @id_persona IS NOT NULL
-           AND EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
-        BEGIN
-            SET @new_persona = @id_persona;
-        END
-        ELSE
-        BEGIN
-            EXEC usuarios.CrearPersona
-                @dni, @nombre, @apellido, @email, @fecha_nac, @telefono,
-                @id_persona = @new_persona OUTPUT;
-            IF @new_persona IS NULL
-            BEGIN
-                ROLLBACK TRANSACTION; 
-                RETURN;
-            END
-        END;
-
-        -- 2) Validar username
-        IF @username IS NULL OR LTRIM(RTRIM(@username)) = ''
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'El username es obligatorio' AS Mensaje, '400' AS Estado;
-            RETURN;
-        END
-        IF @username LIKE '% %' OR @username <> LOWER(@username)
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'El username no debe tener espacios y debe estar en minúsculas' AS Mensaje, '400' AS Estado;
-            RETURN;
-        END
-        IF EXISTS(SELECT 1 FROM usuarios.usuario WHERE username = @username)
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Ya existe un usuario con ese username' AS Mensaje, '409' AS Estado;
-            RETURN;
-        END;
-
-        -- 3) Validar hash
-        IF @password_hash IS NULL OR LEN(@password_hash) = 0
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'El password_hash es obligatorio' AS Mensaje, '400' AS Estado;
-            RETURN;
-        END
-
-        -- 4) Insertar usuario
-        INSERT INTO usuarios.usuario(id_persona, username, password_hash)
-        VALUES(@new_persona, @username, @password_hash);
-
-        COMMIT TRANSACTION;
-        SELECT 'OK' AS Resultado, 'Usuario creado correctamente' AS Mensaje, '200' AS Estado;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-    END CATCH;
-END;
-GO
-/*
-* Nombre: ModificarUsuario
-* Descripcion: Modifica un usuario y/o sus datos de persona asociados.
-* Parametros:
-*   @id_usuario     INT             – ID del usuario a modificar.
-*   @new_id_persona INT           = NULL – (Opcional) Reasignar o crear nueva persona.
-*   @dni            VARCHAR(9)    = NULL – (Opcional) Nuevo DNI.
-*   @nombre         VARCHAR(50)   = NULL – (Opcional) Nuevo nombre.
-*   @apellido       VARCHAR(50)   = NULL – (Opcional) Nuevo apellido.
-*   @email          VARCHAR(320)  = NULL – (Opcional) Nuevo email.
-*   @fecha_nac      DATE          = NULL – (Opcional) Nueva fecha de nacimiento.
-*   @telefono       VARCHAR(20)   = NULL – (Opcional) Nuevo teléfono.
-*   @username       VARCHAR(50)   = NULL – (Opcional) Nuevo username.
-*   @password_hash  VARCHAR(256)  = NULL – (Opcional) Nuevo hash de contraseña.
-*   @estado         BIT           = NULL – (Opcional) Nuevo estado (1=activo,0=inactivo).
-*/
-CREATE OR ALTER PROCEDURE usuarios.ModificarUsuario
-    @id_usuario     INT,
-    @new_id_persona INT           = NULL,
-    @dni            VARCHAR(9)    = NULL,
-    @nombre         VARCHAR(50)   = NULL,
-    @apellido       VARCHAR(50)   = NULL,
-    @email          VARCHAR(320)  = NULL,
-    @fecha_nac      DATE          = NULL,
-    @telefono       VARCHAR(20)   = NULL,
-    @username       VARCHAR(50)   = NULL,
-    @password_hash  VARCHAR(256)  = NULL,
-    @estado         BIT           = NULL
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-    DECLARE @cur_persona INT;
-
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        -- 1) Verificar usuario existe y activo
-        IF NOT EXISTS(SELECT 1 FROM usuarios.usuario WHERE id_usuario = @id_usuario AND estado = 1)
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Usuario no encontrado' AS Mensaje, '404' AS Estado;
-            RETURN;
-        END;
-
-        -- 2) Obtener persona actual
-        SELECT @cur_persona = id_persona
-          FROM usuarios.usuario
-         WHERE id_usuario = @id_usuario;
-
-        -- 3) Reasignar o crear persona si se pidió
-        IF @new_id_persona IS NOT NULL
-        BEGIN
-            IF EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @new_id_persona AND activo = 1)
-                SET @cur_persona = @new_id_persona;
-            ELSE IF @dni IS NOT NULL 
-                 AND @nombre IS NOT NULL 
-                 AND @apellido IS NOT NULL 
-                 AND @email IS NOT NULL 
-                 AND @fecha_nac IS NOT NULL 
-                 AND @telefono IS NOT NULL
-            BEGIN
-                EXEC usuarios.CrearPersona
-                    @dni, @nombre, @apellido, @email, @fecha_nac, @telefono,
-                    @id_persona = @cur_persona OUTPUT;
-                IF @cur_persona IS NULL
-                BEGIN
-                    ROLLBACK TRANSACTION;
-                    RETURN;
-                END
-            END
-            ELSE
-            BEGIN
-                ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 
-                       'La persona a reasignar no existe y no hay datos para crearla' AS Mensaje, 
-                       '400' AS Estado;
-                RETURN;
-            END;
-        END;
-
-        -- 4) Actualizar DNI si se pide
-        IF @dni IS NOT NULL
-        BEGIN
-            IF LEN(@dni) < 7 OR LEN(@dni) > 8 OR @dni LIKE '%[^0-9]%'
-            BEGIN
-                ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'DNI inválido. Debe contener entre 7 y 8 dígitos numéricos.' AS Mensaje, '400' AS Estado;
-                RETURN;
-            END;
-            IF EXISTS(SELECT 1 FROM usuarios.persona WHERE dni = @dni AND id_persona <> @cur_persona)
-            BEGIN
-                ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'DNI duplicado.' AS Mensaje, '400' AS Estado;
-                RETURN;
-            END;
-            UPDATE usuarios.persona
-               SET dni = @dni
-             WHERE id_persona = @cur_persona;
-        END;
-
-        -- 5) Actualizar otros campos de persona si se piden
-        IF @nombre IS NOT NULL OR @apellido IS NOT NULL OR @email IS NOT NULL OR @fecha_nac IS NOT NULL OR @telefono IS NOT NULL
-        BEGIN
-            SELECT
-                @nombre    = COALESCE(@nombre, nombre),
-                @apellido  = COALESCE(@apellido, apellido),
-                @email     = COALESCE(@email, email),
-                @fecha_nac = COALESCE(@fecha_nac, fecha_nac),
-                @telefono  = COALESCE(@telefono, telefono)
-              FROM usuarios.persona
-             WHERE id_persona = @cur_persona;
-
-            EXEC usuarios.ModificarPersona
-                @id_persona = @cur_persona,
-                @nombre     = @nombre,
-                @apellido   = @apellido,
-                @email      = @email,
-                @fecha_nac  = @fecha_nac,
-                @telefono   = @telefono;
-        END;
-
-        -- 6) Validar username si se pide
-        IF @username IS NOT NULL
-        BEGIN
-            IF LTRIM(@username) = '' 
-               OR @username LIKE '% %' 
-               OR @username <> LOWER(@username)
-            BEGIN
-                ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'Username inválido (espacios o mayúsculas)' AS Mensaje, '400' AS Estado;
-                RETURN;
-            END;
-            IF EXISTS(SELECT 1 FROM usuarios.usuario WHERE username = @username AND id_usuario <> @id_usuario)
-            BEGIN
-                ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'Username duplicado' AS Mensaje, '409' AS Estado;
-                RETURN;
-            END;
-        END;
-
-        -- 7) Validar hash si se pide
-        IF @password_hash IS NOT NULL AND LEN(@password_hash) = 0
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Password_hash inválido' AS Mensaje, '400' AS Estado;
-            RETURN;
-        END;
-
-        -- 8) Actualizar usuario
-        UPDATE usuarios.usuario
-           SET id_persona    = @cur_persona,
-               username      = COALESCE(@username, username),
-               password_hash = COALESCE(@password_hash, password_hash),
-               estado        = COALESCE(@estado, estado)
-         WHERE id_usuario = @id_usuario;
-
-        COMMIT TRANSACTION;
-        SELECT 'OK' AS Resultado, 'Usuario modificado correctamente' AS Mensaje, '200' AS Estado;
-    END TRY
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-    END CATCH;
-END;
-GO
-/*
-* Nombre: EliminarUsuario
-* Descripcion: Realiza eliminación lógica de un usuario (marca estado=0).
-* Parametros:
-*   @id_usuario INT – ID del usuario a eliminar.
-*/
-CREATE OR ALTER PROCEDURE usuarios.EliminarUsuario
-    @id_usuario INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    -- 1) Verificar existencia y activo
-    IF NOT EXISTS(SELECT 1 FROM usuarios.usuario WHERE id_usuario = @id_usuario AND estado = 1)
-    BEGIN
-        SELECT 'Error' AS Resultado, 'Usuario no encontrado' AS Mensaje, '404' AS Estado;
-        RETURN;
-    END;
-    BEGIN TRY
-        UPDATE usuarios.usuario
-           SET estado = 0
-         WHERE id_usuario = @id_usuario;
-        SELECT 'OK' AS Resultado, 'Usuario dado de baja correctamente' AS Mensaje, '200' AS Estado;
-    END TRY
-    BEGIN CATCH
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-    END CATCH;
-END;
-GO
--- ############################################################
--- #################### SP INVITADO ###########################
--- ############################################################
-
-/*
-* Nombre: CrearInvitado
-* Descripcion: Crea un invitado, reutilizando o creando la persona asociada.
-*   - @id_socio es obligatorio y debe existir y estar activo.
-*   - Si se pasa @id_persona y existe y está activa, se reutiliza.
-*   - Si no, se requieren todos los datos de persona para crearla.
-*   - Verifica que la persona no esté ya invitada.
-* Transacción explícita porque afecta a dos tablas: persona e invitado.
-*/
-CREATE OR ALTER PROCEDURE usuarios.CrearInvitado
-    @id_persona     INT           = NULL,
-    @dni            VARCHAR(9)    = NULL,
-    @nombre         VARCHAR(50)   = NULL,
-    @apellido       VARCHAR(50)   = NULL,
-    @email          VARCHAR(320)  = NULL,
-    @fecha_nac      DATE          = NULL,
-    @telefono       VARCHAR(20)   = NULL,
-    @id_socio       INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-
-    -- 0) Validar socio obligatorio
-    IF @id_socio IS NULL
-    BEGIN
-        SELECT 'Error' AS Resultado, 'El id_socio es obligatorio' AS Mensaje, '400' AS Estado;
-        RETURN;
-    END
-
-    DECLARE @new_persona INT;
-
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        -- 1) Verificar socio existe y activo
-        IF NOT EXISTS(SELECT 1 FROM usuarios.socio WHERE id_socio = @id_socio AND activo = 1)
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Socio no encontrado' AS Mensaje, '404' AS Estado;
-            RETURN;
-        END;
-
-        -- 2) Reutilizar o crear persona
-        IF @id_persona IS NOT NULL
-           AND EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @id_persona AND activo = 1)
-        BEGIN
-            SET @new_persona = @id_persona;
-        END
-        ELSE
-        BEGIN
-            -- requieren todos los datos para crearla
-            IF @dni IS NULL OR @nombre IS NULL OR @apellido IS NULL
-               OR @email IS NULL OR @fecha_nac IS NULL OR @telefono IS NULL
-            BEGIN
-                ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'Faltan datos de persona para crearla' AS Mensaje, '400' AS Estado;
-                RETURN;
-            END
-
-            EXEC usuarios.CrearPersona
-                @dni, @nombre, @apellido, @email, @fecha_nac, @telefono,
-                @id_persona = @new_persona OUTPUT;
-            IF @new_persona IS NULL
-            BEGIN
-                ROLLBACK TRANSACTION;
-                RETURN;
-            END
-        END;
-
-        -- 3) Verificar que esa persona no esté ya invitada
-        IF EXISTS(SELECT 1 FROM usuarios.invitado WHERE id_persona = @new_persona)
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'La persona ya está invitada' AS Mensaje, '400' AS Estado;
-            RETURN;
-        END;
-
-        -- 4) Crear invitado
-        INSERT INTO usuarios.invitado(id_persona, id_socio)
-        VALUES(@new_persona, @id_socio);
-
-        COMMIT TRANSACTION;
-        SELECT 'OK' AS Resultado, 'Invitado creado correctamente' AS Mensaje, '200' AS Estado;
-    END TRY
-
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-    END CATCH;
-
-END;
-GO
-/*
-* Nombre: ModificarInvitado
-* Descripcion: Modifica un invitado y/o sus datos de persona asociados.
-*   - @id_invitado obligatorio.
-*   - Permite cambiar datos de la persona (dni, nombre, apellido, email, fecha_nac, telefono).
-*   - Permite cambiar el socio invitador (@new_id_socio).
-*   - No crea nuevas personas: actualiza la existente vía usuarios.ModificarPersona.
-* Transacción explícita porque puede afectar persona e invitado.
-*/
-CREATE OR ALTER PROCEDURE usuarios.ModificarInvitado
-    @id_invitado    INT,             
-    @dni            VARCHAR(9)    = NULL,  
-    @nombre         VARCHAR(50)   = NULL,  
-    @apellido       VARCHAR(50)   = NULL,  
-    @email          VARCHAR(320)  = NULL,  
-    @fecha_nac      DATE          = NULL,  
-    @telefono       VARCHAR(20)   = NULL,  
-    @new_id_socio   INT           = NULL   
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-    DECLARE @cur_persona INT, @cur_socio INT;
-
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        -- 1) Verificar invitado existe
-        IF NOT EXISTS (SELECT 1 FROM usuarios.invitado WHERE id_invitado = @id_invitado)
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Invitado no encontrado' AS Mensaje, '404' AS Estado;
-            RETURN;
-        END;
-
-        -- 2) Obtener persona y socio actuales
-        SELECT 
-            @cur_persona = id_persona,
-            @cur_socio   = id_socio
-          FROM usuarios.invitado
-         WHERE id_invitado = @id_invitado;
-
-         -- 3) Actualizar DNI si se pide
-		IF @dni IS NOT NULL
-		BEGIN
-			-- 3.1) Formato y rango
-			IF LEN(@dni) < 7 OR LEN(@dni) > 8 OR @dni LIKE '%[^0-9]%'
-			BEGIN
-				ROLLBACK TRANSACTION;
-				SELECT 'Error' AS Resultado, 'DNI inválido. Debe contener entre 7 y 8 dígitos numéricos.' AS Mensaje, '400' AS Estado;
-				RETURN;
-			END;
-			-- 4.2) Unicidad
-			IF EXISTS(SELECT 1 FROM usuarios.persona WHERE dni = @dni AND id_persona <> @cur_persona)
-			BEGIN
-				ROLLBACK TRANSACTION;
-				SELECT 'Error' AS Resultado, 'DNI duplicado.' AS Mensaje, '400' AS Estado;
-				RETURN;
-			END;
-			-- 4.3) Update
-			UPDATE usuarios.persona
-			   SET dni = @dni
-			 WHERE id_persona = @cur_persona;
-		END;
-
-        -- 3) Actualizar otros campos de persona si se piden
-        IF  @nombre     IS NOT NULL
-        OR  @apellido   IS NOT NULL
-        OR  @email      IS NOT NULL
-        OR  @fecha_nac  IS NOT NULL
-        OR  @telefono   IS NOT NULL
-        BEGIN
-            SELECT
-                @nombre     = COALESCE(@nombre, nombre),
-                @apellido   = COALESCE(@apellido, apellido),
-                @email      = COALESCE(@email, email),
-                @fecha_nac  = COALESCE(@fecha_nac, fecha_nac),
-                @telefono   = COALESCE(@telefono, telefono)
-              FROM usuarios.persona
-             WHERE id_persona = @cur_persona;
-
-            EXEC usuarios.ModificarPersona
-                @id_persona = @cur_persona,
-                @nombre     = @nombre,
-                @apellido   = @apellido,
-                @email      = @email,
-                @fecha_nac  = @fecha_nac,
-                @telefono   = @telefono;
-        END;
-
-        -- 4) Cambiar socio invitador si se pide
-        IF @new_id_socio IS NOT NULL
-        BEGIN
-            IF NOT EXISTS (
-                SELECT 1 FROM usuarios.socio WHERE id_socio = @new_id_socio AND activo = 1
-            )
-            BEGIN
-                ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'Socio no encontrado' AS Mensaje, '404' AS Estado;
-                RETURN;
-            END
-            SET @cur_socio = @new_id_socio;
-        END;
-
-        -- 5) Guardar cambios en invitado
-        UPDATE usuarios.invitado
-           SET id_socio = @cur_socio
-         WHERE id_invitado = @id_invitado;
-
-        COMMIT TRANSACTION;
-        SELECT 'OK' AS Resultado, 'Invitado modificado correctamente' AS Mensaje, '200' AS Estado;
-    END TRY
-
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-    END CATCH;
-
-END;
-GO
-/*
-* Nombre: EliminarInvitado
-* Descripcion: Elimina un invitado y desactiva su persona asociada.
-*   - @id_invitado obligatorio.
-*   - Marca activo=0 a la persona usando usuarios.EliminarPersona.
-*   - Luego elimina el registro de invitado.
-* Transacción explícita porque afecta invitado y persona.
-*/
-CREATE OR ALTER PROCEDURE usuarios.EliminarInvitado
-    @id_invitado INT
-AS
-BEGIN
-    SET NOCOUNT ON;
-    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
-    DECLARE @cur_persona INT;
-
-    BEGIN TRY
-        BEGIN TRANSACTION;
-
-        -- 1) Verificar invitado existe
-        SELECT @cur_persona = id_persona
-          FROM usuarios.invitado
-         WHERE id_invitado = @id_invitado;
-
-        IF @cur_persona IS NULL
-        BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Invitado no encontrado' AS Mensaje, '404' AS Estado;
-            RETURN;
-        END;
-
-        -- 2) Dar de baja la persona (activo = 0)
-        EXEC usuarios.EliminarPersona @id_persona = @cur_persona;
-
-        -- 3) Eliminar registro de invitado
-        DELETE FROM usuarios.invitado
-         WHERE id_invitado = @id_invitado;
-
-        COMMIT TRANSACTION;
-        SELECT 'OK' AS Resultado, 'Invitado y persona eliminados correctamente' AS Mensaje, '200' AS Estado;
-    END TRY
-
-    BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
-    END CATCH;
-
-END;
-GO
