@@ -23,8 +23,8 @@ CREATE SCHEMA actividades;
 GO
 CREATE SCHEMA facturacion;
 
--- Crear tablas (Esquema usuario): 
 GO
+-- Crear tablas:
 CREATE TABLE usuarios.persona(
 	id_persona INT IDENTITY(1,1) PRIMARY KEY,
 	dni VARCHAR(9) NOT NULL UNIQUE,
@@ -60,6 +60,13 @@ CREATE TABLE actividades.categoria(
 	CONSTRAINT CK_categoria_costo_membrecia CHECK (costo_membrecia >0)
 ); 
 GO
+CREATE TABLE actividades.pileta(
+	id_pileta INT IDENTITY(1,1) PRIMARY KEY,
+	detalle VARCHAR(50) NOT NULL,
+	metro_cuadrado DECIMAL(5,2),
+	CONSTRAINT CK_metro_cuadrado CHECK(metro_cuadrado > 0)
+);
+GO
 CREATE TABLE usuarios.socio(
 	id_socio INT IDENTITY(1,1) NOT NULL PRIMARY KEY,
     numero_socio VARCHAR(7) NOT NULL UNIQUE, 
@@ -72,6 +79,7 @@ CREATE TABLE usuarios.socio(
 	id_obra_social INT NULL,
     id_categoria INT NOT NULL,
     id_grupo INT NULL,
+	id_pileta INT NULL -- relacion opcional
 	
 	CONSTRAINT FK_socio_persona FOREIGN KEY (id_persona) REFERENCES usuarios.persona(id_persona) 
 	ON DELETE CASCADE, -- Se elimina socio, si se elimina persona. 
@@ -79,8 +87,8 @@ CREATE TABLE usuarios.socio(
 	ON DELETE SET NULL, -- Si se elimina la obra social, se asigna NULL
 	CONSTRAINT FK_socio_grupo_familiar FOREIGN KEY (id_grupo) REFERENCES usuarios.grupo_familiar(id_grupo_familiar)
 	ON DELETE SET NULL, -- Si se elimina el grupo familiar, se asigna NULL
-	CONSTRAINT FK_Socio_Categoria FOREIGN KEY (id_categoria) REFERENCES actividades.categoria(id_categoria)
-
+	CONSTRAINT FK_socio_Categoria FOREIGN KEY (id_categoria) REFERENCES actividades.categoria(id_categoria),
+	CONSTRAINT FK_socio_pileta FOREIGN KEY (id_pileta) REFERENCES actividades.pileta(id_pileta)
 );
 GO
 CREATE TABLE usuarios.invitado(
@@ -88,7 +96,6 @@ CREATE TABLE usuarios.invitado(
     id_persona INT NOT NULL UNIQUE,
 	id_socio INT NOT NULL,
 	fecha_invitacion DATE NOT NULL DEFAULT GETDATE()
-
 	CONSTRAINT FK_invitado_persona FOREIGN KEY (id_persona) REFERENCES usuarios.persona(id_persona)
 	ON DELETE CASCADE, 
 	CONSTRAINT FK_invitado_socio FOREIGN KEY (id_socio) REFERENCES usuarios.socio(id_socio)
@@ -187,6 +194,9 @@ CREATE TABLE facturacion.factura_descuento (
 	CONSTRAINT FK_factura_descuento_descuento FOREIGN KEY(id_descuento) REFERENCES facturacion.descuento(id_descuento)
 );
 GO
+
+GO
+
 -- ############################################################
 -- ######################## SP PERSONA ########################
 -- ############################################################
@@ -1008,7 +1018,6 @@ BEGIN
 	END CATCH;
 END;
 GO
-
 /*
 * Nombre: ModificarSocio
 * Descripcion: Modifica un socio y, opcionalmente, la persona asociada.
@@ -1029,7 +1038,6 @@ GO
 *   @id_grupo            INT         = NULL - Nueva FK grupo.
 * Aclaracion: Se utiliza transaccion explicita porque se afectan persona y socio.
 */
-
 CREATE OR ALTER PROCEDURE usuarios.ModificarSocio
     @id_socio            INT,
     @id_persona          INT           = NULL,
@@ -1130,7 +1138,6 @@ BEGIN
 	END CATCH;
 END;
 GO
-
 /*
 * Nombre: EliminarSocio
 * Descripcion: Realiza eliminacion logica de un socio.
@@ -1139,7 +1146,6 @@ GO
 * Aclaracion: No se utiliza transacciones explicitas ya que:
 *   Solo se trabaja con una unica tabla y ejecutando sentencia DML
 */
-
 CREATE OR ALTER PROCEDURE usuarios.EliminarSocio
     @id_socio INT
 AS
@@ -1163,7 +1169,6 @@ BEGIN
 	END CATCH;
 END;
 GO
-
 
 -- ############################################################
 -- ###################### SP FACTURA ##########################
@@ -1375,7 +1380,6 @@ BEGIN
 
 END;
 GO
-
 /*
 * Nombre: ModificarMetodoPago
 * Descripcion: Modifica el nombre de un método de pago existente, validando parámetros y unicidad.
@@ -1384,7 +1388,6 @@ GO
 *   @nombre          VARCHAR(50) - Nuevo nombre. Opcional.
 * Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
 */
-
 CREATE OR ALTER PROCEDURE facturacion.ModificarMetodoPago
     @id_metodo_pago INT,
     @nombre          VARCHAR(50)
@@ -1426,7 +1429,6 @@ BEGIN
 
 END;
 GO
-
 /*
 * Nombre: EliminarMetodoPago
 * Descripcion: Elimina físicamente un método de pago.
@@ -1434,7 +1436,6 @@ GO
 *   @id_metodo_pago INT - ID del método de pago a eliminar.
 * Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
 */
-
 CREATE OR ALTER PROCEDURE facturacion.EliminarMetodoPago
     @id_metodo_pago INT
 AS
@@ -1460,7 +1461,6 @@ BEGIN
 
 END;
 GO
-
 -- ############################################################
 -- #################### SP DESCUENTO ##########################
 -- ############################################################
@@ -1473,7 +1473,6 @@ GO
 *   @cantidad    DECIMAL(10,2) - Valor del descuento (>= 0).
 * Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
 */
-
 CREATE OR ALTER PROCEDURE facturacion.CrearDescuento
     @descripcion VARCHAR(100),
     @cantidad    DECIMAL(10,2)
@@ -1507,7 +1506,6 @@ BEGIN
 
 END;
 GO
-
 /*
 * Nombre: ModificarDescuento
 * Descripcion: Modifica los datos de un descuento existente.
@@ -1517,7 +1515,6 @@ GO
 *   @cantidad     DECIMAL(10,2) - Nuevo valor del descuento (>= 0). Obligatorio.
 * Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
 */
-
 CREATE OR ALTER PROCEDURE facturacion.ModificarDescuento
     @id_descuento INT,
     @descripcion  VARCHAR(100),
@@ -1562,7 +1559,6 @@ BEGIN
 
 END;
 GO
-
 /*
 * Nombre: EliminarDescuento
 * Descripcion: Elimina físicamente un descuento de la tabla facturacion.descuento.
@@ -1570,7 +1566,6 @@ GO
 *   @id_descuento INT - ID del descuento a eliminar.
 * Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
 */
-
 CREATE OR ALTER PROCEDURE facturacion.EliminarDescuento
     @id_descuento INT
 AS
@@ -1596,7 +1591,6 @@ BEGIN
 
 END;
 GO
-
 -- ############################################################
 -- #################### SP CATEGORIA ##########################
 -- ############################################################
@@ -1610,7 +1604,6 @@ GO
 *   @vigencia         DATE - Fecha de vigencia de la categoría.
 * Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
 */
-
 CREATE OR ALTER PROCEDURE actividades.CrearCategoria
     @nombre_categoria VARCHAR(50),
     @costo_membrecia  DECIMAL(10,2),
@@ -1655,7 +1648,6 @@ BEGIN
     END CATCH;
 END;
 GO
-
 /*
 * Nombre: ModificarCategoria
 * Descripcion: Modifica los datos de una categoría existente, validando su información.
@@ -1666,7 +1658,6 @@ GO
 *   @vigencia         DATE - Nueva fecha de vigencia.
 * Aclaracion: No se utilizan transacciones explícitas ya que solo se trabaja con una única tabla.
 */
-
 CREATE OR ALTER PROCEDURE actividades.ModificarCategoria
     @id_categoria     INT,
     @nombre_categoria VARCHAR(50),
@@ -1723,7 +1714,6 @@ BEGIN
 
 END;
 GO
-
 /*
 * Nombre: EliminarCategoria
 * Descripcion: Elimina físicamente una categoría de la tabla actividades.categoria.
@@ -1754,7 +1744,6 @@ BEGIN
 
 END;
 GO
-
 -- ############################################################
 -- #################### SP ObraSocial #########################
 -- ############################################################
@@ -1807,8 +1796,6 @@ BEGIN
 	END CATCH
 END;
 GO
-
-
 /*
 * Nombre: ModificacionObraSocial
 * Descripcion: Permite modificar el nombre de una obra social.
@@ -1874,7 +1861,6 @@ BEGIN
 	END CATCH
 END;
 GO
-
 /*
 * Nombre: EliminacionObraSocial
 * Descripcion: Elimina una obra social de forma fisica.
@@ -1982,8 +1968,6 @@ BEGIN
 	END CATCH
 END;
 GO
-
-
 /*
 * Nombre: ModificarActividad
 * Descripcion: Modifica el nombre y el costo mensual de una actividad existente, validando que el nombre no se repita y que el costo sea válido.
@@ -2066,7 +2050,6 @@ BEGIN
 	END CATCH
 END;
 GO
-
 /*
 * Nombre: EliminarActividad
 * Descripcion: Realiza una eliminación lógica de una actividad, cambiando su estado a inactiva.
@@ -2115,7 +2098,6 @@ BEGIN
 	END CATCH
 END;
 GO
-
 -- ############################################################
 -- ##################### SP RESPONSABLE #######################
 -- ############################################################
@@ -2135,7 +2117,6 @@ GO
 *   @parentesco  VARCHAR(10)          – Parentesco de la persona con el grupo.
 * Aclaracion: Se utiliza transacción explícita porque se afectan dos tablas.
 */
-
 CREATE OR ALTER PROCEDURE usuarios.CrearResponsable
     @id_persona  INT = NULL,
     @dni         VARCHAR(9),
@@ -2223,7 +2204,6 @@ BEGIN
 
 END;
 GO
-
 /*
 * Nombre: ModificarResponsable
 * Descripcion: Modifica un responsable y/o sus datos de persona asociados.
@@ -2240,7 +2220,6 @@ GO
 *   @parentesco      VARCHAR(10)   = NULL – (Opcional) Nuevo parentesco.
 * Aclaracion: Se utiliza transacción explícita porque puede afectar varias tablas.
 */
-
 CREATE OR ALTER PROCEDURE usuarios.ModificarResponsable
     @id_responsable INT,
     @new_id_persona  INT           = NULL,
@@ -2389,7 +2368,6 @@ BEGIN
 
 END;
 GO
-
 /*
 * Nombre: EliminarResponsable
 * Descripcion: Realiza eliminación física de un responsable.
@@ -2397,7 +2375,6 @@ GO
 *   @id_responsable INT – ID del responsable a eliminar.
 * Aclaracion: No se utiliza transacción explícita ya que solo se trabaja con una única tabla.
 */
-
 CREATE OR ALTER PROCEDURE usuarios.EliminarResponsable
     @id_responsable INT
 AS
@@ -2421,7 +2398,6 @@ BEGIN
 
 END;
 GO
-
 -- ############################################################
 -- ###################### SP USUARIO ##########################
 -- ############################################################
@@ -2518,8 +2494,6 @@ BEGIN
     END CATCH;
 END;
 GO
-
-
 /*
 * Nombre: ModificarUsuario
 * Descripcion: Modifica un usuario y/o sus datos de persona asociados.
@@ -2686,8 +2660,6 @@ BEGIN
     END CATCH;
 END;
 GO
-
-
 /*
 * Nombre: EliminarUsuario
 * Descripcion: Realiza eliminación lógica de un usuario (marca estado=0).
@@ -2716,7 +2688,6 @@ BEGIN
     END CATCH;
 END;
 GO
-
 -- ############################################################
 -- #################### SP INVITADO ###########################
 -- ############################################################
@@ -2814,7 +2785,6 @@ BEGIN
 
 END;
 GO
-
 /*
 * Nombre: ModificarInvitado
 * Descripcion: Modifica un invitado y/o sus datos de persona asociados.
@@ -2824,7 +2794,6 @@ GO
 *   - No crea nuevas personas: actualiza la existente vía usuarios.ModificarPersona.
 * Transacción explícita porque puede afectar persona e invitado.
 */
-
 CREATE OR ALTER PROCEDURE usuarios.ModificarInvitado
     @id_invitado    INT,             
     @dni            VARCHAR(9)    = NULL,  
@@ -2936,7 +2905,6 @@ BEGIN
 
 END;
 GO
-
 /*
 * Nombre: EliminarInvitado
 * Descripcion: Elimina un invitado y desactiva su persona asociada.
@@ -2945,7 +2913,6 @@ GO
 *   - Luego elimina el registro de invitado.
 * Transacción explícita porque afecta invitado y persona.
 */
-
 CREATE OR ALTER PROCEDURE usuarios.EliminarInvitado
     @id_invitado INT
 AS
