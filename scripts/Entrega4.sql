@@ -120,15 +120,6 @@ CREATE TABLE usuarios.usuario(
     )
 );
 GO
-CREATE TABLE usuarios.responsable(
-	id_responsable INT IDENTITY(1,1) PRIMARY KEY,
-	id_grupo INT NOT NULL,
-	id_persona INT NOT NULL UNIQUE,
-	parentesco VARCHAR(10) NOT NULL
-	CONSTRAINT FK_responsable_persona FOREIGN KEY (id_persona) REFERENCES usuarios.persona(id_persona),
-	CONSTRAINT FK_responsable_grupo_familiar FOREIGN KEY (id_grupo) REFERENCES usuarios.grupo_familiar(id_grupo_familiar)
-);
-GO
 CREATE TABLE actividades.actividad (
 	id_actividad INT IDENTITY PRIMARY KEY,
 	nombre VARCHAR(50) NOT NULL,
@@ -3338,13 +3329,13 @@ GO
 * Descripcion: Inserta un nuevo registro de clima en la tabla facturacion.clima, validando su informacion.
 * Parametros:
 *   @fecha DATE - Fecha del registro de clima.
-*   @lluvia DECIMAL(5,2) - Cantidad de lluvia registrada (entre 0 y 999.99).
+*   @lluvia NUMERIC(5,2) - Cantidad de lluvia registrada (entre 0 y 999.99).
 * Aclaracion: No se utilizan transacciones explicitas ya que:
 *   Solo se trabaja con una unica tabla y ejecutando sentencia DML
 */
 CREATE OR ALTER PROCEDURE facturacion.CrearClima
     @fecha DATE,
-    @lluvia DECIMAL(5,2)
+    @lluvia NUMERIC(5,2)
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -3385,9 +3376,217 @@ BEGIN
     
     BEGIN TRY
         INSERT INTO facturacion.clima(fecha, lluvia)
-        VALUES (@fecha, @lluvia);
+        VALUES (@fecha, CAST(@lluvia AS DECIMAL(5,2)));
         
         SELECT 'OK' AS Resultado, 'Registro de clima creado correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH
+END
+GO
+
+-- ############################################################
+-- #################### NOTA CREDITO ##########################
+-- ############################################################
+
+/*
+* Nombre: CrearNotaCredito
+* Descripcion: Crea una nueva nota de credito, validando que la factura exista y el monto sea valido.
+* Parametros:
+*   @fecha_emision DATE - Fecha de emision de la nota de credito.
+*   @monto DECIMAL(10,2) - Monto de la nota de credito (debe ser > 0).
+*   @motivo VARCHAR(40) = NULL - Motivo de la nota de credito (opcional).
+*   @id_factura INT - ID de la factura asociada.
+*   @id_clima INT = NULL - ID del clima asociado (opcional).
+* Aclaracion: Se utiliza transaccion explicita porque se validan varias tablas.
+*/
+CREATE OR ALTER PROCEDURE facturacion.CrearNotaCredito
+    @fecha_emision DATE,
+    @monto DECIMAL(10,2),
+    @motivo VARCHAR(40) = NULL,
+    @id_factura INT,
+    @id_clima INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        
+        -- Valido fecha de emision
+        IF @fecha_emision IS NULL
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La fecha de emision es obligatoria' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END
+        
+        -- Valido que la fecha no sea futura
+        IF @fecha_emision > GETDATE()
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La fecha de emision no puede ser futura' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END
+        
+        -- Valido monto
+        IF @monto IS NULL OR @monto <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El monto debe ser mayor a 0' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END
+        
+        -- Valido factura
+        IF @id_factura IS NULL
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El ID de factura es obligatorio' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END
+        
+        IF NOT EXISTS (SELECT 1 FROM facturacion.factura WHERE id_factura = @id_factura)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La factura especificada no existe' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END
+        
+        -- Valido clima (si se proporciona)
+        IF @id_clima IS NOT NULL
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM facturacion.clima WHERE id_clima = @id_clima)
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El clima especificado no existe' AS Mensaje, '404' AS Estado;
+                RETURN;
+            END
+        END
+        
+        -- Inserto la nota de credito
+        INSERT INTO facturacion.nota_credito(fecha_emision, monto, motivo, id_factura, id_clima)
+        VALUES (@fecha_emision, @monto, @motivo, @id_factura, @id_clima);
+        
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Nota de credito creada correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH
+END
+GO
+
+/*
+* Nombre: ModificarNotaCredito
+* Descripcion: Modifica una nota de credito existente, validando los nuevos datos.
+* Parametros:
+*   @id_nota_credito INT - ID de la nota de credito a modificar.
+*   @fecha_emision DATE = NULL - Nueva fecha de emision (opcional).
+*   @monto DECIMAL(10,2) = NULL - Nuevo monto (opcional).
+*   @motivo VARCHAR(40) = NULL - Nuevo motivo (opcional).
+*   @id_clima INT = NULL - Nuevo ID de clima (opcional).
+* Aclaracion: Se utiliza transaccion explicita porque se validan varias tablas.
+*/
+CREATE OR ALTER PROCEDURE facturacion.ModificarNotaCredito
+    @id_nota_credito INT,
+    @fecha_emision DATE = NULL,
+    @monto DECIMAL(10,2) = NULL,
+    @motivo VARCHAR(40) = NULL,
+    @id_clima INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    
+    BEGIN TRY
+        BEGIN TRANSACTION;
+        
+        -- Valido existencia de la nota de credito
+        IF NOT EXISTS (SELECT 1 FROM facturacion.nota_credito WHERE id_nota_credito = @id_nota_credito)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La nota de credito no existe' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END
+        
+        -- Valido fecha de emision (si se proporciona)
+        IF @fecha_emision IS NOT NULL
+        BEGIN
+            IF @fecha_emision > GETDATE()
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'La fecha de emision no puede ser futura' AS Mensaje, '400' AS Estado;
+                RETURN;
+            END
+        END
+        
+        -- Valido monto (si se proporciona)
+        IF @monto IS NOT NULL AND @monto <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El monto debe ser mayor a 0' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END
+        
+        -- Valido clima (si se proporciona)
+        IF @id_clima IS NOT NULL
+        BEGIN
+            IF NOT EXISTS (SELECT 1 FROM facturacion.clima WHERE id_clima = @id_clima)
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El clima especificado no existe' AS Mensaje, '404' AS Estado;
+                RETURN;
+            END
+        END
+        
+        -- Actualizo la nota de credito
+        UPDATE facturacion.nota_credito
+        SET
+            fecha_emision = ISNULL(@fecha_emision, fecha_emision),
+            monto = ISNULL(@monto, monto),
+            motivo = ISNULL(@motivo, motivo),
+            id_clima = @id_clima -- Permite NULL
+        WHERE id_nota_credito = @id_nota_credito;
+        
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Nota de credito modificada correctamente' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH
+END
+GO
+
+/*
+* Nombre: EliminarNotaCredito
+* Descripcion: Elimina fisicamente una nota de credito del sistema.
+* Parametros:
+*   @id_nota_credito INT - ID de la nota de credito a eliminar.
+* Aclaracion: No se utilizan transacciones explicitas ya que:
+*   Solo se trabaja con una unica tabla y ejecutando sentencia DML
+*/
+CREATE OR ALTER PROCEDURE facturacion.EliminarNotaCredito
+    @id_nota_credito INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    
+    -- Valido existencia de la nota de credito
+    IF NOT EXISTS (SELECT 1 FROM facturacion.nota_credito WHERE id_nota_credito = @id_nota_credito)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'La nota de credito no existe' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END
+    
+    BEGIN TRY
+        DELETE FROM facturacion.nota_credito
+        WHERE id_nota_credito = @id_nota_credito;
+        
+        SELECT 'OK' AS Resultado, 'Nota de credito eliminada correctamente' AS Mensaje, '200' AS Estado;
     END TRY
     BEGIN CATCH
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
