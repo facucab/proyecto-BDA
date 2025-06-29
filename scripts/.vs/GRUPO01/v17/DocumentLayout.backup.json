@@ -3,8 +3,60 @@
   "WorkspaceRootPath": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\",
   "Documents": [
     {
-      "AbsoluteMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\02_CrearTablas.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
-      "RelativeMoniker": "D:0:0:{FC3DF230-76E7-3903-5A0C-93F690F11CE7}|GRUPO01.ssmssqlproj|solutionrelative:02_CrearTablas.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Roles y permisos.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:Roles y permisos.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Reportes.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:Reportes.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\13_pruebasSPFacturas.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:13_pruebasSPFacturas.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\12_pruebasSPMetodoPago.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:12_pruebasSPMetodoPago.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\10_pruebasSPResponsable.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:10_pruebasSPResponsable.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\08_pruebasSPGrupoFamiliar.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:08_pruebasSPGrupoFamiliar.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\07_pruebasSPSocio.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:07_pruebasSPSocio.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\04_pruebasSPRol.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:04_pruebasSPRol.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\05_pruebasSPClases.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:05_pruebasSPClases.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\06_pruebasSPUsuarios.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:06_pruebasSPUsuarios.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\03_pruebasSpActividad.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:03_pruebasSpActividad.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\02_pruebasSPcategoria.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:02_pruebasSPcategoria.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\01_pruebasObraSocial.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:01_pruebasObraSocial.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Entrega4.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:Entrega4.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
     }
   ],
   "DocumentGroupContainers": [
@@ -19,13 +71,170 @@
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "02_CrearTablas.sql - localhost.master (tPcWin\\tomas (57))",
-              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\02_CrearTablas.sql",
-              "RelativeDocumentMoniker": "02_CrearTablas.sql",
-              "ToolTip": "02_CrearTablas.sql - localhost.master (tPcWin\\tomas (57))",
+              "Title": "Roles y permisos.sql - localhost.Com5600G01 (tPcWin\\tomas (85))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Roles y permisos.sql",
+              "RelativeDocumentMoniker": "Roles y permisos.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Roles y permisos.sql - localhost.Com5600G01 (tPcWin\\tomas (85))",
+              "RelativeToolTip": "Roles y permisos.sql - localhost.Com5600G01 (tPcWin\\tomas (85))",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
-              "WhenOpened": "2025-06-26T17:31:06.731Z",
-              "EditorCaption": " - localhost.master (tPcWin\\tomas (57))"
+              "WhenOpened": "2025-06-27T14:57:47.388Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (85))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 3,
+              "Title": "12_pruebasSPMetodoPago.sql - localhost.Com5600G01 (tPcWin\\tomas (73))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\12_pruebasSPMetodoPago.sql",
+              "RelativeDocumentMoniker": "12_pruebasSPMetodoPago.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\12_pruebasSPMetodoPago.sql - localhost.Com5600G01 (tPcWin\\tomas (73))",
+              "RelativeToolTip": "12_pruebasSPMetodoPago.sql - localhost.Com5600G01 (tPcWin\\tomas (73))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-27T14:56:51.543Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (73))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 5,
+              "Title": "08_pruebasSPGrupoFamiliar.sql - localhost.Com5600G01 (tPcWin\\tomas (55))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\08_pruebasSPGrupoFamiliar.sql",
+              "RelativeDocumentMoniker": "08_pruebasSPGrupoFamiliar.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\08_pruebasSPGrupoFamiliar.sql - localhost.Com5600G01 (tPcWin\\tomas (55))",
+              "RelativeToolTip": "08_pruebasSPGrupoFamiliar.sql - localhost.Com5600G01 (tPcWin\\tomas (55))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-27T14:52:10.712Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (55))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 6,
+              "Title": "07_pruebasSPSocio.sql - localhost.Com5600G01 (tPcWin\\tomas (63))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\07_pruebasSPSocio.sql",
+              "RelativeDocumentMoniker": "07_pruebasSPSocio.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\07_pruebasSPSocio.sql - localhost.Com5600G01 (tPcWin\\tomas (63))",
+              "RelativeToolTip": "07_pruebasSPSocio.sql - localhost.Com5600G01 (tPcWin\\tomas (63))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-27T14:50:53.886Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (63))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 4,
+              "Title": "10_pruebasSPResponsable.sql - localhost.Com5600G01 (tPcWin\\tomas (84))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\10_pruebasSPResponsable.sql",
+              "RelativeDocumentMoniker": "10_pruebasSPResponsable.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\10_pruebasSPResponsable.sql - localhost.Com5600G01 (tPcWin\\tomas (84))",
+              "RelativeToolTip": "10_pruebasSPResponsable.sql - localhost.Com5600G01 (tPcWin\\tomas (84))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-27T14:49:32.469Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (84))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 2,
+              "Title": "13_pruebasSPFacturas.sql - localhost.Com5600G01 (tPcWin\\tomas (75))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\13_pruebasSPFacturas.sql",
+              "RelativeDocumentMoniker": "13_pruebasSPFacturas.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\13_pruebasSPFacturas.sql - localhost.Com5600G01 (tPcWin\\tomas (75))",
+              "RelativeToolTip": "13_pruebasSPFacturas.sql - localhost.Com5600G01 (tPcWin\\tomas (75))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-27T14:43:50.914Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (75))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Reportes.sql - localhost.Com5600G01 (tPcWin\\tomas (82))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Reportes.sql",
+              "RelativeDocumentMoniker": "Reportes.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Reportes.sql - localhost.Com5600G01 (tPcWin\\tomas (82))",
+              "RelativeToolTip": "Reportes.sql - localhost.Com5600G01 (tPcWin\\tomas (82))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-27T14:45:37.241Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (82))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 11,
+              "Title": "02_pruebasSPcategoria.sql - localhost.Com5600G01 (tPcWin\\tomas (59))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\02_pruebasSPcategoria.sql",
+              "RelativeDocumentMoniker": "02_pruebasSPcategoria.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\02_pruebasSPcategoria.sql - localhost.Com5600G01 (tPcWin\\tomas (59))",
+              "RelativeToolTip": "02_pruebasSPcategoria.sql - localhost.Com5600G01 (tPcWin\\tomas (59))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-27T14:46:06.488Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (59))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 12,
+              "Title": "01_pruebasObraSocial.sql - localhost.Com5600G01 (tPcWin\\tomas (58))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\01_pruebasObraSocial.sql",
+              "RelativeDocumentMoniker": "01_pruebasObraSocial.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\01_pruebasObraSocial.sql - localhost.Com5600G01 (tPcWin\\tomas (58))",
+              "RelativeToolTip": "01_pruebasObraSocial.sql - localhost.Com5600G01 (tPcWin\\tomas (58))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-27T14:46:02.567Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (58))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 10,
+              "Title": "03_pruebasSpActividad.sql - localhost.Com5600G01 (tPcWin\\tomas (61))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\03_pruebasSpActividad.sql",
+              "RelativeDocumentMoniker": "03_pruebasSpActividad.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\03_pruebasSpActividad.sql - localhost.Com5600G01 (tPcWin\\tomas (61))",
+              "RelativeToolTip": "03_pruebasSpActividad.sql - localhost.Com5600G01 (tPcWin\\tomas (61))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-27T14:46:11.452Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (61))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 9,
+              "Title": "06_pruebasSPUsuarios.sql - localhost.Com5600G01 (tPcWin\\tomas (60))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\06_pruebasSPUsuarios.sql",
+              "RelativeDocumentMoniker": "06_pruebasSPUsuarios.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\06_pruebasSPUsuarios.sql - localhost.Com5600G01 (tPcWin\\tomas (60))",
+              "RelativeToolTip": "06_pruebasSPUsuarios.sql - localhost.Com5600G01 (tPcWin\\tomas (60))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-27T14:46:15.302Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (60))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 8,
+              "Title": "05_pruebasSPClases.sql - localhost.Com5600G01 (tPcWin\\tomas (62))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\05_pruebasSPClases.sql",
+              "RelativeDocumentMoniker": "05_pruebasSPClases.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\05_pruebasSPClases.sql - localhost.Com5600G01 (tPcWin\\tomas (62))",
+              "RelativeToolTip": "05_pruebasSPClases.sql - localhost.Com5600G01 (tPcWin\\tomas (62))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-27T14:46:22.639Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (62))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 7,
+              "Title": "04_pruebasSPRol.sql - localhost.Com5600G01 (tPcWin\\tomas (83))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\04_pruebasSPRol.sql",
+              "RelativeDocumentMoniker": "04_pruebasSPRol.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\04_pruebasSPRol.sql - localhost.Com5600G01 (tPcWin\\tomas (83))",
+              "RelativeToolTip": "04_pruebasSPRol.sql - localhost.Com5600G01 (tPcWin\\tomas (83))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-27T14:46:27.673Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (83))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 13,
+              "Title": "Entrega4.sql - localhost.Com5600G01 (tPcWin\\tomas (53))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Entrega4.sql",
+              "RelativeDocumentMoniker": "Entrega4.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Entrega4.sql - localhost.Com5600G01 (tPcWin\\tomas (53))",
+              "RelativeToolTip": "Entrega4.sql - localhost.Com5600G01 (tPcWin\\tomas (53))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-06-27T14:45:47.285Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (53))"
             }
           ]
         }

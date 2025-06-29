@@ -3202,3 +3202,240 @@ BEGIN
 		RETURN -999;
 	END CATCH
 END;
+GO
+
+-- ############################################################
+-- ################### DATOS EMPRRESA #########################
+-- ############################################################
+
+/*
+* Nombre: CrearDatosEmpresa
+* Descripcion: Establece cuales son los datos de la empresa para facturacion
+* Parametros:
+*   @cuit VARCHAR(20) NOT NULL
+*   @domicilio_comercial VARCHAR(25)
+*   @condicion_iva VARCHAR(25)
+*   @nombre VARCHAR(35)
+*/
+
+CREATE OR ALTER PROCEDURE facturacion.CrearDatosEmpresa
+    @cuit VARCHAR(20),
+    @domicilio_comercial VARCHAR(25),
+    @condicion_iva VARCHAR(25),
+    @nombre VARCHAR(35)
+AS
+BEGIN
+    -- Chequeo de parámetros
+    IF @cuit IS NULL OR @domicilio_comercial IS NULL OR @condicion_iva IS NULL OR @nombre IS NULL
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Los parámetros no pueden ser nulos' AS Mensaje;
+        RETURN;
+    END
+
+    IF LTRIM(RTRIM(@cuit)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El CUIT no puede estar vacío' AS Mensaje;
+        RETURN;
+    END
+
+	IF EXISTS (SELECT 1 FROM facturacion.datos_empresa WHERE cuit_emisor = @cuit)
+	BEGIN
+		SELECT 'Error' AS Resultado, 'Cuit Repetido' AS Mensaje;
+        RETURN;
+	END
+
+    IF LTRIM(RTRIM(@domicilio_comercial)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El domicilio no puede estar vacío' AS Mensaje;
+        RETURN;
+    END
+
+    IF LTRIM(RTRIM(@condicion_iva)) = '' OR @condicion_iva NOT IN ('Responsable Inscripto','Monotributista','Exento')
+    BEGIN
+        SELECT 'Error' AS Resultado, 
+               'Las condiciones válidas frente al IVA son "Responsable Inscripto", "Monotributista" y "Exento"' AS Mensaje;
+        RETURN;
+    END
+
+    IF LTRIM(RTRIM(@nombre)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El nombre de la empresa no puede estar vacío' AS Mensaje;
+        RETURN;
+    END
+
+    BEGIN TRY
+        INSERT INTO facturacion.datos_empresa(cuit_emisor, domicilio_comercial, condicion_IVA, nombre)
+        VALUES (LTRIM(RTRIM(@cuit)), LTRIM(RTRIM(@domicilio_comercial)), LTRIM(RTRIM(@condicion_iva)), LTRIM(RTRIM(@nombre)));
+        
+        SELECT 'OK' AS Resultado, 'Datos ingresados correctamente' AS Mensaje;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH
+END
+GO
+
+/*
+* Nombre: ModificarDatosEmpresa
+* Descripcion: Modifica los datos de la empresa para facturacion. Solo actualiza los campos que se pasen como parametro (no nulos)
+* Parametros:
+*   @cuit VARCHAR(20) NOT NULL - CUIT de la empresa a modificar
+*   @domicilio_comercial VARCHAR(25) - Nuevo domicilio comercial (opcional)
+*   @condicion_iva VARCHAR(25) - Nueva condicion frente al IVA (opcional)
+*   @nombre VARCHAR(35) - Nuevo nombre de la empresa (opcional)
+*/
+CREATE OR ALTER PROCEDURE facturacion.ModificarDatosEmpresa
+    @cuit VARCHAR(20),
+    @domicilio_comercial VARCHAR(25) = NULL,
+    @condicion_iva VARCHAR(25) = NULL,
+    @nombre VARCHAR(35) = NULL
+AS
+BEGIN
+    -- Chequeo de parámetros obligatorios
+    IF @cuit IS NULL
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El CUIT es obligatorio para identificar la empresa' AS Mensaje;
+        RETURN;
+    END
+    
+    IF LTRIM(RTRIM(@cuit)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El CUIT no puede estar vacío' AS Mensaje;
+        RETURN;
+    END
+    
+    -- Validaciones de parámetros opcionales (solo si se proporcionan)
+    IF @domicilio_comercial IS NOT NULL AND LTRIM(RTRIM(@domicilio_comercial)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Domicilio no valido' AS Mensaje;
+        RETURN;
+    END
+    
+    IF @condicion_iva IS NOT NULL AND (LTRIM(RTRIM(@condicion_iva)) = '' OR @condicion_iva NOT IN ('Responsable Inscripto','Monotributista','Exento'))
+    BEGIN
+        SELECT 'Error' AS Resultado, 
+               'Las condiciones válidas frente al IVA son "Responsable Inscripto", "Monotributista" y "Exento"' AS Mensaje;
+        RETURN;
+    END
+    
+    IF @nombre IS NOT NULL AND LTRIM(RTRIM(@nombre)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El nombre de la empresa no puede ser vacío' AS Mensaje;
+        RETURN;
+    END
+    
+    BEGIN TRY
+        -- Verificar que existe la empresa con ese CUIT
+        IF NOT EXISTS (SELECT 1 FROM facturacion.datos_empresa WHERE cuit_emisor = LTRIM(RTRIM(@cuit)))
+        BEGIN
+            SELECT 'Error' AS Resultado, 'No existe una empresa con el CUIT proporcionado' AS Mensaje;
+            RETURN;
+        END
+        
+        -- Construir la consulta UPDATE dinámicamente solo con los campos que se proporcionaron
+        DECLARE @sql NVARCHAR(MAX) = 'UPDATE facturacion.datos_empresa SET ';
+        DECLARE @campos_actualizados NVARCHAR(MAX) = '';
+        DECLARE @contador INT = 0;
+        
+        IF @domicilio_comercial IS NOT NULL
+        BEGIN
+            SET @campos_actualizados = @campos_actualizados + 'domicilio_comercial = LTRIM(RTRIM(@domicilio_comercial))';
+            SET @contador = @contador + 1;
+        END
+        
+        IF @condicion_iva IS NOT NULL
+        BEGIN
+            IF @contador > 0 SET @campos_actualizados = @campos_actualizados + ', ';
+            SET @campos_actualizados = @campos_actualizados + 'condicion_IVA = LTRIM(RTRIM(@condicion_iva))';
+            SET @contador = @contador + 1;
+        END
+        
+        IF @nombre IS NOT NULL
+        BEGIN
+            IF @contador > 0 SET @campos_actualizados = @campos_actualizados + ', ';
+            SET @campos_actualizados = @campos_actualizados + 'nombre = LTRIM(RTRIM(@nombre))';
+            SET @contador = @contador + 1;
+        END
+        
+        -- Si no se proporcionó ningún campo para actualizar
+        IF @contador = 0
+        BEGIN
+            SELECT 'Error' AS Resultado, 'Debe proporcionar al menos un campo para modificar' AS Mensaje;
+            RETURN;
+        END
+        
+        -- Ejecutar la actualización
+        SET @sql = @sql + @campos_actualizados + ' WHERE cuit_emisor = LTRIM(RTRIM(@cuit))';
+        
+        EXEC sp_executesql @sql, 
+            N'@domicilio_comercial VARCHAR(25), @condicion_iva VARCHAR(25), @nombre VARCHAR(35), @cuit VARCHAR(20)',
+            @domicilio_comercial, @condicion_iva, @nombre, @cuit;
+        
+        SELECT 'OK' AS Resultado, 'Datos modificados correctamente' AS Mensaje;
+        
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH
+END
+GO
+
+/*
+* Nombre: EliminarDatosEmpresa
+* Descripcion: Elimina los datos de una empresa del sistema de facturacion
+* Parametros:
+*   @cuit VARCHAR(20) NOT NULL - CUIT de la empresa a eliminar
+*/
+CREATE OR ALTER PROCEDURE facturacion.EliminarDatosEmpresa
+    @cuit VARCHAR(20)
+AS
+BEGIN
+    -- Chequeo de parámetros obligatorios
+    IF @cuit IS NULL
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El CUIT es obligatorio para identificar la empresa a eliminar' AS Mensaje;
+        RETURN;
+    END
+    
+    IF LTRIM(RTRIM(@cuit)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El CUIT no puede estar vacío' AS Mensaje;
+        RETURN;
+    END
+    
+    BEGIN TRY
+        -- Verificar que existe la empresa con ese CUIT
+        IF NOT EXISTS (SELECT 1 FROM facturacion.datos_empresa WHERE cuit_emisor = LTRIM(RTRIM(@cuit)))
+        BEGIN
+            SELECT 'Error' AS Resultado, 'No existe una empresa con el CUIT proporcionado' AS Mensaje;
+            RETURN;
+        END
+        
+        -- Verificar si la empresa tiene facturas asociadas (opcional - descomenta si es necesario)
+        /*
+        IF EXISTS (SELECT 1 FROM facturacion.facturas WHERE cuit_emisor = LTRIM(RTRIM(@cuit)))
+        BEGIN
+            SELECT 'Error' AS Resultado, 'No se puede eliminar la empresa porque tiene facturas asociadas' AS Mensaje;
+            RETURN;
+        END
+        */
+        
+        -- Eliminar la empresa
+        DELETE FROM facturacion.datos_empresa 
+        WHERE cuit_emisor = LTRIM(RTRIM(@cuit));
+        
+        -- Verificar que se eliminó correctamente
+        IF @@ROWCOUNT = 0
+        BEGIN
+            SELECT 'Error' AS Resultado, 'No se pudo eliminar la empresa' AS Mensaje;
+            RETURN;
+        END
+        
+        SELECT 'OK' AS Resultado, 'Empresa eliminada correctamente' AS Mensaje;
+        
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH
+END
+GO
