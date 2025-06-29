@@ -69,7 +69,7 @@ EXEC facturacion.CrearDatosEmpresa
 	@domicilio_comercial = 'Otra dirección',
 	@condicion_iva = 'Responsable Inscripto',
 	@nombre = 'Empresa Duplicada';
---Resultado: Error - CUIT duplicado
+--Resultado: Error - CUIT Repetido
 
 -- Error: CUIT nulo
 EXEC facturacion.CrearDatosEmpresa
