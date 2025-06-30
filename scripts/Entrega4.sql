@@ -3668,3 +3668,110 @@ BEGIN
     END CATCH;
 END;
 GO
+-- ############################################################
+-- ############### SP SOCIO_ACTIVIDAD ############
+-- ############################################################
+GO
+/*
+* Nombre: InscribirSocioActividad
+* Descripción: Inscribe a un socio en una actividad específica.
+* Parámetros:
+*   @id_socio     INT – ID del socio.
+*   @id_actividad INT – ID de la actividad.
+* Aclaración:
+*   Se usa transacción explícita para evitar duplicaciones y asegurar atomicidad.
+*/
+CREATE OR ALTER PROCEDURE actividades.InscribirSocioActividad
+    @id_socio     INT,
+    @id_actividad INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- Validar existencia del socio activo
+        IF NOT EXISTS (
+            SELECT 1 FROM usuarios.socio 
+            WHERE id_socio = @id_socio AND activo = 1
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Socio no encontrado o inactivo.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- Validar existencia de la actividad activa
+        IF NOT EXISTS (
+            SELECT 1 FROM actividades.actividad 
+            WHERE id_actividad = @id_actividad AND estado = 1
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Actividad no encontrada o inactiva.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- Verificar si ya está inscripto
+        IF EXISTS (
+            SELECT 1 FROM actividades.actividad_socio
+            WHERE id_socio = @id_socio AND id_actividad = @id_actividad
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El socio ya está inscripto en la actividad.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+
+        -- Insertar inscripción
+        INSERT INTO actividades.actividad_socio (id_socio, id_actividad)
+        VALUES (@id_socio, @id_actividad);
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Socio inscripto correctamente en la actividad.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: QuitarSocioActividad
+* Descripción: Elimina la inscripción de un socio en una actividad.
+* Parámetros:
+*   @id_socio     INT – ID del socio.
+*   @id_actividad INT – ID de la actividad.
+* Aclaración:
+*   No requiere transacción explícita ya que sólo afecta una fila.
+*/
+CREATE OR ALTER PROCEDURE actividades.QuitarSocioActividad
+    @id_socio     INT,
+    @id_actividad INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Verificar si existe la inscripción
+    IF NOT EXISTS (
+        SELECT 1 FROM actividades.actividad_socio
+        WHERE id_socio = @id_socio AND id_actividad = @id_actividad
+    )
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El socio no está inscripto en la actividad.' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        DELETE FROM actividades.actividad_socio
+        WHERE id_socio = @id_socio AND id_actividad = @id_actividad;
+
+        SELECT 'OK' AS Resultado, 'Socio eliminado correctamente de la actividad.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
