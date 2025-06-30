@@ -2241,9 +2241,6 @@ BEGIN
 
 END;
 GO
-
-
-
 /*
 * Nombre: EliminarCategoria
 * Descripcion: Elimina f�sicamente una categor�a de la tabla actividades.categoria.
@@ -2714,7 +2711,6 @@ BEGIN
 	END CATCH;
 END;
 GO
-
 /*
 * Nombre: EliminarClase
 * Descripcion: Realiza un borrado logico de una clase desactivandola.
@@ -3051,6 +3047,7 @@ GO
 -- ############################################################
 -- #################### SP DESCUENTO ##########################
 -- ############################################################
+GO
 /*
 * Nombre: CrearDescuento
 * Descripcion: Inserta un nuevo descuento en la tabla facturacion.descuento, validando su informaci�n.
@@ -3359,6 +3356,505 @@ BEGIN
         SELECT 'OK' AS Resultado, 'Empresa eliminada correctamente.' AS Mensaje, '200' AS Estado;
     END TRY
     BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+-- ############################################################
+-- ###################### SP PILETA #####################
+-- ############################################################
+GO
+/*
+* Nombre: CrearPileta
+* Descripción: Inserta una nueva pileta validando sus datos.
+* Parámetros:
+*   @detalle         VARCHAR(50)  – Descripción de la pileta (obligatorio).
+*   @metro_cuadrado  DECIMAL(5,2) – Tamaño en metros cuadrados (obligatorio, > 0).
+* Aclaración:
+*   No se usa transacción explícita, solo afecta una tabla.
+*/
+CREATE OR ALTER PROCEDURE actividades.CrearPileta
+    @detalle        VARCHAR(50),
+    @metro_cuadrado DECIMAL(5,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Validaciones
+    IF @detalle IS NULL OR LTRIM(RTRIM(@detalle)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El detalle es obligatorio.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    IF @metro_cuadrado IS NULL OR @metro_cuadrado <= 0
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El tamaño de la pileta debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        INSERT INTO actividades.pileta (detalle, metro_cuadrado)
+        VALUES (LTRIM(RTRIM(@detalle)), @metro_cuadrado);
+
+        SELECT 'OK' AS Resultado, 'Pileta creada correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: CrearPileta
+* Descripción: Inserta una nueva pileta validando sus datos.
+* Parámetros:
+*   @detalle         VARCHAR(50)  – Descripción de la pileta (obligatorio).
+*   @metro_cuadrado  DECIMAL(5,2) – Tamaño en metros cuadrados (obligatorio, > 0).
+* Aclaración:
+*   No se usa transacción explícita, solo afecta una tabla.
+*/
+CREATE OR ALTER PROCEDURE actividades.CrearPileta
+    @detalle        VARCHAR(50),
+    @metro_cuadrado DECIMAL(5,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Validaciones
+    IF @detalle IS NULL OR LTRIM(RTRIM(@detalle)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El detalle es obligatorio.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    IF @metro_cuadrado IS NULL OR @metro_cuadrado <= 0
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El tamaño de la pileta debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        INSERT INTO actividades.pileta (detalle, metro_cuadrado)
+        VALUES (LTRIM(RTRIM(@detalle)), @metro_cuadrado);
+
+        SELECT 'OK' AS Resultado, 'Pileta creada correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: ModificarPileta
+* Descripción: Modifica los datos de una pileta existente.
+* Parámetros:
+*   @id_pileta       INT           – ID de la pileta a modificar.
+*   @detalle         VARCHAR(50)   – Nuevo detalle (opcional).
+*   @metro_cuadrado  DECIMAL(5,2)  – Nuevo tamaño (opcional).
+* Aclaración:
+*   No se usa transacción explícita, solo afecta una tabla.
+*/
+CREATE OR ALTER PROCEDURE actividades.ModificarPileta
+    @id_pileta       INT,
+    @detalle         VARCHAR(50) = NULL,
+    @metro_cuadrado  DECIMAL(5,2) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Validación de existencia
+    IF NOT EXISTS (SELECT 1 FROM actividades.pileta WHERE id_pileta = @id_pileta)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Pileta no encontrada.' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+
+    -- Validación de metro cuadrado si se pasa
+    IF @metro_cuadrado IS NOT NULL AND @metro_cuadrado <= 0
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El tamaño debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        UPDATE actividades.pileta
+        SET detalle        = COALESCE(NULLIF(LTRIM(RTRIM(@detalle)), ''), detalle),
+            metro_cuadrado = COALESCE(@metro_cuadrado, metro_cuadrado)
+        WHERE id_pileta = @id_pileta;
+
+        SELECT 'OK' AS Resultado, 'Pileta modificada correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+-- ############################################################
+-- ##################### SP COSTO ########################
+-- ############################################################
+GO
+/*
+* Nombre: CrearCosto
+* Descripción: Registra un nuevo costo para una pileta.
+* Parámetros:
+*   @tipo              CHAR(3)        – Tipo de pase ('dia', 'tem', 'mes').
+*   @tipo_grupo        CHAR(3)        – Grupo ('adu', 'men').
+*   @precio_socios     DECIMAL(10,2)  – Precio para socios (> 0).
+*   @precio_invitados  DECIMAL(10,2)  – Precio para invitados (> 0).
+*   @id_pileta         INT            – FK a actividades.pileta.
+* Aclaración:
+*   Se usa transacción explícita para evitar lecturas sucias y mantener atomicidad.
+*/
+CREATE OR ALTER PROCEDURE actividades.CrearCosto
+    @tipo             CHAR(3),
+    @tipo_grupo       CHAR(3),
+    @precio_socios    DECIMAL(10,2),
+    @precio_invitados DECIMAL(10,2),
+    @id_pileta        INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- Validaciones
+        IF @tipo NOT IN ('dia', 'tem', 'mes')
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Tipo inválido. Debe ser dia, tem o mes.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @tipo_grupo NOT IN ('adu', 'men')
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Tipo de grupo inválido. Debe ser adu o men.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @precio_socios IS NULL OR @precio_socios <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Precio para socios inválido. Debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @precio_invitados IS NULL OR @precio_invitados <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Precio para invitados inválido. Debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF NOT EXISTS (SELECT 1 FROM actividades.pileta WHERE id_pileta = @id_pileta)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Pileta no encontrada.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- Inserción
+        INSERT INTO actividades.costo(tipo, tipo_grupo, precio_socios, precio_invitados, id_pileta)
+        VALUES(@tipo, @tipo_grupo, @precio_socios, @precio_invitados, @id_pileta);
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Costo registrado correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: ModificarCosto
+* Descripción: Modifica un costo existente.
+* Parámetros:
+*   @id_costo          INT           – ID del costo a modificar.
+*   @tipo              CHAR(3)       – Nuevo tipo ('dia', 'tem', 'mes') (opcional).
+*   @tipo_grupo        CHAR(3)       – Nuevo tipo grupo ('adu', 'men') (opcional).
+*   @precio_socios     DECIMAL(10,2) – Nuevo precio para socios (opcional).
+*   @precio_invitados  DECIMAL(10,2) – Nuevo precio para invitados (opcional).
+*   @id_pileta         INT           – Nueva pileta asociada (opcional).
+* Aclaración:
+*   Se usa transacción explícita para evitar lecturas inconsistentes y mantener atomicidad.
+*/
+CREATE OR ALTER PROCEDURE actividades.ModificarCosto
+    @id_costo         INT,
+    @tipo             CHAR(3) = NULL,
+    @tipo_grupo       CHAR(3) = NULL,
+    @precio_socios    DECIMAL(10,2) = NULL,
+    @precio_invitados DECIMAL(10,2) = NULL,
+    @id_pileta        INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        IF NOT EXISTS (SELECT 1 FROM actividades.costo WHERE id_costo = @id_costo)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Costo no encontrado.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        IF @tipo IS NOT NULL AND @tipo NOT IN ('dia', 'tem', 'mes')
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Tipo inválido. Debe ser dia, tem o mes.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @tipo_grupo IS NOT NULL AND @tipo_grupo NOT IN ('adu', 'men')
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Tipo de grupo inválido. Debe ser adu o men.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @precio_socios IS NOT NULL AND @precio_socios <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Precio para socios debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @precio_invitados IS NOT NULL AND @precio_invitados <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Precio para invitados debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @id_pileta IS NOT NULL AND NOT EXISTS (SELECT 1 FROM actividades.pileta WHERE id_pileta = @id_pileta)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Pileta no encontrada.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        UPDATE actividades.costo
+        SET tipo             = COALESCE(@tipo, tipo),
+            tipo_grupo       = COALESCE(@tipo_grupo, tipo_grupo),
+            precio_socios    = COALESCE(@precio_socios, precio_socios),
+            precio_invitados = COALESCE(@precio_invitados, precio_invitados),
+            id_pileta        = COALESCE(@id_pileta, id_pileta)
+        WHERE id_costo = @id_costo;
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Costo modificado correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: EliminarCosto
+* Descripción: Elimina físicamente un costo.
+* Parámetros:
+*   @id_costo INT – ID del costo a eliminar.
+*/
+CREATE OR ALTER PROCEDURE actividades.EliminarCosto
+    @id_costo INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF NOT EXISTS (SELECT 1 FROM actividades.costo WHERE id_costo = @id_costo)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Costo no encontrado.' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        DELETE FROM actividades.costo WHERE id_costo = @id_costo;
+        SELECT 'OK' AS Resultado, 'Costo eliminado correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+-- ############################################################
+-- ############### SP SOCIO_ACTIVIDAD ############
+-- ############################################################
+GO
+/*
+* Nombre: InscribirSocioActividad
+* Descripción: Inscribe a un socio en una actividad específica.
+* Parámetros:
+*   @id_socio     INT – ID del socio.
+*   @id_actividad INT – ID de la actividad.
+* Aclaración:
+*   Se usa transacción explícita para evitar duplicaciones y asegurar atomicidad.
+*/
+CREATE OR ALTER PROCEDURE actividades.InscribirSocioActividad
+    @id_socio     INT,
+    @id_actividad INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- Validar existencia del socio activo
+        IF NOT EXISTS (
+            SELECT 1 FROM usuarios.socio 
+            WHERE id_socio = @id_socio AND activo = 1
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Socio no encontrado o inactivo.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- Validar existencia de la actividad activa
+        IF NOT EXISTS (
+            SELECT 1 FROM actividades.actividad 
+            WHERE id_actividad = @id_actividad AND estado = 1
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Actividad no encontrada o inactiva.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- Verificar si ya está inscripto
+        IF EXISTS (
+            SELECT 1 FROM actividades.actividad_socio
+            WHERE id_socio = @id_socio AND id_actividad = @id_actividad
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El socio ya está inscripto en la actividad.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+
+        -- Insertar inscripción
+        INSERT INTO actividades.actividad_socio (id_socio, id_actividad)
+        VALUES (@id_socio, @id_actividad);
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Socio inscripto correctamente en la actividad.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: QuitarSocioActividad
+* Descripción: Elimina la inscripción de un socio en una actividad.
+* Parámetros:
+*   @id_socio     INT – ID del socio.
+*   @id_actividad INT – ID de la actividad.
+* Aclaración:
+*   No requiere transacción explícita ya que sólo afecta una fila.
+*/
+CREATE OR ALTER PROCEDURE actividades.QuitarSocioActividad
+    @id_socio     INT,
+    @id_actividad INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Verificar si existe la inscripción
+    IF NOT EXISTS (
+        SELECT 1 FROM actividades.actividad_socio
+        WHERE id_socio = @id_socio AND id_actividad = @id_actividad
+    )
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El socio no está inscripto en la actividad.' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        DELETE FROM actividades.actividad_socio
+        WHERE id_socio = @id_socio AND id_actividad = @id_actividad;
+
+        SELECT 'OK' AS Resultado, 'Socio eliminado correctamente de la actividad.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+-- ############################################################
+-- ################# SP NOTA DE CRÉDITO #################
+-- ############################################################
+GO
+/*
+* Nombre: CrearNotaCredito
+* Descripción: Registra una nota de crédito asociada a una factura y (opcionalmente) al clima.
+* Parámetros:
+*   @fecha_emision DATE          – Fecha de emisión (obligatoria, no futura).
+*   @monto         DECIMAL(10,2) – Monto de la nota (> 0).
+*   @motivo        VARCHAR(40)   – Motivo de la nota (opcional).
+*   @id_factura    INT           – FK a factura (obligatoria).
+*   @id_clima      INT           – FK opcional a clima.
+* Aclaración:
+*   Se usa transacción explícita para asegurar atomicidad y evitar lecturas inconsistentes.
+*/
+CREATE OR ALTER PROCEDURE facturacion.CrearNotaCredito
+    @fecha_emision DATE,
+    @monto         DECIMAL(10,2),
+    @motivo        VARCHAR(40) = NULL,
+    @id_factura    INT,
+    @id_clima      INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- Validaciones
+        IF @fecha_emision IS NULL OR @fecha_emision > GETDATE()
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La fecha de emisión es inválida o futura.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+
+        IF @monto IS NULL OR @monto <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El monto debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+
+        IF NOT EXISTS (SELECT 1 FROM facturacion.factura WHERE id_factura = @id_factura)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Factura no encontrada.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        IF @id_clima IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM facturacion.clima WHERE id_clima = @id_clima
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Clima no encontrado.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- Inserción
+        INSERT INTO facturacion.nota_credito (
+            fecha_emision, monto, motivo, id_factura, id_clima
+        )
+        VALUES (
+            @fecha_emision, @monto, LTRIM(RTRIM(@motivo)), @id_factura, @id_clima
+        );
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Nota de crédito registrada correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
     END CATCH;
 END;
