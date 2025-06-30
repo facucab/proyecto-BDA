@@ -37,13 +37,14 @@ CREATE TABLE usuarios.persona(
 	fecha_alta DATE NOT NULL DEFAULT GETDATE(),
 	activo BIT NOT NULL DEFAULT 1,
     CONSTRAINT CK_persona_email CHECK (email LIKE '%@%.%' AND email NOT LIKE '@%' AND email NOT LIKE '%@%@%'),
-	CONSTRAINT CK_persona_dni CHECK (dni LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
+	CONSTRAINT CK_persona_dni CHECK (dni LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
 	CONSTRAINT CK_persona_fecha_nac CHECK(fecha_nac < GETDATE()) 
 );
 GO
 CREATE TABLE usuarios.obra_social(
 	id_obra_social INT IDENTITY PRIMARY KEY,
-	descripcion VARCHAR(50) NOT NULL
+	descripcion VARCHAR(50) NOT NULL,
+    nro_telefono VARCHAR(20) NOT NULL
 	);
 GO
 CREATE TABLE usuarios.grupo_familiar(
@@ -289,8 +290,8 @@ AS
 BEGIN
 	SET NOCOUNT ON;
 	-- Valido DNI:
-	IF @dni IS NULL OR LEN(@dni) < 7 OR LEN(@dni) > 8 OR @dni LIKE '%[^0-9]%' BEGIN
-		SELECT 'Error' as Resultado, 'DNI inv�lido. Debe contener entre 7 y 8 d�gitos num�ricos.' AS Mensaje, '400' AS Estado; 
+	IF @dni IS NULL OR LEN(@dni) < 7 OR LEN(@dni) > 9 OR @dni LIKE '%[^0-9]%' BEGIN
+		SELECT 'Error' as Resultado, 'DNI invalido. Debe contener entre 7 y 9 digitos numericos.' AS Mensaje, '400' AS Estado; 
 		RETURN; 
 	END;
 	-- Valido email: 
@@ -431,113 +432,118 @@ GO
 -- ############################################################
 GO
 /*
-* Nombre: CreacionObraSocial
+* Nombre: CrearObraSocial
 * Descripcion: Crea una nueva obra social.
 * Parametros:
 *	@nombre VARCHAR(50) - Nombre de la obra social. 
 */
-CREATE OR ALTER PROCEDURE usuarios.CreacionObraSocial
-	@nombre VARCHAR(50)
+CREATE OR ALTER PROCEDURE usuarios.CrearObraSocial
+	@nombre VARCHAR(50),
+	@nro_telefono VARCHAR(20),
+	@id_obra_social INT OUTPUT
 AS
 BEGIN
 	BEGIN TRY
-		-- Verifico que no sea nulo
 		IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
 		BEGIN
 			SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje, '400' AS Estado;
+			SET @id_obra_social = NULL;
 			RETURN;
 		END
 
-		-- Normalizo el nombre
+		IF @nro_telefono IS NULL OR LTRIM(RTRIM(@nro_telefono)) = ''
+		BEGIN
+			SELECT 'Error' AS Resultado, 'El número de teléfono no puede ser nulo' AS Mensaje, '400' AS Estado;
+			SET @id_obra_social = NULL;
+			RETURN;
+		END
+
 		SET @nombre = UPPER(LTRIM(RTRIM(@nombre)))
 
-		-- Verifico que el nombre no exista ya
 		IF EXISTS (SELECT 1 FROM usuarios.obra_social WHERE descripcion = @nombre)
 		BEGIN
 			SELECT 'Error' AS Resultado, 'Ya hay una obra social con ese nombre' AS Mensaje, '400' AS Estado;
+			SET @id_obra_social = NULL;
 			RETURN;
 		END
 
-		-- Inserto los datos
-		INSERT INTO usuarios.obra_social(descripcion)
-		VALUES (@nombre);
+		INSERT INTO usuarios.obra_social(descripcion, nro_telefono)
+		VALUES (@nombre, @nro_telefono);
 
-		SELECT 'Exito' AS Resultado, 'Obra Social Ingresada' AS Mensaje,'200' AS Estado;
+		SET @id_obra_social = SCOPE_IDENTITY();
+		SELECT 'Exito' AS Resultado, 'Obra Social Ingresada' AS Mensaje,'200' AS Estado, @id_obra_social AS id_obra_social;
 		RETURN;
 
 	END TRY
 	BEGIN CATCH
+		SET @id_obra_social = NULL;
 		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
 		RETURN;
 	END CATCH
 END;
 GO
 /*
-* Nombre: ModificacionObraSocial
+* Nombre: ModificarObraSocial
 * Descripcion: Permite modificar el nombre de una obra social.
 * Parametros:
 *	@id INT - id de la obra social. (DEBE SER NO NULO)
 *	@nombre_nuevo VARCHAR(50) - Nuevo nombre de la obra social.
 */
-CREATE OR ALTER PROCEDURE usuarios.ModificacionObraSocial
+CREATE OR ALTER PROCEDURE usuarios.ModificarObraSocial
 	@id INT,
-	@nombre_nuevo VARCHAR(50)
+	@nombre_nuevo VARCHAR(50),
+	@nro_telefono VARCHAR(20) = NULL,
+	@id_obra_social INT OUTPUT
 AS
 BEGIN
 	BEGIN TRY
-		-- Verifico que el ID no sea nulo
 		IF @id IS NULL
 		BEGIN
 			SELECT 'Error' AS Resultado, 'id nulo' AS Mensaje, '400' AS Estado;
+			SET @id_obra_social = NULL;
 			RETURN;
 		END
-		
-		-- Verifico que exista en la tabla
 		IF NOT EXISTS (SELECT 1 FROM usuarios.obra_social WHERE id_obra_social = @id)
 		BEGIN
 			SELECT 'Error' AS Resultado, 'id no existente' AS Mensaje, '404' AS Estado;
+			SET @id_obra_social = NULL;
 			RETURN;
 		END
-
-		-- Verifico que el nombre no sea nulo
 		IF @nombre_nuevo IS NULL OR LTRIM(RTRIM(@nombre_nuevo)) = ''
 		BEGIN
 			SELECT 'Error' AS Resultado, 'El nombre no puede ser nulo' AS Mensaje, '400' AS Estado;;
+			SET @id_obra_social = NULL;
 			RETURN;
 		END
-
-		-- Normalizo el nombre
 		SET @nombre_nuevo = UPPER(LTRIM(RTRIM(@nombre_nuevo)));
-
-		-- Verifico que el nombre no exista ya en la tabla
-		IF EXISTS (SELECT 1 FROM usuarios.obra_social WHERE descripcion = @nombre_nuevo AND id_obra_social <> @id) -- evita si el usuario carga el mismo nombre
+		IF EXISTS (SELECT 1 FROM usuarios.obra_social WHERE descripcion = @nombre_nuevo AND id_obra_social <> @id)
 		BEGIN
 			SELECT 'Error' AS Resultado, 'La obra social ya esta registrada' AS Mensaje, '400' AS Estado;;
+			SET @id_obra_social = NULL;
 			RETURN;
 		END
-
-		-- Actualizo los datos
 		UPDATE usuarios.obra_social
 		SET descripcion = @nombre_nuevo
+		    , nro_telefono = COALESCE(@nro_telefono, nro_telefono)
 		WHERE id_obra_social = @id;
-
-		SELECT 'Exito' AS Resultado, 'Obra Social Modificada' AS Mensaje, '200' AS Estado;;
+		SET @id_obra_social = @id;
+		SELECT 'Exito' AS Resultado, 'Obra Social Modificada' AS Mensaje, '200' AS Estado, @id_obra_social AS id_obra_social;;
 		RETURN;
-
 	END TRY
 	BEGIN CATCH
+		SET @id_obra_social = NULL;
 		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;;
 		RETURN;
 	END CATCH
 END;
 GO
 /*
-* Nombre: EliminacionObraSocial
+* Nombre: EliminarObraSocial
 * Descripcion: Elimina una obra social de forma fisica.
 * Parametros:
 *	@id INT - id de la obra social. (DEBE SER NO NULO)
 */
-CREATE OR ALTER PROCEDURE usuarios.EliminacionObraSocial
+CREATE OR ALTER PROCEDURE usuarios.EliminarObraSocial
 	@id INT
 AS BEGIN
 	BEGIN TRY
@@ -1157,10 +1163,10 @@ BEGIN
 		IF @dni IS NOT NULL
 		BEGIN
 			-- 3.1) Formato y rango
-			IF LEN(@dni) < 7 OR LEN(@dni) > 8 OR @dni LIKE '%[^0-9]%'
+			IF LEN(@dni) < 7 OR LEN(@dni) > 9 OR @dni LIKE '%[^0-9]%'
 			BEGIN
 				ROLLBACK TRANSACTION;
-				SELECT 'Error' AS Resultado, 'DNI inv�lido. Debe contener entre 7 y 8 d�gitos num�ricos.' AS Mensaje, '400' AS Estado;
+				SELECT 'Error' AS Resultado, 'DNI invalido. Debe contener entre 7 y 9 digitos numericos.' AS Mensaje, '400' AS Estado;
 				RETURN;
 			END;
 			-- 4.2) Unicidad
@@ -1460,10 +1466,10 @@ BEGIN
         -- 4) Actualizar DNI si se pide
         IF @dni IS NOT NULL
         BEGIN
-            IF LEN(@dni) < 7 OR LEN(@dni) > 8 OR @dni LIKE '%[^0-9]%'
+            IF LEN(@dni) < 7 OR LEN(@dni) > 9 OR @dni LIKE '%[^0-9]%'
             BEGIN
                 ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'DNI inv�lido. Debe contener entre 7 y 8 d�gitos num�ricos.' AS Mensaje, '400' AS Estado;
+                SELECT 'Error' AS Resultado, 'DNI invalido. Debe contener entre 7 y 9 digitos numericos.' AS Mensaje, '400' AS Estado;
                 RETURN;
             END;
             IF EXISTS(SELECT 1 FROM usuarios.persona WHERE dni = @dni AND id_persona <> @cur_persona)
@@ -1749,10 +1755,10 @@ BEGIN
 		IF @dni IS NOT NULL
 		BEGIN
 			-- 4.1) Formato y rango
-			IF LEN(@dni) < 7 OR LEN(@dni) > 8 OR @dni LIKE '%[^0-9]%'
+			IF LEN(@dni) < 7 OR LEN(@dni) > 9 OR @dni LIKE '%[^0-9]%'
 			BEGIN
 				ROLLBACK TRANSACTION;
-				SELECT 'Error' AS Resultado, 'DNI inv�lido. Debe contener entre 7 y 8 d�gitos num�ricos.' AS Mensaje, '400' AS Estado;
+				SELECT 'Error' AS Resultado, 'DNI inv�lido. Debe contener entre 7 y 9 digitos numericos.' AS Mensaje, '400' AS Estado;
 				RETURN;
 			END;
 			-- 4.2) Unicidad
@@ -2210,7 +2216,7 @@ BEGIN
 
 
     -- Valido duplicado en otro registro
-    IF EXISTS (
+   IF EXISTS (
         SELECT 1 FROM actividades.categoria
         WHERE LOWER(nombre_categoria) = LOWER(LTRIM(RTRIM(@nombre_categoria))) AND id_categoria <> @id_categoria)
     BEGIN
