@@ -437,6 +437,250 @@ END
 GO
 
 
+-- Importar Actividades
+
+CREATE OR ALTER PROCEDURE actividades.ImportarActividades
+    @RutaArchivo NVARCHAR(260)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        DECLARE @nombre_actividad VARCHAR(50),
+                @costo_mensual DECIMAL(10,2),
+                @SQL NVARCHAR(MAX);
+
+        CREATE TABLE #TempDatos (
+            [Actividad] VARCHAR(50),
+            [Valor por mes] DECIMAL(10,2),
+            [Vigente hasta] DATE
+        );
+
+        SET @SQL = N'
+            INSERT INTO #TempDatos ([Actividad], [Valor por mes], [Vigente hasta])
+            SELECT [Actividad], [Valor por mes], [Vigente hasta]
+            FROM OPENROWSET(
+                ''Microsoft.ACE.OLEDB.12.0'',
+                ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
+                ''SELECT * FROM [Tarifas$B2:D8]'')';
+
+        EXEC sp_executesql @SQL;
+
+        DECLARE cur CURSOR FOR
+            SELECT [Actividad], [Valor por mes]
+            FROM #TempDatos
+            WHERE [Actividad] IS NOT NULL;
+
+        OPEN cur;
+        FETCH NEXT FROM cur INTO @nombre_actividad, @costo_mensual;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            BEGIN TRY
+                DECLARE @return_procedimiento INT;
+                DECLARE @id_aux INT;
+
+                EXEC @return_procedimiento = actividades.CrearActividad
+                    @nombre_actividad = @nombre_actividad,
+                    @costo_mensual = @costo_mensual;
+
+                IF @return_procedimiento = -2
+                BEGIN
+                    SELECT @id_aux = id_actividad
+                    FROM actividades.actividad 
+                    WHERE nombre = @nombre_actividad;
+
+                    EXEC actividades.ModificarActividad
+                        @id = @id_aux,
+                        @nombre_actividad = @nombre_actividad,
+                        @costo_mensual = @costo_mensual;
+                END
+            END TRY
+            BEGIN CATCH
+                SELECT 'Error' AS Resultado, 
+                       'Error al importar registro: ' + ISNULL(ERROR_MESSAGE(), 'Error desconocido') AS Mensaje;
+            END CATCH
+
+            FETCH NEXT FROM cur INTO @nombre_actividad, @costo_mensual;
+        END
+
+        CLOSE cur;
+        DEALLOCATE cur;
+        DROP TABLE #TempDatos;
+
+        SELECT 'Éxito' AS Resultado, 'Importación de actividades completada' AS Mensaje;
+
+    END TRY
+    BEGIN CATCH
+        IF CURSOR_STATUS('local', 'cur') >= 0
+        BEGIN
+            CLOSE cur;
+            DEALLOCATE cur;
+        END
+
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
+            DROP TABLE #TempDatos;
+
+        SELECT 'Error' AS Resultado, 
+               'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
+        RETURN -1;
+    END CATCH
+END
+GO
+
+
+
+-- Importar Costos de Pileta (revisar, parece funcionar.)
+
+CREATE OR ALTER PROCEDURE actividades.ImportarCostosPileta
+    @RutaArchivo NVARCHAR(260),
+    @id_pileta    INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        DECLARE 
+            @SQL            NVARCHAR(MAX),
+            @conceptoBruto  NVARCHAR(100),
+            @grupoBruto     NVARCHAR(100),
+            @sociosBruto    NVARCHAR(100),
+            @invitadosBruto NVARCHAR(100),
+            @lastConcepto   NVARCHAR(100)   = NULL, -- para rellenar nulls
+            @tipo           CHAR(3),
+            @tipo_grupo     CHAR(3),
+            @precio_socios  DECIMAL(10,2),
+            @precio_invitados DECIMAL(10,2),
+            @return_sp      INT,
+            @id_aux         INT;
+
+        -- Tabla temporal donde importar crudo
+        CREATE TABLE #TempDatos (
+            [Concepto]  NVARCHAR(100), --nombre de tarifa
+            [Grupo]     NVARCHAR(100), --adulto o menores
+            [Socios]    NVARCHAR(100),
+            [Invitados] NVARCHAR(100)
+        );
+
+        SET @SQL = N'
+            INSERT INTO #TempDatos(Concepto,Grupo,Socios,Invitados)
+            SELECT F1,F2,F3,F4
+              FROM OPENROWSET(
+                   ''Microsoft.ACE.OLEDB.12.0'',
+                   ''Excel 12.0;HDR=NO;IMEX=1;TypeGuessRows=0;Database=' + @RutaArchivo + ''',
+                   ''SELECT * FROM [Tarifas$B16:F22]''
+              )';
+        EXEC sp_executesql @SQL;
+
+        DECLARE cur CURSOR FOR
+            SELECT Concepto,Grupo,Socios,Invitados
+              FROM #TempDatos
+             WHERE Grupo IS NOT NULL;  -- descartar fila de título
+
+        OPEN cur;
+        FETCH NEXT FROM cur INTO @conceptoBruto,@grupoBruto,@sociosBruto,@invitadosBruto;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            BEGIN TRY
+                -- relleanr Concepto
+                IF @conceptoBruto IS NOT NULL AND LTRIM(RTRIM(@conceptoBruto)) <> ''
+                    SET @lastConcepto = @conceptoBruto;
+                SET @conceptoBruto = @lastConcepto;
+
+                -- mapear tipo (dia/tem/mes)
+                SET @tipo = CASE
+                    WHEN @conceptoBruto LIKE '%dia%'  OR @conceptoBruto LIKE '%día%'      THEN 'dia'
+                    WHEN @conceptoBruto LIKE '%temporad%'                            THEN 'tem'
+                    WHEN @conceptoBruto LIKE '%mes%'                                 THEN 'mes'
+                    ELSE NULL
+                END;
+
+                -- mapear grupo (adu/men)
+                SET @tipo_grupo = CASE
+                    WHEN @grupoBruto LIKE '%menor%' THEN 'men'
+                    ELSE 'adu'
+                END;
+
+                -- limpiar y convertir Socios a DECIMAL
+                SET @precio_socios = TRY_CAST(
+                    REPLACE(
+                      REPLACE(
+                        REPLACE(
+                          REPLACE(REPLACE(@sociosBruto, CHAR(160), ''), ' ', ''), '$', ''), '.', ''
+                        ), ',', '.')
+                  AS DECIMAL(10,2));
+
+                -- limpiar y convertir Invitados (0 si vacío)
+                SET @precio_invitados = ISNULL(
+                  TRY_CAST(
+                    REPLACE(
+                      REPLACE(
+                        REPLACE(
+                          REPLACE(REPLACE(@invitadosBruto, CHAR(160), ''), ' ', ''), '$', ''), '.', ''
+                        ), ',', '.')
+                  AS DECIMAL(10,2))
+                , 0);
+
+                IF @tipo IS NOT NULL
+                BEGIN
+                    -- alta o modificación
+                    SELECT @id_aux = id_costo
+                      FROM actividades.costo
+                     WHERE tipo       = @tipo
+                       AND tipo_grupo = @tipo_grupo
+                       AND id_pileta   = @id_pileta;
+
+                    IF @id_aux IS NULL
+                        EXEC @return_sp = actividades.CrearCosto
+                            @tipo             = @tipo,
+                            @tipo_grupo       = @tipo_grupo,
+                            @precio_socios    = @precio_socios,
+                            @precio_invitados = @precio_invitados,
+                            @id_pileta        = @id_pileta;
+                    ELSE
+                        EXEC @return_sp = actividades.ModificarCosto
+                            @id_costo         = @id_aux,
+                            @tipo             = @tipo,
+                            @tipo_grupo       = @tipo_grupo,
+                            @precio_socios    = @precio_socios,
+                            @precio_invitados = @precio_invitados,
+                            @id_pileta        = @id_pileta;
+                END
+            END TRY
+            BEGIN CATCH
+                SELECT 'Error' AS Resultado, 
+                       'Error al importar registro: ' 
+                       + ISNULL(ERROR_MESSAGE(),'Error desconocido') AS Mensaje;
+            END CATCH
+
+            FETCH NEXT FROM cur INTO @conceptoBruto,@grupoBruto,@sociosBruto,@invitadosBruto;
+        END
+
+        -- Cierra objetos
+        CLOSE cur;
+        DEALLOCATE cur;
+        DROP TABLE #TempDatos;
+
+        -- Resultado final
+        SELECT 'Éxito' AS Resultado, 'Importación completada' AS Mensaje;
+        
+    END TRY
+    BEGIN CATCH
+        -- Cleanup en caso de error
+        IF CURSOR_STATUS('local','cur') >= 0
+        BEGIN
+            CLOSE cur;
+            DEALLOCATE cur;
+        END
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
+            DROP TABLE #TempDatos;
+
+        SELECT 'Error' AS Resultado, 
+               'Error general en el proceso: ' 
+               + ERROR_MESSAGE() AS Mensaje;
+        RETURN -1;
+    END CATCH
+END
+GO
+
 
 
 -- IMPORTACION Y PRUEBAS

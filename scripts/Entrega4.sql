@@ -140,8 +140,8 @@ CREATE TABLE actividades.costo(
 	ON DELETE CASCADE,
 	CONSTRAINT CK_tipo CHECK(tipo IN ('dia', 'tem', 'mes')),
 	CONSTRAINT CK_tipo_grupo CHECK(tipo_grupo IN ('adu','men')),
-	CONSTRAINT CK_precios_socios CHECK(precio_socios > 0),
-	CONSTRAINT CK_precios_invitados CHECK(precio_invitados > 0),
+	CONSTRAINT CK_precios_socios CHECK(precio_socios >= 0),
+	CONSTRAINT CK_precios_invitados CHECK(precio_invitados >= 0),
 ); 
 GO
 CREATE TABLE actividades.clase(
@@ -3532,16 +3532,16 @@ BEGIN
             SELECT 'Error' AS Resultado, 'Tipo de grupo inválido. Debe ser adu o men.' AS Mensaje, '400' AS Estado;
             RETURN;
         END;
-        IF @precio_socios IS NULL OR @precio_socios <= 0
+        IF @precio_socios IS NULL OR @precio_socios < 0
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Precio para socios inválido. Debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            SELECT 'Error' AS Resultado, 'Precio para socios inválido. Debe ser mayor o igual a cero.' AS Mensaje, '400' AS Estado;
             RETURN;
         END;
-        IF @precio_invitados IS NULL OR @precio_invitados <= 0
+        IF @precio_invitados IS NULL OR @precio_invitados < 0
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Precio para invitados inválido. Debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            SELECT 'Error' AS Resultado, 'Precio para invitados inválido. Debe ser mayor o igual a cero.' AS Mensaje, '400' AS Estado;
             RETURN;
         END;
         IF NOT EXISTS (SELECT 1 FROM actividades.pileta WHERE id_pileta = @id_pileta)
@@ -3611,16 +3611,16 @@ BEGIN
             SELECT 'Error' AS Resultado, 'Tipo de grupo inválido. Debe ser adu o men.' AS Mensaje, '400' AS Estado;
             RETURN;
         END;
-        IF @precio_socios IS NOT NULL AND @precio_socios <= 0
+        IF @precio_socios IS NOT NULL AND @precio_socios < 0
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Precio para socios debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            SELECT 'Error' AS Resultado, 'Precio para socios debe ser mayor o igual a cero.' AS Mensaje, '400' AS Estado;
             RETURN;
         END;
-        IF @precio_invitados IS NOT NULL AND @precio_invitados <= 0
+        IF @precio_invitados IS NOT NULL AND @precio_invitados < 0
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Precio para invitados debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            SELECT 'Error' AS Resultado, 'Precio para invitados debe ser mayor  cero.' AS Mensaje, '400' AS Estado;
             RETURN;
         END;
         IF @id_pileta IS NOT NULL AND NOT EXISTS (SELECT 1 FROM actividades.pileta WHERE id_pileta = @id_pileta)
