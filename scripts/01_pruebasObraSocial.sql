@@ -19,48 +19,57 @@ GO
 -- CREACION
 
 --Casos Normales
-EXEC usuarios.CreacionObraSocial
-	@nombre = 'OSDE';
+EXEC usuarios.CrearObraSocial
+	@nombre = 'OSDE',
+	@nro_telefono = '123456789';
 --Resultado: Obra Social creada correctamente
 
-EXEC usuarios.CreacionObraSocial
-	@nombre = 'OSDE 10';
---Resultado: Obra Social creada correctamente
-
-
-EXEC usuarios.CreacionObraSocial
-	@nombre = 'OSMTT';
+EXEC usuarios.CrearObraSocial
+	@nombre = 'OSDE 10',
+	@nro_telefono = '987654321';
 --Resultado: Obra Social creada correctamente
 
 
-EXEC usuarios.CreacionObraSocial
-	@nombre = 'OSDE 10';
+EXEC usuarios.CrearObraSocial
+	@nombre = 'OSMTT',
+	@nro_telefono = '111111111';
 --Resultado: Obra Social creada correctamente
 
 
-EXEC usuarios.CreacionObraSocial
-	@nombre = 'Swiss Medical';
+EXEC usuarios.CrearObraSocial
+	@nombre = 'OSDE 10',
+	@nro_telefono = '222222222';
 --Resultado: Obra Social creada correctamente
 
 
-EXEC usuarios.CreacionObraSocial
-	@nombre = 'Medifé';
+EXEC usuarios.CrearObraSocial
+	@nombre = 'Swiss Medical',
+	@nro_telefono = '333333333';
 --Resultado: Obra Social creada correctamente
 
 
-EXEC usuarios.CreacionObraSocial
-	@nombre = 'OSPROTURA';
+EXEC usuarios.CrearObraSocial
+	@nombre = 'Medifé',
+	@nro_telefono = '444444444';
 --Resultado: Obra Social creada correctamente
 
-EXEC usuarios.CreacionObraSocial
-	@nombre = 'Sancor Salud';
+
+EXEC usuarios.CrearObraSocial
+	@nombre = 'OSPROTURA',
+	@nro_telefono = '555555555';
 --Resultado: Obra Social creada correctamente
 
-EXEC usuarios.CreacionObraSocial
-	@nombre = 'TEST';
+EXEC usuarios.CrearObraSocial
+	@nombre = 'Sancor Salud',
+	@nro_telefono = '666666666';
 --Resultado: Obra Social creada correctamente
 
-EXEC usuarios.ModificacionObraSocial
+EXEC usuarios.CrearnObraSocial
+	@nombre = 'TEST',
+	@nro_telefono = '777777777';
+--Resultado: Obra Social creada correctamente
+
+EXEC usuarios.ModificarObraSocial
 	@id = 8,
 	@nombre_nuevo = 'TEST 1';
 -- Resultado: Obra Social Modificada
@@ -72,25 +81,27 @@ EXEC usuarios.EliminacionObraSocial
 
 -- ERRORES
 
-EXEC usuarios.CreacionObraSocial
-	@nombre = 'Sancor Salud';
+EXEC usuarios.CrearObraSocial
+	@nombre = 'Sancor Salud',
+	@nro_telefono = '888888888';
 --Resultado: Ya hay una obra social con ese nombre
 
-EXEC usuarios.CreacionObraSocial
-	@nombre = '';
+EXEC usuarios.CrearObraSocial
+	@nombre = '',
+	@nro_telefono = '999999999';
 --Resultado: El nombre no puede ser nulo
 
-EXEC usuarios.ModificacionObraSocial
+EXEC usuarios.ModificarObraSocial
 	@id = 99999,
 	@nombre_nuevo = 'ESTO FALLA';
 -- Resultado: id no existe
 
-EXEC usuarios.ModificacionObraSocial
+EXEC usuarios.ModificarObraSocial
 	@id = 1,
 	@nombre_nuevo = '';
 -- Resultado: El nombre no puede ser nulo
 
-EXEC usuarios.EliminacionObraSocial
+EXEC usuarios.EliminarObraSocial
 	@id = 99999;
 
 --Resultado: id no existe

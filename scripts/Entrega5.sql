@@ -153,7 +153,7 @@ BEGIN
             [ teléfono de contacto emergencia] VARCHAR(50),
             [ Nombre de la obra social o prepaga] NVARCHAR(100),
             [nro# de socio obra social/prepaga ] VARCHAR(50),
-            [telefono obra social] VARCHAR(50)
+            [teléfono de contacto de emergencia ] VARCHAR(50)
         );
 
         -- Variables auxiliares
@@ -168,7 +168,6 @@ BEGIN
                 @nroSocioObra VARCHAR(50), 
                 @nroSocio VARCHAR(20),
                 @telefonoObraSocial VARCHAR(50);
-
         -- Arma el SQL para la ruta
         SET @SQL = N'
             INSERT INTO #TempDatos (
@@ -181,15 +180,41 @@ BEGIN
                 [ teléfono de contacto emergencia],
                 [ Nombre de la obra social o prepaga], 
                 [nro# de socio obra social/prepaga ], 
-                [telefono obra social]
+                [teléfono de contacto de emergencia ]
             )
-            SELECT *
-            FROM OPENROWSET(
-                ''Microsoft.ACE.OLEDB.12.0'',
-                ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
-                ''SELECT * FROM [Responsables de Pago$]'')';
-
+            SELECT 
+                [Nro de Socio],
+                [Nombre],
+                [ apellido], 
+                [ DNI],
+                [ email personal],
+                [ fecha de nacimiento],
+                CASE 
+                    WHEN ISNUMERIC([ teléfono de contacto]) = 1 AND [ teléfono de contacto] IS NOT NULL
+                    THEN FORMAT(CAST([ teléfono de contacto] AS BIGINT), ''0'')
+                    ELSE CAST([ teléfono de contacto] AS VARCHAR(50))
+                END,
+                CASE 
+                    WHEN ISNUMERIC([ teléfono de contacto emergencia]) = 1 AND [ teléfono de contacto emergencia] IS NOT NULL
+                    THEN FORMAT(CAST([ teléfono de contacto emergencia] AS BIGINT), ''0'')
+                    ELSE CAST([ teléfono de contacto emergencia] AS VARCHAR(50))
+                END,
+                [ Nombre de la obra social o prepaga],
+                [nro# de socio obra social/prepaga ],
+                CASE 
+                    WHEN ISNUMERIC([teléfono de contacto de emergencia ]) = 1 AND [teléfono de contacto de emergencia ] IS NOT NULL
+                    THEN FORMAT(CAST([teléfono de contacto de emergencia ] AS BIGINT), ''0'')
+                    ELSE CAST([teléfono de contacto de emergencia ] AS VARCHAR(50))
+                END
+                FROM OPENROWSET(
+                    ''Microsoft.ACE.OLEDB.12.0'',
+                    ''Excel 12.0;HDR=YES;IMEX=1;TypeGuessRows=0;Database=' + @RutaArchivo + ''',
+                    ''SELECT * FROM [Responsables de Pago$]'')';
+        
         EXEC sp_executesql @SQL;  -- Importa los registros
+
+        SELECT * FROM #TempDatos
+        RETURN
 
         -- Declara el cursor para la tabla
         DECLARE cur CURSOR FOR 
@@ -203,7 +228,7 @@ BEGIN
                [ teléfono de contacto emergencia],
                [ Nombre de la obra social o prepaga], 
                [nro# de socio obra social/prepaga ],
-               [telefono obra social]
+               [teléfono de contacto de emergencia ]
         FROM #TempDatos;
 
         OPEN cur;
@@ -231,6 +256,30 @@ BEGIN
                 -- Buscar IDs existentes
                 SELECT @id_persona = id_persona FROM usuarios.persona WHERE dni = @dni;
                 SELECT @id_ObSo = id_obra_social FROM usuarios.obra_social WHERE descripcion = @obraSocial;
+
+                -- Si la obra social no existe, crearla y obtener el id
+                IF @obraSocial IS NOT NULL AND @obraSocial <> ''
+                BEGIN
+                    IF @id_ObSo IS NULL
+                    BEGIN
+                        DECLARE @new_id_obra_social INT;
+                        EXEC usuarios.CrearObraSocial
+                            @nombre = @obraSocial,
+                            @nro_telefono = @telefonoObraSocial,
+                            @id_obra_social = @new_id_obra_social OUTPUT;
+                        SET @id_ObSo = @new_id_obra_social;
+                    END
+                    ELSE
+                    BEGIN
+                        DECLARE @mod_id_obra_social INT;
+                        EXEC usuarios.ModificarObraSocial
+                            @id = @id_ObSo,
+                            @nombre_nuevo = @obraSocial,
+                            @nro_telefono = @telefonoObraSocial,
+                            @id_obra_social = @mod_id_obra_social OUTPUT;
+                        SET @id_ObSo = @mod_id_obra_social;
+                    END
+                END
 
                 -- Calcular categoría segun edad
                 DECLARE @edad INT = DATEDIFF(YEAR, @fechaNac, GETDATE());
@@ -393,15 +442,17 @@ GO
 -- IMPORTACION Y PRUEBAS
 
 EXEC actividades.ImportarCategorias 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
-GO
-
 select * from actividades.categoria
-
-
-EXEC usuarios.ImportarSocios 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 GO
 
-select * from usuarios.socio
+
+
+EXEC usuarios.ImportarSocios 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
+select s.*, os.descripcion AS obra_social_descripcion, os.nro_telefono AS obra_social_telefono
+FROM usuarios.socio s
+LEFT JOIN usuarios.obra_social os ON s.id_obra_social = os.id_obra_social
+GO
+
 
 EXEC pagos_y_facturas.ImportarFacturas 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 GO
