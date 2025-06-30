@@ -10,17 +10,20 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Elementos de la solución",
 		01_pruebasObraSocial.sql = 01_pruebasObraSocial.sql
 		02_pruebasSPcategoria.sql = 02_pruebasSPcategoria.sql
 		03_pruebasSpActividad.sql = 03_pruebasSpActividad.sql
-		06_pruebasSPUsuarios.sql = 06_pruebasSPUsuarios.sql
-		05_pruebasSPClases.sql = 05_pruebasSPClases.sql
 		04_pruebasSPRol.sql = 04_pruebasSPRol.sql
-		08_pruebasSPGrupoFamiliar.sql = 08_pruebasSPGrupoFamiliar.sql
+		05_pruebasSPClases.sql = 05_pruebasSPClases.sql
+		06_pruebasSPUsuarios.sql = 06_pruebasSPUsuarios.sql
 		07_pruebasSPSocio.sql = 07_pruebasSPSocio.sql
+		08_pruebasSPGrupoFamiliar.sql = 08_pruebasSPGrupoFamiliar.sql
 		09_pruebasSPInvitado.sql = 09_pruebasSPInvitado.sql
-		11_pruebasSPDescuentos.sql = 11_pruebasSPDescuentos.sql
-		10_pruebasSPResponsable.sql = 10_pruebasSPResponsable.sql
-		12_pruebasSPMetodoPago.sql = 12_pruebasSPMetodoPago.sql
-		13_pruebasSPFacturas.sql = 13_pruebasSPFacturas.sql
+		10_pruebasSPDescuentos.sql = 10_pruebasSPDescuentos.sql
+		11_pruebasSPMetodoPago.sql = 11_pruebasSPMetodoPago.sql
+		12_pruebasSPdatosEmpresa.sql = 12_pruebasSPdatosEmpresa.sql
 		Entrega4.sql = Entrega4.sql
+		14_pruebasSPFacturas.sql = 14_pruebasSPFacturas.sql
+		15_pruebaSPNotaCredito.sql = 15_pruebaSPNotaCredito.sql
+		13_pruebasSPClima.sql = 13_pruebasSPClima.sql
+		Entrega5.sql = Entrega5.sql
 		Reportes.sql = Reportes.sql
 		Roles y permisos.sql = Roles y permisos.sql
 	EndProjectSection
@@ -31,7 +34,7 @@ Global
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{FC3DF230-76E7-3903-5A0C-93F690F11CE7}.Default|Default.ActiveCfg = Default
-		{D5DCAA73-719F-43BE-9869-3354DDD47AAF}.Default|Default.ActiveCfg = Default
+		{790E3C50-DC7F-411B-9FC5-A4849C93B56B}.Default|Default.ActiveCfg = Default
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

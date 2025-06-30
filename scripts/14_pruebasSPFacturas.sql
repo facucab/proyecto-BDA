@@ -14,21 +14,22 @@
 USE Com5600G01;
 GO
 
+
 BEGIN TRAN TestFacturaAll;
 
 -- CrearFactura
 
 -- Casos normales
 EXEC facturacion.CrearFactura
-	@id_persona     = 1,
-	@id_metodo_pago = 1,
+	@id_persona     = 3,
+	@id_metodo_pago = 5,
 	@estado_pago    = 'Pendiente',
 	@monto_a_pagar  = 150.75,
 	@detalle        = 'Factura test 1';
 -- Resultado esperado: OK, Factura creada correctamente.
 
 EXEC facturacion.CrearFactura
-	@id_persona     = 1,
+	@id_persona     = 3,
 	@id_metodo_pago = NULL,
 	@estado_pago    = 'Pagado',
 	@monto_a_pagar  = 200.00,
@@ -46,7 +47,7 @@ EXEC facturacion.CrearFactura
 
 -- Metodo de pago inexistente
 EXEC facturacion.CrearFactura
-	@id_persona     = 1,
+	@id_persona     = 3,
 	@id_metodo_pago = 999,
 	@estado_pago    = 'Pendiente',
 	@monto_a_pagar  = 75.00,
@@ -55,7 +56,7 @@ EXEC facturacion.CrearFactura
 
 -- Estado de pago vacío
 EXEC facturacion.CrearFactura
-	@id_persona     = 1,
+	@id_persona     = 3,
 	@id_metodo_pago = 1,
 	@estado_pago    = '',
 	@monto_a_pagar  = 60.00,
@@ -64,7 +65,7 @@ EXEC facturacion.CrearFactura
 
 -- Monto a pagar inválido (<= 0)
 EXEC facturacion.CrearFactura
-	@id_persona     = 1,
+	@id_persona     = 3,
 	@id_metodo_pago = 1,
 	@estado_pago    = 'Pendiente',
 	@monto_a_pagar  = 0,

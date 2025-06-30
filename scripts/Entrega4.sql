@@ -2123,13 +2123,13 @@ BEGIN
     -- Valido nombre
     IF @nombre_categoria IS NULL OR LTRIM(RTRIM(@nombre_categoria)) = ''
     BEGIN
-        SELECT 'Error' AS Resultado, 'El nombre de la categor�a es obligatorio' AS Mensaje, '400' AS Estado;
+        SELECT 'Error' AS Resultado, 'El nombre de la categoria es obligatorio' AS Mensaje, '400' AS Estado;
         RETURN;
     END;
     -- Valido costo
     IF @costo_membrecia <= 0
     BEGIN
-        SELECT 'Error' AS Resultado, 'El costo de membres�a debe ser mayor a 0' AS Mensaje, '400' AS Estado;
+        SELECT 'Error' AS Resultado, 'El costo de membresia debe ser mayor a 0' AS Mensaje, '400' AS Estado;
         RETURN;
     END;
     -- Valido vigencia
@@ -2144,13 +2144,13 @@ BEGIN
         WHERE LOWER(nombre_categoria) = LOWER(LTRIM(RTRIM(@nombre_categoria)))
     )
     BEGIN
-        SELECT 'Error' AS Resultado, 'Ya existe una categor�a con ese nombre' AS Mensaje, '400' AS Estado;
-        RETURN;
+        SELECT 'Error' AS Resultado, 'Ya existe una categoria con ese nombre' AS Mensaje, '400' AS Estado;
+        RETURN -10;
     END;
     BEGIN TRY
         INSERT INTO actividades.categoria(nombre_categoria, costo_membrecia, vigencia)
         VALUES (LOWER(LTRIM(RTRIM(@nombre_categoria))), @costo_membrecia, @vigencia);
-        SELECT 'OK' AS Resultado, 'Categor�a creada correctamente' AS Mensaje, '200' AS Estado;
+        SELECT 'OK' AS Resultado, 'Categoria creada correctamente' AS Mensaje, '200' AS Estado;
     END TRY
     BEGIN CATCH
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
@@ -2175,38 +2175,50 @@ CREATE OR ALTER PROCEDURE actividades.ModificarCategoria
 AS
 BEGIN
     SET NOCOUNT ON;
+
+
     -- Valido existencia
     IF NOT EXISTS (SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
     BEGIN
-        SELECT 'Error' AS Resultado, 'Categor�a no encontrada' AS Mensaje, '404' AS Estado;
-        RETURN;
+        SELECT 'Error' AS Resultado, 'Categoria no encontrada' AS Mensaje, '404' AS Estado;
+        RETURN -1;
     END;
+
+
     -- Valido nombre
     IF @nombre_categoria IS NULL OR LTRIM(RTRIM(@nombre_categoria)) = ''
     BEGIN
-        SELECT 'Error' AS Resultado, 'El nombre de la categor�a es obligatorio' AS Mensaje, '400' AS Estado;
-        RETURN;
+        SELECT 'Error' AS Resultado, 'El nombre de la categoria es obligatorio' AS Mensaje, '400' AS Estado;
+        RETURN -2;
     END;
+
+
     -- Valido costo
     IF @costo_membrecia <= 0
     BEGIN
-        SELECT 'Error' AS Resultado, 'El costo de membres�a debe ser mayor a 0' AS Mensaje, '400' AS Estado;
-        RETURN;
+        SELECT 'Error' AS Resultado, 'El costo de membresia debe ser mayor a 0' AS Mensaje, '400' AS Estado;
+        RETURN -3;
     END;
+
+
     -- Valido vigencia
     IF @vigencia IS NULL
     BEGIN
         SELECT 'Error' AS Resultado, 'La fecha de vigencia es obligatoria' AS Mensaje, '400' AS Estado;
-        RETURN;
+        RETURN -4;
     END;
+
+
     -- Valido duplicado en otro registro
     IF EXISTS (
         SELECT 1 FROM actividades.categoria
         WHERE LOWER(nombre_categoria) = LOWER(LTRIM(RTRIM(@nombre_categoria))) AND id_categoria <> @id_categoria)
     BEGIN
-        SELECT 'Error' AS Resultado, 'Ya existe otra categor�a con ese nombre' AS Mensaje, '400' AS Estado;
-        RETURN;
+        SELECT 'Error' AS Resultado, 'Ya existe otra categoria con ese nombre' AS Mensaje, '400' AS Estado;
+        RETURN -10;
     END;
+
+
     BEGIN TRY
         UPDATE actividades.categoria
         SET
@@ -2214,7 +2226,7 @@ BEGIN
             costo_membrecia  = @costo_membrecia,
             vigencia         = @vigencia
         WHERE id_categoria = @id_categoria;
-        SELECT 'OK' AS Resultado, 'Categor�a modificada correctamente' AS Mensaje, '200' AS Estado;
+        SELECT 'OK' AS Resultado, 'Categoria modificada correctamente' AS Mensaje, '200' AS Estado;
     END TRY
 
     BEGIN CATCH
@@ -2223,6 +2235,9 @@ BEGIN
 
 END;
 GO
+
+
+
 /*
 * Nombre: EliminarCategoria
 * Descripcion: Elimina f�sicamente una categor�a de la tabla actividades.categoria.
