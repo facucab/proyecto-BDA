@@ -3483,3 +3483,188 @@ BEGIN
     END CATCH;
 END;
 GO
+-- ############################################################
+-- ##################### SP COSTO ########################
+-- ############################################################
+GO
+/*
+* Nombre: CrearCosto
+* Descripción: Registra un nuevo costo para una pileta.
+* Parámetros:
+*   @tipo              CHAR(3)        – Tipo de pase ('dia', 'tem', 'mes').
+*   @tipo_grupo        CHAR(3)        – Grupo ('adu', 'men').
+*   @precio_socios     DECIMAL(10,2)  – Precio para socios (> 0).
+*   @precio_invitados  DECIMAL(10,2)  – Precio para invitados (> 0).
+*   @id_pileta         INT            – FK a actividades.pileta.
+* Aclaración:
+*   Se usa transacción explícita para evitar lecturas sucias y mantener atomicidad.
+*/
+CREATE OR ALTER PROCEDURE actividades.CrearCosto
+    @tipo             CHAR(3),
+    @tipo_grupo       CHAR(3),
+    @precio_socios    DECIMAL(10,2),
+    @precio_invitados DECIMAL(10,2),
+    @id_pileta        INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- Validaciones
+        IF @tipo NOT IN ('dia', 'tem', 'mes')
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Tipo inválido. Debe ser dia, tem o mes.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @tipo_grupo NOT IN ('adu', 'men')
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Tipo de grupo inválido. Debe ser adu o men.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @precio_socios IS NULL OR @precio_socios <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Precio para socios inválido. Debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @precio_invitados IS NULL OR @precio_invitados <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Precio para invitados inválido. Debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF NOT EXISTS (SELECT 1 FROM actividades.pileta WHERE id_pileta = @id_pileta)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Pileta no encontrada.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- Inserción
+        INSERT INTO actividades.costo(tipo, tipo_grupo, precio_socios, precio_invitados, id_pileta)
+        VALUES(@tipo, @tipo_grupo, @precio_socios, @precio_invitados, @id_pileta);
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Costo registrado correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: ModificarCosto
+* Descripción: Modifica un costo existente.
+* Parámetros:
+*   @id_costo          INT           – ID del costo a modificar.
+*   @tipo              CHAR(3)       – Nuevo tipo ('dia', 'tem', 'mes') (opcional).
+*   @tipo_grupo        CHAR(3)       – Nuevo tipo grupo ('adu', 'men') (opcional).
+*   @precio_socios     DECIMAL(10,2) – Nuevo precio para socios (opcional).
+*   @precio_invitados  DECIMAL(10,2) – Nuevo precio para invitados (opcional).
+*   @id_pileta         INT           – Nueva pileta asociada (opcional).
+* Aclaración:
+*   Se usa transacción explícita para evitar lecturas inconsistentes y mantener atomicidad.
+*/
+CREATE OR ALTER PROCEDURE actividades.ModificarCosto
+    @id_costo         INT,
+    @tipo             CHAR(3) = NULL,
+    @tipo_grupo       CHAR(3) = NULL,
+    @precio_socios    DECIMAL(10,2) = NULL,
+    @precio_invitados DECIMAL(10,2) = NULL,
+    @id_pileta        INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        IF NOT EXISTS (SELECT 1 FROM actividades.costo WHERE id_costo = @id_costo)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Costo no encontrado.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        IF @tipo IS NOT NULL AND @tipo NOT IN ('dia', 'tem', 'mes')
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Tipo inválido. Debe ser dia, tem o mes.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @tipo_grupo IS NOT NULL AND @tipo_grupo NOT IN ('adu', 'men')
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Tipo de grupo inválido. Debe ser adu o men.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @precio_socios IS NOT NULL AND @precio_socios <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Precio para socios debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @precio_invitados IS NOT NULL AND @precio_invitados <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Precio para invitados debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+        IF @id_pileta IS NOT NULL AND NOT EXISTS (SELECT 1 FROM actividades.pileta WHERE id_pileta = @id_pileta)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Pileta no encontrada.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        UPDATE actividades.costo
+        SET tipo             = COALESCE(@tipo, tipo),
+            tipo_grupo       = COALESCE(@tipo_grupo, tipo_grupo),
+            precio_socios    = COALESCE(@precio_socios, precio_socios),
+            precio_invitados = COALESCE(@precio_invitados, precio_invitados),
+            id_pileta        = COALESCE(@id_pileta, id_pileta)
+        WHERE id_costo = @id_costo;
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Costo modificado correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: EliminarCosto
+* Descripción: Elimina físicamente un costo.
+* Parámetros:
+*   @id_costo INT – ID del costo a eliminar.
+*/
+CREATE OR ALTER PROCEDURE actividades.EliminarCosto
+    @id_costo INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    IF NOT EXISTS (SELECT 1 FROM actividades.costo WHERE id_costo = @id_costo)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Costo no encontrado.' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        DELETE FROM actividades.costo WHERE id_costo = @id_costo;
+        SELECT 'OK' AS Resultado, 'Costo eliminado correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
