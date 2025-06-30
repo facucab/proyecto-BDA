@@ -3853,3 +3853,96 @@ BEGIN
     END CATCH;
 END;
 GO
+-- ############################################################
+-- ############### SP CREAR DETALLE DE FACTURA ################
+-- ############################################################
+GO
+/*
+* Nombre: CrearDetalleFactura
+* Descripción: Registra un nuevo detalle asociado a una factura y una empresa emisora.
+* Parámetros:
+*   @tipo_comprobante    CHAR(1)        – Tipo de comprobante: A, B, C o M.
+*   @numero_comprobante  VARCHAR(20)   – Número del comprobante (opcional).
+*   @descripcion         VARCHAR(50)   – Descripción del ítem (opcional).
+*   @cantidad            SMALLINT      – Cantidad del ítem (opcional, default 1 si NULL o <= 0).
+*   @precio_unitario     DECIMAL(10,2) – Precio unitario (> 0).
+*   @id_factura          INT           – FK a facturacion.factura.
+*   @id_empresa          INT           – FK a facturacion.datos_empresa.
+* Aclaración:
+*   Se usa transacción explícita para mantener consistencia y evitar errores concurrentes.
+*/
+CREATE OR ALTER PROCEDURE facturacion.CrearDetalleFactura
+    @tipo_comprobante    CHAR(1),
+    @numero_comprobante  VARCHAR(20) = NULL,
+    @descripcion         VARCHAR(50) = NULL,
+    @cantidad            SMALLINT = 1,
+    @precio_unitario     DECIMAL(10,2),
+    @id_factura          INT,
+    @id_empresa          INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- Validar tipo de comprobante
+        IF @tipo_comprobante NOT IN ('A', 'B', 'C', 'M')
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Tipo de comprobante inválido. Debe ser A, B, C o M.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+
+        -- Validar precio
+        IF @precio_unitario IS NULL OR @precio_unitario <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El precio unitario debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+
+        -- Validar factura
+        IF NOT EXISTS (SELECT 1 FROM facturacion.factura WHERE id_factura = @id_factura)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Factura no encontrada.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- Validar empresa
+        IF NOT EXISTS (SELECT 1 FROM facturacion.datos_empresa WHERE id_empresa = @id_empresa)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Empresa emisora no encontrada.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- Ajuste de cantidad por defecto
+        SET @cantidad = ISNULL(NULLIF(@cantidad, 0), 1);
+
+        -- Inserción
+        INSERT INTO facturacion.detalle (
+            tipo_comprobante, numero_comprobante, descripcion, cantidad,
+            precio_unitario, id_factura, id_empresa
+        )
+        VALUES (
+            @tipo_comprobante,
+            LTRIM(RTRIM(@numero_comprobante)),
+            LTRIM(RTRIM(@descripcion)),
+            @cantidad,
+            @precio_unitario,
+            @id_factura,
+            @id_empresa
+        );
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Detalle de factura creado correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
