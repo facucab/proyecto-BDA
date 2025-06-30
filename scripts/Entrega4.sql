@@ -2235,9 +2235,6 @@ BEGIN
 
 END;
 GO
-
-
-
 /*
 * Nombre: EliminarCategoria
 * Descripcion: Elimina f�sicamente una categor�a de la tabla actividades.categoria.
@@ -2708,7 +2705,6 @@ BEGIN
 	END CATCH;
 END;
 GO
-
 /*
 * Nombre: EliminarClase
 * Descripcion: Realiza un borrado logico de una clase desactivandola.
@@ -3045,6 +3041,7 @@ GO
 -- ############################################################
 -- #################### SP DESCUENTO ##########################
 -- ############################################################
+GO
 /*
 * Nombre: CrearDescuento
 * Descripcion: Inserta un nuevo descuento en la tabla facturacion.descuento, validando su informaci�n.
@@ -3351,6 +3348,135 @@ BEGIN
          WHERE id_empresa = @id_empresa;
 
         SELECT 'OK' AS Resultado, 'Empresa eliminada correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+-- ############################################################
+-- ###################### SP PILETA #####################
+-- ############################################################
+GO
+/*
+* Nombre: CrearPileta
+* Descripción: Inserta una nueva pileta validando sus datos.
+* Parámetros:
+*   @detalle         VARCHAR(50)  – Descripción de la pileta (obligatorio).
+*   @metro_cuadrado  DECIMAL(5,2) – Tamaño en metros cuadrados (obligatorio, > 0).
+* Aclaración:
+*   No se usa transacción explícita, solo afecta una tabla.
+*/
+CREATE OR ALTER PROCEDURE actividades.CrearPileta
+    @detalle        VARCHAR(50),
+    @metro_cuadrado DECIMAL(5,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Validaciones
+    IF @detalle IS NULL OR LTRIM(RTRIM(@detalle)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El detalle es obligatorio.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    IF @metro_cuadrado IS NULL OR @metro_cuadrado <= 0
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El tamaño de la pileta debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        INSERT INTO actividades.pileta (detalle, metro_cuadrado)
+        VALUES (LTRIM(RTRIM(@detalle)), @metro_cuadrado);
+
+        SELECT 'OK' AS Resultado, 'Pileta creada correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: CrearPileta
+* Descripción: Inserta una nueva pileta validando sus datos.
+* Parámetros:
+*   @detalle         VARCHAR(50)  – Descripción de la pileta (obligatorio).
+*   @metro_cuadrado  DECIMAL(5,2) – Tamaño en metros cuadrados (obligatorio, > 0).
+* Aclaración:
+*   No se usa transacción explícita, solo afecta una tabla.
+*/
+CREATE OR ALTER PROCEDURE actividades.CrearPileta
+    @detalle        VARCHAR(50),
+    @metro_cuadrado DECIMAL(5,2)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Validaciones
+    IF @detalle IS NULL OR LTRIM(RTRIM(@detalle)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El detalle es obligatorio.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    IF @metro_cuadrado IS NULL OR @metro_cuadrado <= 0
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El tamaño de la pileta debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        INSERT INTO actividades.pileta (detalle, metro_cuadrado)
+        VALUES (LTRIM(RTRIM(@detalle)), @metro_cuadrado);
+
+        SELECT 'OK' AS Resultado, 'Pileta creada correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: ModificarPileta
+* Descripción: Modifica los datos de una pileta existente.
+* Parámetros:
+*   @id_pileta       INT           – ID de la pileta a modificar.
+*   @detalle         VARCHAR(50)   – Nuevo detalle (opcional).
+*   @metro_cuadrado  DECIMAL(5,2)  – Nuevo tamaño (opcional).
+* Aclaración:
+*   No se usa transacción explícita, solo afecta una tabla.
+*/
+CREATE OR ALTER PROCEDURE actividades.ModificarPileta
+    @id_pileta       INT,
+    @detalle         VARCHAR(50) = NULL,
+    @metro_cuadrado  DECIMAL(5,2) = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    -- Validación de existencia
+    IF NOT EXISTS (SELECT 1 FROM actividades.pileta WHERE id_pileta = @id_pileta)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Pileta no encontrada.' AS Mensaje, '404' AS Estado;
+        RETURN;
+    END;
+
+    -- Validación de metro cuadrado si se pasa
+    IF @metro_cuadrado IS NOT NULL AND @metro_cuadrado <= 0
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El tamaño debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+        RETURN;
+    END;
+
+    BEGIN TRY
+        UPDATE actividades.pileta
+        SET detalle        = COALESCE(NULLIF(LTRIM(RTRIM(@detalle)), ''), detalle),
+            metro_cuadrado = COALESCE(@metro_cuadrado, metro_cuadrado)
+        WHERE id_pileta = @id_pileta;
+
+        SELECT 'OK' AS Resultado, 'Pileta modificada correctamente.' AS Mensaje, '200' AS Estado;
     END TRY
     BEGIN CATCH
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
