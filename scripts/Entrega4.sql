@@ -3775,3 +3775,81 @@ BEGIN
     END CATCH;
 END;
 GO
+-- ############################################################
+-- ################# SP NOTA DE CRÉDITO #################
+-- ############################################################
+GO
+/*
+* Nombre: CrearNotaCredito
+* Descripción: Registra una nota de crédito asociada a una factura y (opcionalmente) al clima.
+* Parámetros:
+*   @fecha_emision DATE          – Fecha de emisión (obligatoria, no futura).
+*   @monto         DECIMAL(10,2) – Monto de la nota (> 0).
+*   @motivo        VARCHAR(40)   – Motivo de la nota (opcional).
+*   @id_factura    INT           – FK a factura (obligatoria).
+*   @id_clima      INT           – FK opcional a clima.
+* Aclaración:
+*   Se usa transacción explícita para asegurar atomicidad y evitar lecturas inconsistentes.
+*/
+CREATE OR ALTER PROCEDURE facturacion.CrearNotaCredito
+    @fecha_emision DATE,
+    @monto         DECIMAL(10,2),
+    @motivo        VARCHAR(40) = NULL,
+    @id_factura    INT,
+    @id_clima      INT = NULL
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+
+    BEGIN TRY
+        BEGIN TRANSACTION;
+
+        -- Validaciones
+        IF @fecha_emision IS NULL OR @fecha_emision > GETDATE()
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La fecha de emisión es inválida o futura.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+
+        IF @monto IS NULL OR @monto <= 0
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El monto debe ser mayor a cero.' AS Mensaje, '400' AS Estado;
+            RETURN;
+        END;
+
+        IF NOT EXISTS (SELECT 1 FROM facturacion.factura WHERE id_factura = @id_factura)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Factura no encontrada.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        IF @id_clima IS NOT NULL AND NOT EXISTS (
+            SELECT 1 FROM facturacion.clima WHERE id_clima = @id_clima
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'Clima no encontrado.' AS Mensaje, '404' AS Estado;
+            RETURN;
+        END;
+
+        -- Inserción
+        INSERT INTO facturacion.nota_credito (
+            fecha_emision, monto, motivo, id_factura, id_clima
+        )
+        VALUES (
+            @fecha_emision, @monto, LTRIM(RTRIM(@motivo)), @id_factura, @id_clima
+        );
+
+        COMMIT TRANSACTION;
+        SELECT 'OK' AS Resultado, 'Nota de crédito registrada correctamente.' AS Mensaje, '200' AS Estado;
+    END TRY
+    BEGIN CATCH
+        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
+    END CATCH;
+END;
+GO
