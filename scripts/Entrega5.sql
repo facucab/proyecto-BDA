@@ -823,7 +823,7 @@ GO
 
 EXEC facturacion.ImportarClima 
     @RutaBase = N'C:\Users\tomas\Desktop\proyecto-BDA\docs\',
-    @Anio = 2025;
+    @Anio = 2024;
     
 select * from facturacion.clima 
 GO
