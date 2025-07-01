@@ -3235,14 +3235,14 @@ GO
 GO
 /*
 * Nombre: CrearEmpresa
-* Descripci�n: Inserta una nueva empresa en la tabla facturacion.datos_empresa.
+* Descripcion: Inserta una nueva empresa en la tabla facturacion.datos_empresa.
 * Parsmetros:
-*   @cuit_emisor         VARCHAR(20) � CUIT del emisor (obligatorio).
-*   @domicilio_comercial VARCHAR(25) � Domicilio comercial (obligatorio).
-*   @condicion_IVA       VARCHAR(25) � Condici�n frente al IVA (obligatorio).
-*   @nombre              VARCHAR(35) � Nombre de la empresa (opcional).
-* Aclaraci�n:
-*   No se utiliza transacci�n expl�cita ya que solo se afecta una tabla.
+*   @cuit_emisor         VARCHAR(20) - CUIT del emisor (obligatorio).
+*   @domicilio_comercial VARCHAR(25) - Domicilio comercial (obligatorio).
+*   @condicion_IVA       VARCHAR(25) - Condicion frente al IVA (obligatorio).
+*   @nombre              VARCHAR(35) - Nombre de la empresa (opcional).
+* Aclaracion:
+*   No se utiliza transaccion explicita ya que solo se afecta una tabla.
 */
 CREATE OR ALTER PROCEDURE facturacion.CrearEmpresa
     @cuit_emisor         VARCHAR(20),

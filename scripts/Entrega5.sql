@@ -681,6 +681,115 @@ BEGIN
 END
 GO
 
+-- Importar Clima desde CSV usando facturacion.RegistrarClima
+CREATE OR ALTER PROCEDURE facturacion.ImportarClima
+    @RutaBase NVARCHAR(300) = 'C:\datos\clima\',  -- Ruta base donde están los archivos
+    @Anio INT
+AS
+BEGIN
+    SET NOCOUNT ON;
+    BEGIN TRY
+        -- Construir la ruta del archivo dinámicamente
+        DECLARE @RutaArchivo NVARCHAR(400);
+        SET @RutaArchivo = @RutaBase + 'open-meteo-buenosaires_' + CAST(@Anio AS NVARCHAR(4)) + '.csv';
+        
+        -- Verificar que el año sea válido
+        IF @Anio < 1900 OR @Anio > YEAR(GETDATE()) + 1
+        BEGIN
+            SELECT 'Error' AS Resultado, 'Año inválido' AS Mensaje;
+            RETURN -1;
+        END
+        
+        -- Tabla temporal para importar los datos del CSV
+        CREATE TABLE #TempClima (
+            [time] VARCHAR(20),
+            [temperature_2m] VARCHAR(20) NULL,
+            [rain_mm] VARCHAR(20) NULL,
+            [relative_humidity_2m] VARCHAR(20) NULL,
+            [wind_speed_10m] VARCHAR(20) NULL
+        );
+        
+        DECLARE @SQL NVARCHAR(MAX);
+        
+        -- Importar datos desde el CSV, saltando las primeras 2 líneas (encabezados)
+        SET @SQL = N'
+            BULK INSERT #TempClima
+            FROM ''' + @RutaArchivo + '''
+            WITH (
+                FIRSTROW = 3, -- Salta los encabezados
+                FIELDTERMINATOR = '','',
+                ROWTERMINATOR = ''\n'',
+                CODEPAGE = ''65001'',
+                TABLOCK
+            );';
+        
+        EXEC sp_executesql @SQL;
+        
+        -- Variables para el cursor
+        DECLARE @fechaHora SMALLDATETIME, @lluvia DECIMAL(5,2), @hora VARCHAR(20), @rain VARCHAR(20);
+        
+        DECLARE cur CURSOR FOR
+            SELECT [time], [rain_mm]
+            FROM #TempClima
+            WHERE [time] IS NOT NULL AND [rain_mm] IS NOT NULL AND LTRIM(RTRIM([time])) <> '';
+        
+        OPEN cur;
+        FETCH NEXT FROM cur INTO @hora, @rain;
+        
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            BEGIN TRY
+                -- Limpiar espacios y caracteres extraños
+                SET @hora = LTRIM(RTRIM(@hora));
+                
+                -- Convertir el campo time a SMALLDATETIME
+                DECLARE @fechaStr NVARCHAR(10), @horaStr NVARCHAR(5), @fechaHoraStr NVARCHAR(20);
+                
+                -- Extraer fecha y hora por separado
+                SET @fechaStr = LEFT(@hora, 10);  -- 2025-01-01
+                SET @horaStr = RIGHT(@hora, 5);   -- 03:00
+                
+                -- Combinar en formato estándar
+                SET @fechaHoraStr = @fechaStr + ' ' + @horaStr;
+                
+                -- Convertir a SMALLDATETIME
+                SET @fechaHora = CAST(@fechaHoraStr AS SMALLDATETIME);
+                
+                -- Convertir lluvia a decimal
+                SET @lluvia = TRY_CAST(REPLACE(@rain, ',', '.') AS DECIMAL(5,2));
+                
+                -- Llamar al SP de registro de clima
+                EXEC facturacion.RegistrarClima @fecha = @fechaHora, @lluvia = @lluvia;
+            END TRY
+            BEGIN CATCH
+                -- Continuar con el siguiente registro
+            END CATCH
+            
+            FETCH NEXT FROM cur INTO @hora, @rain;
+        END
+        
+        CLOSE cur;
+        DEALLOCATE cur;
+        DROP TABLE #TempClima;
+        
+        SELECT 'Éxito' AS Resultado, 'Importación completada' AS Mensaje;
+               
+    END TRY
+    BEGIN CATCH
+        IF CURSOR_STATUS('local', 'cur') >= 0
+        BEGIN
+            CLOSE cur;
+            DEALLOCATE cur;
+        END
+        
+        IF OBJECT_ID('tempdb..#TempClima') IS NOT NULL
+            DROP TABLE #TempClima;
+            
+        SELECT 'Error' AS Resultado, 'Error en el proceso' AS Mensaje;
+        RETURN -1;
+    END CATCH
+END
+GO
 
 
 -- IMPORTACION Y PRUEBAS
@@ -712,3 +821,9 @@ GO
 EXEC manejo_personas.ImportarGrupoFamiliar 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 GO
 
+EXEC facturacion.ImportarClima 
+    @RutaBase = N'C:\Users\tomas\Desktop\proyecto-BDA\docs\',
+    @Anio = 2025;
+    
+select * from facturacion.clima 
+GO
