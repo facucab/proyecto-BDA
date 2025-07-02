@@ -19,7 +19,7 @@ GO
 -- SPS
 GO
 
--- Importar Categorias - FUNCIONANDO (ALTA Y ACTUALIZACION)
+-- Importar Categorias - FUNCIONANDO
 CREATE OR ALTER PROCEDURE actividades.ImportarCategorias
     @RutaArchivo NVARCHAR(260)
 AS
@@ -127,7 +127,7 @@ BEGIN
 END
 GO
     
--- Importar Socios - CASI SEGURO QUE FUNCIONANDO (Falta chequear lo que tiene que ver con la obra social)
+-- Importar Socios - NO FUNCIONA
 CREATE OR ALTER PROCEDURE usuarios.ImportarSocios
     @RutaArchivo NVARCHAR(260)
 AS
@@ -366,7 +366,7 @@ END
 GO
 
 
--- Importar Grupo Familiar 
+-- Importar Grupo Familiar - ?
 CREATE OR ALTER PROCEDURE usuarios.ImportarGrupoFamiliares
     @RutaArchivo VARCHAR(260)
 AS
@@ -437,8 +437,7 @@ END
 GO
 
 
--- Importar Actividades
-
+-- Importar Actividades - FUNCIONADO
 CREATE OR ALTER PROCEDURE actividades.ImportarActividades
     @RutaArchivo NVARCHAR(260)
 AS
@@ -527,10 +526,10 @@ BEGIN
 END
 GO
 
-
-
--- Importar Costos de Pileta (revisar, parece funcionar.)
-
+-- Importar Costos de Pileta - FUNCIONADO
+EXEC actividades.CrearPileta 
+    @detalle = 'Pileta prueba',
+    @metro_cuadrado = 10;
 CREATE OR ALTER PROCEDURE actividades.ImportarCostosPileta
     @RutaArchivo NVARCHAR(260),
     @id_pileta    INT
@@ -681,9 +680,9 @@ BEGIN
 END
 GO
 
--- Importar Clima desde CSV usando facturacion.RegistrarClima
+-- Importar Clima - FUNCIONANDO
 CREATE OR ALTER PROCEDURE facturacion.ImportarClima
-    @RutaBase NVARCHAR(300) = 'C:\datos\clima\',  -- Ruta base donde están los archivos
+    @RutaBase NVARCHAR(300) = '.\docs\',  -- Ruta base donde están los archivos
     @Anio INT
 AS
 BEGIN
@@ -692,13 +691,6 @@ BEGIN
         -- Construir la ruta del archivo dinámicamente
         DECLARE @RutaArchivo NVARCHAR(400);
         SET @RutaArchivo = @RutaBase + 'open-meteo-buenosaires_' + CAST(@Anio AS NVARCHAR(4)) + '.csv';
-        
-        -- Verificar que el año sea válido
-        IF @Anio < 1900 OR @Anio > YEAR(GETDATE()) + 1
-        BEGIN
-            SELECT 'Error' AS Resultado, 'Año inválido' AS Mensaje;
-            RETURN -1;
-        END
         
         -- Tabla temporal para importar los datos del CSV
         CREATE TABLE #TempClima (
@@ -716,7 +708,7 @@ BEGIN
             BULK INSERT #TempClima
             FROM ''' + @RutaArchivo + '''
             WITH (
-                FIRSTROW = 3, -- Salta los encabezados
+                FIRSTROW = 3,
                 FIELDTERMINATOR = '','',
                 ROWTERMINATOR = ''\n'',
                 CODEPAGE = ''65001'',
@@ -729,7 +721,8 @@ BEGIN
         DECLARE @fechaHora SMALLDATETIME, @lluvia DECIMAL(5,2), @hora VARCHAR(20), @rain VARCHAR(20);
         
         DECLARE cur CURSOR FOR
-            SELECT [time], [rain_mm]
+            SELECT [time], 
+                   [rain_mm]
             FROM #TempClima
             WHERE [time] IS NOT NULL AND [rain_mm] IS NOT NULL AND LTRIM(RTRIM([time])) <> '';
         
@@ -791,14 +784,10 @@ BEGIN
 END
 GO
 
-
 -- IMPORTACION Y PRUEBAS
-
 EXEC actividades.ImportarCategorias 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 select * from actividades.categoria
 GO
-
-
 
 EXEC usuarios.ImportarSocios 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
 select s.*, os.descripcion AS obra_social_descripcion, os.nro_telefono AS obra_social_telefono
@@ -806,19 +795,8 @@ FROM usuarios.socio s
 LEFT JOIN usuarios.obra_social os ON s.id_obra_social = os.id_obra_social
 GO
 
-
-EXEC pagos_y_facturas.ImportarFacturas 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
-GO
-
-EXEC actividades.ImportarActividades 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
-GO
-
--- HAY QUE EJECUTAR LO QUE ESTA EN GENERAR DATOS PARA EJECUTAR EL SIGUIENTE
-
-EXEC actividades.ImportarPresentismoActividades 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
-GO
-
-EXEC manejo_personas.ImportarGrupoFamiliar 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
+EXEC actividades.ImportarActividades 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
+SELECT * FROM actividades.actividad
 GO
 
 EXEC facturacion.ImportarClima 
@@ -827,3 +805,10 @@ EXEC facturacion.ImportarClima
     
 select * from facturacion.clima 
 GO
+
+EXEC actividades.ImportarCostosPileta
+     @RutaArchivo = 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx',
+     @id_pileta = 1;
+     SELECT * FROM actividades.costo
+GO
+
