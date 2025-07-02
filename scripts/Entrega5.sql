@@ -16,9 +16,6 @@ GO
 USE Com5600G01;
 GO
 
--- SPS
-GO
-
 -- Importar Categorias - FUNCIONANDO
 CREATE OR ALTER PROCEDURE actividades.ImportarCategorias
     @RutaArchivo NVARCHAR(260)
@@ -127,7 +124,7 @@ BEGIN
 END
 GO
     
--- Importar Socios - NO FUNCIONA
+-- Importar Socios - FUNCIONANDO
 CREATE OR ALTER PROCEDURE usuarios.ImportarSocios
     @RutaArchivo NVARCHAR(260)
 AS
@@ -212,9 +209,6 @@ BEGIN
                     ''SELECT * FROM [Responsables de Pago$]'')';
         
         EXEC sp_executesql @SQL;  -- Importa los registros
-
-        SELECT * FROM #TempDatos
-        RETURN
 
         -- Declara el cursor para la tabla
         DECLARE cur CURSOR FOR 
@@ -439,7 +433,6 @@ BEGIN
 END
 GO
 
-
 -- Importar Actividades - FUNCIONADO
 CREATE OR ALTER PROCEDURE actividades.ImportarActividades
     @RutaArchivo NVARCHAR(260)
@@ -533,6 +526,7 @@ GO
 EXEC actividades.CrearPileta 
     @detalle = 'Pileta prueba',
     @metro_cuadrado = 10;
+GO
 CREATE OR ALTER PROCEDURE actividades.ImportarCostosPileta
     @RutaArchivo NVARCHAR(260),
     @id_pileta    INT
