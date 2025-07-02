@@ -194,6 +194,7 @@ CREATE TABLE facturacion.factura (
 	id_factura    INT IDENTITY(1,1) PRIMARY KEY,
 	id_persona    INT NOT NULL,
 	id_metodo_pago INT NULL,
+    id_pago VARCHAR(50) NULL,
 	estado_pago   VARCHAR(20) NOT NULL,
 	fecha_emision DATE NOT NULL DEFAULT GETDATE(),
 	monto_a_pagar DECIMAL(10,2) NOT NULL,
@@ -1374,7 +1375,7 @@ BEGIN
             ROLLBACK TRANSACTION;
             SELECT 'Error' AS Resultado, 'El password_hash es obligatorio' AS Mensaje, '400' AS Estado;
             RETURN;
-        END
+        END;
 
         -- 4) Insertar usuario
         INSERT INTO usuarios.usuario(id_persona, username, password_hash)
@@ -2902,6 +2903,8 @@ GO
 *   @estado_pago   VARCHAR(20)     - Estado del pago.
 *   @monto_a_pagar DECIMAL(10,2)   - Monto a pagar.
 *   @detalle       VARCHAR(200) = NULL - Detalle de la factura. Opcional.
+*   @fecha_emision DATE = NULL         - Fecha de emisión. Opcional.
+*   @id_pago       VARCHAR(50) = NULL - Id de pago externo. Opcional.
 * Aclaracion: No se utilizan transacciones explicitas ya que:
 *   Solo se trabaja con una unica tabla y ejecutando sentencia DML
 */
@@ -2911,7 +2914,8 @@ CREATE OR ALTER PROCEDURE facturacion.CrearFactura
 	@estado_pago   VARCHAR(20),
 	@monto_a_pagar DECIMAL(10,2),
 	@detalle       VARCHAR(200) = NULL,
-    @fecha_emision DATE = NULL
+    @fecha_emision DATE = NULL,
+    @id_pago VARCHAR(50) = NULL
 AS
 BEGIN
 	SET NOCOUNT ON;
@@ -2943,8 +2947,8 @@ BEGIN
 	BEGIN TRY
         DECLARE @fecha_final DATE;
         SET @fecha_final = ISNULL(@fecha_emision, GETDATE());
-		INSERT INTO facturacion.factura(id_persona, id_metodo_pago, estado_pago, monto_a_pagar, detalle, fecha_emision)
-		VALUES(@id_persona, @id_metodo_pago, @estado_pago, @monto_a_pagar, @detalle, @fecha_final);
+		INSERT INTO facturacion.factura(id_persona, id_metodo_pago, estado_pago, monto_a_pagar, detalle, fecha_emision, id_pago)
+		VALUES(@id_persona, @id_metodo_pago, @estado_pago, @monto_a_pagar, @detalle, @fecha_final, @id_pago);
 		SELECT 'OK' AS Resultado, 'Factura creada correctamente' AS Mensaje, '200' AS Estado;
 	END TRY 
 	BEGIN CATCH

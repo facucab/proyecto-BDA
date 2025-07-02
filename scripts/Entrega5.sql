@@ -948,7 +948,7 @@ BEGIN
 END
 GO
 
--- Importar Facturas - FUNCIONANDO (Revisar ID de Pago)
+-- Importar Facturas - FUNCIONANDO (Hay que corregir el ID de pago, se importa con notacion cientifica)
 CREATE OR ALTER PROCEDURE facturacion.ImportarFacturas
     @RutaArchivo NVARCHAR(260)
 AS
@@ -972,24 +972,20 @@ BEGIN
         DECLARE @SQL NVARCHAR(MAX);
         SET @SQL = N'
             INSERT INTO #TempDatos (
-                                        [Id de pago], 
-                                        [fecha], 
-                                        [Responsable de pago], 
-                                        [Valor], 
-                                        [Medio de pago]
-                                    )
-            SELECT [Id de pago], 
-                   [fecha], 
-                   [Responsable de pago], 
-                   [Valor], 
-                   [Medio de pago]
+                [Id de pago], [fecha], [Responsable de pago], [Valor], [Medio de pago]
+            )
+            SELECT 
+                CAST([Id de pago] AS VARCHAR(50)), 
+                [fecha], 
+                [Responsable de pago], 
+                [Valor], 
+                [Medio de pago]
             FROM OPENROWSET(
                 ''Microsoft.ACE.OLEDB.12.0'',
                 ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
                 ''SELECT * FROM [pago cuotas$A1:E10000]'')';
-
         EXEC sp_executesql @SQL; -- La ejecuta
-
+    
         --  Variables auxiliares y cursor para recorrer la tabla
         DECLARE @id_pago VARCHAR(50), @fecha DATE, @numero_socio VARCHAR(20), @valor DECIMAL(10,2), @medio_pago VARCHAR(50);
         DECLARE @id_persona INT, @id_metodo_pago INT;
@@ -1049,7 +1045,8 @@ BEGIN
                     @estado_pago = 'Pendiente',
                     @monto_a_pagar = @valor,
                     @detalle = NULL,
-                    @fecha_emision = @fecha;
+                    @fecha_emision = @fecha,
+                    @id_pago = @id_pago;
 
                 SET @ContadorExitosos = @ContadorExitosos + 1;
             END TRY
