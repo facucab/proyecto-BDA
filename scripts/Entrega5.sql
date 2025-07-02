@@ -247,6 +247,9 @@ BEGIN
         WHILE @@FETCH_STATUS = 0
         BEGIN
             BEGIN TRY
+                -- Reinicializar variables para cada iteración (si no queda usando la misma)
+                SET @id_ObSo = NULL;
+
                 -- Antes de insertar, normalizar los campos de texto
                 SET @nroSocio = REPLACE(@nroSocio, 'SN-', '');
                 SET @dni = REPLACE(REPLACE(LTRIM(RTRIM(@dni)), '.', ''), '-', '');
