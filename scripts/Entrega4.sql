@@ -50,7 +50,9 @@ GO
 CREATE TABLE usuarios.grupo_familiar(
 	id_grupo_familiar INT IDENTITY(1,1) PRIMARY KEY,
     fecha_alta DATE NOT NULL DEFAULT GETDATE(),
-    estado BIT NOT NULL DEFAULT 1
+    estado BIT NOT NULL DEFAULT 1,
+	id_socio_rp INT NOT NULL,
+	parentesco  VARCHAR(35) NULL 
 );
 GO
 CREATE TABLE actividades.categoria(
@@ -92,6 +94,11 @@ CREATE TABLE usuarios.socio(
 	CONSTRAINT FK_socio_pileta FOREIGN KEY (id_pileta) REFERENCES actividades.pileta(id_pileta) 
 	ON DELETE SET NULL
 );
+GO
+-- Agrego FK
+ALTER TABLE usuarios.grupo_familiar
+ADD CONSTRAINT FK_grupo_socio_rp
+FOREIGN KEY (id_socio_rp) REFERENCES usuarios.socio(id_socio);
 GO
 CREATE TABLE usuarios.invitado(
 	id_invitado INT IDENTITY(1,1) PRIMARY KEY,

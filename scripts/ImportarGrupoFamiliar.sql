@@ -1,4 +1,4 @@
-EXEC sp_configure 'Show Advanced Options', 1;
+ï»¿EXEC sp_configure 'Show Advanced Options', 1;
 EXEC sp_configure 'Ad Hoc Distributed Queries', 1;
 RECONFIGURE;
 GO
@@ -15,7 +15,6 @@ GO
 -- #################################################
 USE Com5600G01;
 GO
-
 CREATE OR ALTER PROCEDURE usuarios.importarGrupoFamiliar
     @path NVARCHAR(400) 
 AS
@@ -35,7 +34,7 @@ BEGIN
 		tel_emerg INT,
 		nom_obra_social VARCHAR(35),
 		nro_socio_obra_social VARCHAR(35),
-		tel_cont_emerg VARCHAR(35)
+		tel_cont_emerg VARCHAR(80)
     );
 
     DECLARE @sql NVARCHAR(MAX);
@@ -64,11 +63,11 @@ BEGIN
 			[ DNI],
 			[ email personal],
 			CONVERT(DATE, [ fecha de nacimiento], 103) AS fecha_nacimiento,
-			[ teléfono de contacto],
-			[ teléfono de contacto emergencia],
+			[ telÃ©fono de contacto],
+			[ telÃ©fono de contacto emergencia],
 			RTRIM(LTRIM(LOWER([ Nombre de la obra social o prepaga]))),
 			[nro# de socio obra social/prepaga ],
-			[teléfono de contacto de emergencia ]
+			[telÃ©fono de contacto de emergencia ]
 
 			
         FROM OPENROWSET(
@@ -95,6 +94,7 @@ BEGIN
 END;
 GO
 
+GO
 
 
 GO
