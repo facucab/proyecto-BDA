@@ -961,7 +961,7 @@ BEGIN
     BEGIN TRY
         -- Crear tabla temporal 
         CREATE TABLE #TempDatos (
-            [Id de pago] VARCHAR(50),
+            [Id de pago] BIGINT,
             [fecha] DATE,
             [Responsable de pago] VARCHAR(20),
             [Valor] DECIMAL(10,2),
@@ -975,7 +975,7 @@ BEGIN
                 [Id de pago], [fecha], [Responsable de pago], [Valor], [Medio de pago]
             )
             SELECT 
-                CAST([Id de pago] AS VARCHAR(50)), 
+                CAST([Id de pago] AS BIGINT), 
                 [fecha], 
                 [Responsable de pago], 
                 [Valor], 
@@ -987,7 +987,7 @@ BEGIN
         EXEC sp_executesql @SQL; -- La ejecuta
     
         --  Variables auxiliares y cursor para recorrer la tabla
-        DECLARE @id_pago VARCHAR(50), @fecha DATE, @numero_socio VARCHAR(20), @valor DECIMAL(10,2), @medio_pago VARCHAR(50);
+        DECLARE @id_pago BIGINT, @fecha DATE, @numero_socio VARCHAR(20), @valor DECIMAL(10,2), @medio_pago VARCHAR(50);
         DECLARE @id_persona INT, @id_metodo_pago INT;
         DECLARE @ContadorExitosos INT = 0;
         DECLARE @ContadorErrores INT = 0;
@@ -1117,10 +1117,11 @@ EXEC actividades.ImportarCostosPileta
      SELECT * FROM actividades.costo
 GO
 
+/*
 EXEC usuarios.ImportarGrupoFamiliares 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
 SELECT * FROM usuarios.grupo_familiar
 GO
-
+*/
 EXEC facturacion.ImportarFacturas 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 SELECT * FROM facturacion.factura;
 GO

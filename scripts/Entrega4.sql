@@ -201,7 +201,7 @@ CREATE TABLE facturacion.factura (
 	id_factura    INT IDENTITY(1,1) PRIMARY KEY,
 	id_persona    INT NOT NULL,
 	id_metodo_pago INT NULL,
-    id_pago VARCHAR(50) NULL,
+    id_pago BIGINT NULL,
 	estado_pago   VARCHAR(20) NOT NULL,
 	fecha_emision DATE NOT NULL DEFAULT GETDATE(),
 	monto_a_pagar DECIMAL(10,2) NOT NULL,
@@ -2911,7 +2911,7 @@ GO
 *   @monto_a_pagar DECIMAL(10,2)   - Monto a pagar.
 *   @detalle       VARCHAR(200) = NULL - Detalle de la factura. Opcional.
 *   @fecha_emision DATE = NULL         - Fecha de emisión. Opcional.
-*   @id_pago       VARCHAR(50) = NULL - Id de pago externo. Opcional.
+*   @id_pago       BIGINT = NULL - Id de pago externo. Opcional.
 * Aclaracion: No se utilizan transacciones explicitas ya que:
 *   Solo se trabaja con una unica tabla y ejecutando sentencia DML
 */
@@ -2922,7 +2922,7 @@ CREATE OR ALTER PROCEDURE facturacion.CrearFactura
 	@monto_a_pagar DECIMAL(10,2),
 	@detalle       VARCHAR(200) = NULL,
     @fecha_emision DATE = NULL,
-    @id_pago VARCHAR(50) = NULL
+    @id_pago BIGINT = NULL
 AS
 BEGIN
 	SET NOCOUNT ON;
