@@ -2910,7 +2910,8 @@ CREATE OR ALTER PROCEDURE facturacion.CrearFactura
 	@id_metodo_pago INT    = NULL,
 	@estado_pago   VARCHAR(20),
 	@monto_a_pagar DECIMAL(10,2),
-	@detalle       VARCHAR(200) = NULL
+	@detalle       VARCHAR(200) = NULL,
+    @fecha_emision DATE = NULL
 AS
 BEGIN
 	SET NOCOUNT ON;
@@ -2940,8 +2941,10 @@ BEGIN
 		RETURN;
 	END;
 	BEGIN TRY
-		INSERT INTO facturacion.factura(id_persona, id_metodo_pago, estado_pago, monto_a_pagar, detalle)
-		VALUES(@id_persona, @id_metodo_pago, @estado_pago, @monto_a_pagar, @detalle);
+        DECLARE @fecha_final DATE;
+        SET @fecha_final = ISNULL(@fecha_emision, GETDATE());
+		INSERT INTO facturacion.factura(id_persona, id_metodo_pago, estado_pago, monto_a_pagar, detalle, fecha_emision)
+		VALUES(@id_persona, @id_metodo_pago, @estado_pago, @monto_a_pagar, @detalle, @fecha_final);
 		SELECT 'OK' AS Resultado, 'Factura creada correctamente' AS Mensaje, '200' AS Estado;
 	END TRY 
 	BEGIN CATCH

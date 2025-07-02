@@ -362,72 +362,239 @@ BEGIN
 END
 GO
 
-
 -- Importar Grupo Familiar - ?
-CREATE OR ALTER PROCEDURE usuarios.ImportarGrupoFamiliares
-    @RutaArchivo VARCHAR(260)
+CREATE OR ALTER PROCEDURE usuarios.ImportarGrupoFamiliar
+    @RutaArchivo NVARCHAR(260)
 AS
 BEGIN
-    -- Evita que SQL mande mensajes por insercion
     SET NOCOUNT ON;
-
+    
     DECLARE @SQL NVARCHAR(MAX);
+    DECLARE @id_persona INT;
+    DECLARE @id_socio INT;
+    DECLARE @id_ObSo INT;
+    DECLARE @id_categoria INT;
 
-    -- Intento prueba importacion
     BEGIN TRY
-        CREATE TABLE #TempDatos (
-            [Nro de Soci] VARCHAR(7),
-            [Nro de Socio RP] VARCHAR(7),
-            [Nombre] VARCHAR(50),
-            [Apellido] VARCHAR(50),
-            [DNI] VARCHAR(9),
-            [email personal] VARCHAR(320),
-            [fecha de nacimiento] DATE,
-            [télefono de contacto] VARCHAR(30),
-            [teléfono de contacto emergencia] VARCHAR(30),
-            [Nombre de la obra social o prepaga] VARCHAR(50),
-            [obra_social_socio] VARCHAR(20),
-            [teléfono de contacto de emergencia] VARCHAR(30)
+        -- Tabla temporal para poner los datos
+        CREATE TABLE #TempDatos ( 
+            [Nro de Socio] VARCHAR(20),
+            [Nombre] NVARCHAR(50),
+            [ apellido] NVARCHAR(50),
+            [ DNI] VARCHAR(20),
+            [ email personal] VARCHAR(320),
+            [ fecha de nacimiento] DATE,
+            [ teléfono de contacto] VARCHAR(50),
+            [ teléfono de contacto emergencia] VARCHAR(50),
+            [ Nombre de la obra social o prepaga] NVARCHAR(100),
+            [nro# de socio obra social/prepaga ] VARCHAR(50),
+            [teléfono de contacto de emergencia ] VARCHAR(50)
         );
 
-        -- Arma la consulta para la ruta del archivo
+        -- Variables auxiliares
+        DECLARE @dni VARCHAR(20), 
+                @nombre NVARCHAR(100), 
+                @apellido NVARCHAR(100),
+                @email VARCHAR(320), 
+                @fechaNac DATE, 
+                @telefono VARCHAR(50),
+                @telefonoEmergencia VARCHAR(50), 
+                @obraSocial NVARCHAR(100),
+                @nroSocioObra VARCHAR(50), 
+                @nroSocio VARCHAR(20),
+                @telefonoObraSocial VARCHAR(50);
+        -- Arma el SQL para la ruta
         SET @SQL = N'
             INSERT INTO #TempDatos (
-                [Nro de Socio],
-                [Nro de socio RP], 
-                [Nombre], 
-                [apellido], 
-                [DNI], 
-                [email personal],
-                [fecha de nacimiento], 
-                [teléfono de contacto], 
-                [teléfono de contacto emergencia],
-                [Nombre de la obra social o prepaga], 
-                [nro. de socio obra social/prepaga ], 
-                [teléfono de contacto de emergencia]
+                [Nro de Socio], [Nombre], 
+                [ apellido], 
+                [ DNI], 
+                [ email personal],
+                [ fecha de nacimiento], 
+                [ teléfono de contacto], 
+                [ teléfono de contacto emergencia],
+                [ Nombre de la obra social o prepaga], 
+                [nro# de socio obra social/prepaga ], 
+                [teléfono de contacto de emergencia ]
             )
-            SELECT *
-            FROM OPENROWSET(
-                ''Microsoft.ACE.OLEDB.12.0'',
-                ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
-                ''SELECT * FROM [Grupo Familiar$]'')';
+            SELECT 
+                [Nro de Socio],
+                [Nombre],
+                [ apellido], 
+                [ DNI],
+                [ email personal],
+                [ fecha de nacimiento],
+                CASE 
+                    WHEN ISNUMERIC([ teléfono de contacto]) = 1 AND [ teléfono de contacto] IS NOT NULL
+                    THEN FORMAT(CAST([ teléfono de contacto] AS BIGINT), ''0'')
+                    ELSE CAST([ teléfono de contacto] AS VARCHAR(50))
+                END,
+                CASE 
+                    WHEN ISNUMERIC([ teléfono de contacto emergencia]) = 1 AND [ teléfono de contacto emergencia] IS NOT NULL
+                    THEN FORMAT(CAST([ teléfono de contacto emergencia] AS BIGINT), ''0'')
+                    ELSE CAST([ teléfono de contacto emergencia] AS VARCHAR(50))
+                END,
+                [ Nombre de la obra social o prepaga],
+                [nro# de socio obra social/prepaga ],
+                CASE 
+                    WHEN ISNUMERIC([teléfono de contacto de emergencia ]) = 1 AND [teléfono de contacto de emergencia ] IS NOT NULL
+                    THEN FORMAT(CAST([teléfono de contacto de emergencia ] AS BIGINT), ''0'')
+                    ELSE CAST([teléfono de contacto de emergencia ] AS VARCHAR(50))
+                END
+                FROM OPENROWSET(
+                    ''Microsoft.ACE.OLEDB.12.0'',
+                    ''Excel 12.0;HDR=YES;IMEX=1;TypeGuessRows=0;Database=' + @RutaArchivo + ''',
+                    ''SELECT * FROM [Responsables de Pago$]'')';
+        
+        EXEC sp_executesql @SQL;  -- Importa los registros
 
-        EXEC sp_executesql @SQL; -- Ejecuta la consulta
+        -- Declara el cursor para la tabla
+        DECLARE cur CURSOR FOR 
+        SELECT [Nro de Socio], 
+               [ DNI], 
+               [Nombre], 
+               [ apellido], 
+               [ email personal],
+               [ fecha de nacimiento], 
+               [ teléfono de contacto], 
+               [ teléfono de contacto emergencia],
+               [ Nombre de la obra social o prepaga], 
+               [nro# de socio obra social/prepaga ],
+               [teléfono de contacto de emergencia ]
+        FROM #TempDatos;
+
+        OPEN cur;
+        FETCH NEXT FROM cur INTO @nroSocio, 
+                                 @dni, 
+                                 @nombre, 
+                                 @apellido, 
+                                 @email, 
+                                 @fechaNac,
+                                 @telefono, 
+                                 @telefonoEmergencia, 
+                                 @obraSocial, 
+                                 @nroSocioObra,
+                                 @telefonoObraSocial;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            BEGIN TRY
+                -- Reinicializar variables para cada iteración (si no queda usando la misma)
+                SET @id_ObSo = NULL;
+
+                -- Antes de insertar, normalizar los campos de texto
+                SET @nroSocio = REPLACE(@nroSocio, 'SN-', '');
+                SET @dni = REPLACE(REPLACE(LTRIM(RTRIM(@dni)), '.', ''), '-', '');
+                SET @email = LOWER(REPLACE(LTRIM(RTRIM(@email)), ' ', ''));
+                SET @obraSocial = LTRIM(RTRIM(@obraSocial)); -- Corregido: faltaba paréntesis de cierre
+
+                -- Buscar IDs existentes
+                SELECT @id_persona = id_persona FROM usuarios.persona WHERE dni = @dni;
+                SELECT @id_ObSo = id_obra_social FROM usuarios.obra_social WHERE descripcion = @obraSocial;
+
+                -- Si la obra social no existe, crearla y obtener el id
+                IF @obraSocial IS NOT NULL AND @obraSocial <> ''
+                BEGIN
+                    IF @id_ObSo IS NULL
+                    BEGIN
+                        DECLARE @new_id_obra_social INT;
+                        EXEC usuarios.CrearObraSocial
+                            @nombre = @obraSocial,
+                            @nro_telefono = @telefonoObraSocial,
+                            @id_obra_social = @new_id_obra_social OUTPUT;
+                        SET @id_ObSo = @new_id_obra_social;
+                    END
+                    ELSE
+                    BEGIN
+                        DECLARE @mod_id_obra_social INT;
+                        EXEC usuarios.ModificarObraSocial
+                            @id = @id_ObSo,
+                            @nombre_nuevo = @obraSocial,
+                            @nro_telefono = @telefonoObraSocial,
+                            @id_obra_social = @mod_id_obra_social OUTPUT;
+                        SET @id_ObSo = @mod_id_obra_social;
+                    END
+                END
+
+                -- Calcular categoría segun edad
+                DECLARE @edad INT = DATEDIFF(YEAR, @fechaNac, GETDATE());
+                
+                -- Logica para determinar categoría según edad
+                IF @edad >= 18
+                    SELECT @id_categoria = id_categoria FROM actividades.categoria WHERE nombre_categoria = 'mayor';
+                ELSE IF @edad >= 13
+                    SELECT @id_categoria = id_categoria FROM actividades.categoria WHERE nombre_categoria = 'cadete';
+                ELSE
+                    SELECT @id_categoria = id_categoria FROM actividades.categoria WHERE nombre_categoria = 'menor';
+
+                -- Crea o modifica el socio
+                EXEC usuarios.CrearSocio
+                     @id_persona = @id_persona,
+                     @dni = @dni,
+                     @nombre = @nombre,
+                     @apellido = @apellido,
+                     @email = @email,
+                     @fecha_nac = @fechaNac,
+                     @telefono = @telefono,
+                     @numero_socio = @nroSocio,
+                     @telefono_emergencia = @telefonoEmergencia,
+                     @obra_nro_socio = @nroSocioObra,
+                     @id_obra_social = @id_ObSo,
+                     @id_categoria = @id_categoria;
+
+                FETCH NEXT FROM cur INTO @nroSocio, 
+                                         @dni, 
+                                         @nombre, 
+                                         @apellido, 
+                                         @email, 
+                                         @fechaNac,
+                                         @telefono, 
+                                         @telefonoEmergencia, 
+                                         @obraSocial, 
+                                         @nroSocioObra,
+                                         @telefonoObraSocial;
+
+            END TRY
+            BEGIN CATCH
+                -- Continuar con el siguiente registro
+                FETCH NEXT FROM cur INTO @nroSocio, 
+                                         @dni, 
+                                         @nombre, 
+                                         @apellido, 
+                                         @email, 
+                                         @fechaNac,
+                                         @telefono, 
+                                         @telefonoEmergencia, 
+                                         @obraSocial, 
+                                         @nroSocioObra,
+                                         @telefonoObraSocial;
+            END CATCH
+        END
+
+        -- Cleanup del cursor
+        CLOSE cur;
+        DEALLOCATE cur;
+
+        -- Cleanup de tabla temporal
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
+            DROP TABLE #TempDatos;
+
+        SELECT 'Éxito' AS Resultado, 'Proceso completado correctamente' AS Mensaje;
 
     END TRY
     BEGIN CATCH
+        -- Cleanup en caso de error general
         IF CURSOR_STATUS('local', 'cur') >= 0
         BEGIN
             CLOSE cur;
             DEALLOCATE cur;
         END
 
-
         IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
             DROP TABLE #TempDatos;
 
-
-        SELECT 'Error' AS Resultado
+        SELECT 'Error' AS Resultado, 
+               'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
         RETURN -1;
     END CATCH
 END
@@ -781,6 +948,151 @@ BEGIN
 END
 GO
 
+-- Importar Facturas - FUNCIONANDO (Revisar ID de Pago)
+CREATE OR ALTER PROCEDURE facturacion.ImportarFacturas
+    @RutaArchivo NVARCHAR(260)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    DECLARE @ErrorOcurrido BIT = 0;
+    DECLARE @MensajeError NVARCHAR(MAX) = '';
+
+    BEGIN TRY
+        -- Crear tabla temporal 
+        CREATE TABLE #TempDatos (
+            [Id de pago] VARCHAR(50),
+            [fecha] DATE,
+            [Responsable de pago] VARCHAR(20),
+            [Valor] DECIMAL(10,2),
+            [Medio de pago] VARCHAR(50)
+        );
+
+        -- Arma la consulta
+        DECLARE @SQL NVARCHAR(MAX);
+        SET @SQL = N'
+            INSERT INTO #TempDatos (
+                                        [Id de pago], 
+                                        [fecha], 
+                                        [Responsable de pago], 
+                                        [Valor], 
+                                        [Medio de pago]
+                                    )
+            SELECT [Id de pago], 
+                   [fecha], 
+                   [Responsable de pago], 
+                   [Valor], 
+                   [Medio de pago]
+            FROM OPENROWSET(
+                ''Microsoft.ACE.OLEDB.12.0'',
+                ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
+                ''SELECT * FROM [pago cuotas$A1:E10000]'')';
+
+        EXEC sp_executesql @SQL; -- La ejecuta
+
+        --  Variables auxiliares y cursor para recorrer la tabla
+        DECLARE @id_pago VARCHAR(50), @fecha DATE, @numero_socio VARCHAR(20), @valor DECIMAL(10,2), @medio_pago VARCHAR(50);
+        DECLARE @id_persona INT, @id_metodo_pago INT;
+        DECLARE @ContadorExitosos INT = 0;
+        DECLARE @ContadorErrores INT = 0;
+
+        DECLARE cur CURSOR FOR
+            SELECT [Id de pago], [fecha], [Responsable de pago], [Valor], [Medio de pago]
+            FROM #TempDatos
+            WHERE [Responsable de pago] IS NOT NULL;
+
+        OPEN cur;
+        FETCH NEXT FROM cur INTO @id_pago, @fecha, @numero_socio, @valor, @medio_pago;
+
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+            BEGIN TRY
+                -- Quita el SN a los registros 'SN-'
+                SET @numero_socio = REPLACE(@numero_socio, 'SN-', '');
+                SET @numero_socio = LTRIM(RTRIM(@numero_socio));
+                SET @medio_pago = LTRIM(RTRIM(@medio_pago));
+
+                -- Buscar id_persona a partir del numero_socio
+                SELECT @id_persona = s.id_persona
+                FROM usuarios.socio s
+                WHERE s.numero_socio = @numero_socio;
+
+                IF @id_persona IS NULL
+                BEGIN
+                    SET @ContadorErrores = @ContadorErrores + 1;
+                    SET @ErrorOcurrido = 1;
+                    SET @MensajeError = @MensajeError + 
+                        'No se encontró persona para socio "' + ISNULL(@numero_socio, 'NULL') + '".' + CHAR(13) + CHAR(10);
+                    GOTO SIGUIENTE;
+                END
+
+                -- Buscar id_metodo_pago a partir del nombre
+                SELECT @id_metodo_pago = id_metodo_pago
+                FROM facturacion.metodo_pago
+                WHERE LOWER(nombre) = LOWER(@medio_pago);
+
+                -- Si no existe, crearlo y capturar el id
+                IF @id_metodo_pago IS NULL
+                BEGIN
+                    DECLARE @nuevo_id_metodo_pago INT;
+                    -- Crear el metodo de pago
+                    EXEC facturacion.CrearMetodoPago @nombre = @medio_pago;
+                    -- Recupera el id recién creado
+                    SELECT @nuevo_id_metodo_pago = id_metodo_pago FROM facturacion.metodo_pago WHERE LOWER(nombre) = LOWER(@medio_pago);
+                    SET @id_metodo_pago = @nuevo_id_metodo_pago;
+                END
+
+                -- Insertar la factura (estado por defecto: 'Pendiente')
+                EXEC facturacion.CrearFactura
+                    @id_persona = @id_persona,
+                    @id_metodo_pago = @id_metodo_pago,
+                    @estado_pago = 'Pendiente',
+                    @monto_a_pagar = @valor,
+                    @detalle = NULL,
+                    @fecha_emision = @fecha;
+
+                SET @ContadorExitosos = @ContadorExitosos + 1;
+            END TRY
+            BEGIN CATCH
+                SET @ContadorErrores = @ContadorErrores + 1;
+                SET @ErrorOcurrido = 1;
+                SET @MensajeError = @MensajeError + 
+                    'Error en socio "' + ISNULL(@numero_socio, 'NULL') + '": ' + 
+                    ERROR_MESSAGE() + CHAR(13) + CHAR(10);
+            END CATCH
+
+            SIGUIENTE:
+            FETCH NEXT FROM cur INTO @id_pago, @fecha, @numero_socio, @valor, @medio_pago;
+        END
+
+        CLOSE cur;
+        DEALLOCATE cur;
+        DROP TABLE #TempDatos;
+
+        -- Generar reporte final
+        BEGIN
+            SELECT 'Exito' AS Resultado, 
+                   'Facturas importadas: ' + CAST(@ContadorExitosos AS VARCHAR) + '. Errores: ' + CAST(@ContadorErrores AS VARCHAR) + CHAR(13) + CHAR(10) + @MensajeError AS Mensaje;
+            RETURN;
+        END
+    END TRY
+    BEGIN CATCH
+        IF CURSOR_STATUS('local', 'cur') >= 0
+        BEGIN
+            CLOSE cur;
+            DEALLOCATE cur;
+        END
+
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
+            DROP TABLE #TempDatos;
+
+        SELECT 'Error' AS Resultado, 
+               'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
+        RETURN -1;
+    END CATCH
+END
+GO
+
 -- IMPORTACION Y PRUEBAS
 EXEC actividades.ImportarCategorias 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 select * from actividades.categoria
@@ -799,7 +1111,6 @@ GO
 EXEC facturacion.ImportarClima 
     @RutaBase = N'C:\Users\tomas\Desktop\proyecto-BDA\docs\',
     @Anio = 2024;
-    
 select * from facturacion.clima 
 GO
 
@@ -809,3 +1120,10 @@ EXEC actividades.ImportarCostosPileta
      SELECT * FROM actividades.costo
 GO
 
+EXEC usuarios.ImportarGrupoFamiliares 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
+SELECT * FROM usuarios.grupo_familiar
+GO
+
+EXEC facturacion.ImportarFacturas 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
+SELECT * FROM facturacion.factura;
+GO
