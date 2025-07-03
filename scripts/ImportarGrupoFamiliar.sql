@@ -110,6 +110,22 @@ BEGIN
 			SET @nro_de_socio_RP = SUBSTRING(@nro_de_socio_RP, CHARINDEX('-', @nro_de_socio_RP) + 1, LEN(@nro_de_socio_RP));
 			SET @nro_de_socio = SUBSTRING(@nro_de_socio, CHARINDEX('-', @nro_de_socio) + 1, LEN(@nro_de_socio));
 			
+			-- Obtengo el id del socio responsable: 
+			DECLARE @id_socio_rp INT = NULL; 
+			SELECT @id_socio_rp = id_socio
+			FROM usuarios.socio	
+			WHERE numero_socio = @nro_de_socio_RP;
+
+			IF @id_socio_rp IS NOT NULL 
+			BEGIN 
+					PRINT 'socio  existe' + @nro_de_socio_RP;  
+			END
+			ELSE 
+			BEGIN
+				PRINT 'socio NO existe' + @nro_de_socio_RP;; 
+			END
+
+			/*
 			IF EXISTS (SELECT 1 FROM usuarios.socio WHERE numero_socio = @nro_de_socio_RP)
 			BEGIN
 				EXEC 
@@ -117,6 +133,7 @@ BEGIN
 			ELSE BEGIN 
 				PRINT 'socio NO existe'; 
 			END
+			*/
 
             -- Obtener siguiente fila
             FETCH NEXT FROM cur INTO  @nro_de_socio, @nro_de_socio_RP, @nombre, @apellido, @dni, @email_personal, @fec_nac, @tel_contacto, @tel_emerg, @nom_obra_social, @nro_socio_obra_social, @tel_cont_emerg;
@@ -144,6 +161,19 @@ GO
 GO
 EXEC usuarios.importarGrupoFamiliar @path = 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx'
 
+-- TEST: 
+/*
+USE Com5600G01;
+EXEC actividades.CrearCategoria 
+    'Junior', 
+    150.00, 
+    '2025-12-31';
+
+EXEC usuarios.CrearObraSocial 	
+	@nombre = 'sancor',
+	@nro_telefono = '1133455';
+
+
 
 EXEC usuarios.CrearSocio
     @id_persona = NULL,
@@ -157,12 +187,9 @@ EXEC usuarios.CrearSocio
     @telefono_emergencia = '1166666666',
     @obra_nro_socio = 'OBR-9988',
     @id_obra_social = 2,   -- Debe existir
-    @id_categoria = 1,     -- Debe existir
-    @id_grupo = 3;   
+    @id_categoria = 1;     -- Debe existir  
 
 GO
-USE Com5600G01;
-EXEC usuarios.CrearObraSocial 	
-	@nombre = 'sancor',
-	@nro_telefono = '1133455'
 
+
+*/
