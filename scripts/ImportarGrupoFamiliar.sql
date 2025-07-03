@@ -118,22 +118,34 @@ BEGIN
 
 			IF @id_socio_rp IS NOT NULL 
 			BEGIN 
-					PRINT 'socio  existe' + @nro_de_socio_RP;  
+				-- Evaluo si existe el grupo familiar: 
+				DECLARE @idGrupo INT = NULL;
+				SELECT @idGrupo = g.id_grupo_familiar FROM usuarios.grupo_familiar  g WHERE g.id_socio_rp = @id_socio_rp;
+				IF @idGrupo IS NULL -- Si no existe lo creo: 
+				BEGIN
+					EXEC usuarios.CrearGrupoFamiliar @id_socio_rp = @id_socio_rp;
+				END
+
+				-- Obtengo la obra social o la creo
+				DECLARE @id_obra_social INT = NULL; 
+				SELECT @id_obra_social = id_obra_social 
+				FROM usuarios.obra_social o WHERE UPPER(o.descripcion) = UPPER(RTRIM(LTRIM(@nom_obra_social)));
+				IF @id_obra_social IS NULL 
+				BEGIN
+					PRINT 'CREAR OBRA SOCIAL'; 
+					EXEC usuarios.CrearObraSocial @nombre = @nom_obra_social, @nro_telefono = '11';
+				END
+
+				-- Obtengo la categoria del nuevo socio: 
+
+
+				PRINT 'socio  existe' + @nro_de_socio_RP;  
 			END
 			ELSE 
 			BEGIN
 				PRINT 'socio NO existe' + @nro_de_socio_RP;; 
 			END
 
-			/*
-			IF EXISTS (SELECT 1 FROM usuarios.socio WHERE numero_socio = @nro_de_socio_RP)
-			BEGIN
-				EXEC 
-			END
-			ELSE BEGIN 
-				PRINT 'socio NO existe'; 
-			END
-			*/
 
             -- Obtener siguiente fila
             FETCH NEXT FROM cur INTO  @nro_de_socio, @nro_de_socio_RP, @nombre, @apellido, @dni, @email_personal, @fec_nac, @tel_contacto, @tel_emerg, @nom_obra_social, @nro_socio_obra_social, @tel_cont_emerg;
@@ -183,12 +195,27 @@ EXEC usuarios.CrearSocio
     @email = 'lucia.fernandez@example.com',
     @fecha_nac = '1990-05-20',
     @telefono = '1155555555',
-    @numero_socio = 'S123456',
+    @numero_socio = '4022',
     @telefono_emergencia = '1166666666',
     @obra_nro_socio = 'OBR-9988',
-    @id_obra_social = 2,   -- Debe existir
-    @id_categoria = 1;     -- Debe existir  
+    @id_obra_social = 1,   -- Debe existir
+    @id_categoria = 1;     -- Debe existir 
+	
 
+
+	EXEC usuarios.CrearSocio
+    @id_persona = NULL,
+    @dni = '6543378',
+    @nombre = 'Lionel',
+    @apellido = 'Messi',
+    @email = 'MESSI@example.com',
+    @fecha_nac = '2010-05-20',
+    @telefono = '234534',
+    @numero_socio = '4019',
+    @telefono_emergencia = '1166666666',
+    @obra_nro_socio = 'OBR-9988',
+    @id_obra_social = 1,   -- Debe existir
+    @id_categoria = 1;     -- Debe existir
 GO
 
 
