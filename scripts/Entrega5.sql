@@ -363,241 +363,207 @@ END
 GO
 
 -- Importar Grupo Familiar - ?
-CREATE OR ALTER PROCEDURE usuarios.ImportarGrupoFamiliar
-    @RutaArchivo NVARCHAR(260)
+CREATE OR ALTER PROCEDURE usuarios.importarGrupoFamiliar
+    @path NVARCHAR(260) 
 AS
 BEGIN
     SET NOCOUNT ON;
-    
-    DECLARE @SQL NVARCHAR(MAX);
-    DECLARE @id_persona INT;
-    DECLARE @id_socio INT;
-    DECLARE @id_ObSo INT;
-    DECLARE @id_categoria INT;
+
+    -- Tabla temporal para almacenar los datos importados
+    CREATE TABLE #tempGrupoFamiliar (
+        nro_de_socio VARCHAR(7),
+		nro_de_socio_RP VARCHAR(7),
+		nombre VARCHAR(35),
+		apellido VARCHAR(35),
+		dni INT,
+		email_personal VARCHAR(255),
+		fec_nac DATE,
+		tel_contacto VARCHAR(20),
+		tel_emerg INT,
+		nom_obra_social VARCHAR(35),
+		nro_socio_obra_social VARCHAR(35),
+		tel_cont_emerg VARCHAR(80)
+    );
+
+    DECLARE @sql NVARCHAR(MAX);
+
+    -- Consulta con los encabezados EXACTOS como aparecen en tu Excel
+    SET @sql = N'
+        INSERT INTO #tempGrupoFamiliar (
+            nro_de_socio,
+			nro_de_socio_RP,
+			nombre,
+			apellido,
+			dni,
+			email_personal,
+			fec_nac,
+			tel_contacto,
+			tel_emerg,
+			nom_obra_social,
+			nro_socio_obra_social,
+			tel_cont_emerg
+        )
+        SELECT
+            [Nro de Socio],
+			[Nro de socio RP],
+			RTRIM(LTRIM(LOWER([Nombre]))),
+			RTRIM(LTRIM(LOWER([ apellido]))),
+			[ DNI],
+			[ email personal],
+			CONVERT(DATE, [ fecha de nacimiento], 103) AS fecha_nacimiento,
+			[ teléfono de contacto],
+			[ teléfono de contacto emergencia],
+			RTRIM(LTRIM(LOWER([ Nombre de la obra social o prepaga]))),
+			[nro# de socio obra social/prepaga ],
+			[teléfono de contacto de emergencia ]
+
+			
+        FROM OPENROWSET(
+            ''Microsoft.ACE.OLEDB.12.0'',
+            ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @path + ''',
+            ''SELECT * FROM [Grupo Familiar$]''
+        ) AS ExcelData;
+    ';
 
     BEGIN TRY
-        -- Tabla temporal para poner los datos
-        CREATE TABLE #TempDatos ( 
-            [Nro de Socio] VARCHAR(20),
-            [Nombre] NVARCHAR(50),
-            [ apellido] NVARCHAR(50),
-            [ DNI] VARCHAR(20),
-            [ email personal] VARCHAR(320),
-            [ fecha de nacimiento] DATE,
-            [ teléfono de contacto] VARCHAR(50),
-            [ teléfono de contacto emergencia] VARCHAR(50),
-            [ Nombre de la obra social o prepaga] NVARCHAR(100),
-            [nro# de socio obra social/prepaga ] VARCHAR(50),
-            [teléfono de contacto de emergencia ] VARCHAR(50)
-        );
-
-        -- Variables auxiliares
-        DECLARE @dni VARCHAR(20), 
-                @nombre NVARCHAR(100), 
-                @apellido NVARCHAR(100),
-                @email VARCHAR(320), 
-                @fechaNac DATE, 
-                @telefono VARCHAR(50),
-                @telefonoEmergencia VARCHAR(50), 
-                @obraSocial NVARCHAR(100),
-                @nroSocioObra VARCHAR(50), 
-                @nroSocio VARCHAR(20),
-                @telefonoObraSocial VARCHAR(50);
-        -- Arma el SQL para la ruta
-        SET @SQL = N'
-            INSERT INTO #TempDatos (
-                [Nro de Socio], [Nombre], 
-                [ apellido], 
-                [ DNI], 
-                [ email personal],
-                [ fecha de nacimiento], 
-                [ teléfono de contacto], 
-                [ teléfono de contacto emergencia],
-                [ Nombre de la obra social o prepaga], 
-                [nro# de socio obra social/prepaga ], 
-                [teléfono de contacto de emergencia ]
-            )
-            SELECT 
-                [Nro de Socio],
-                [Nombre],
-                [ apellido], 
-                [ DNI],
-                [ email personal],
-                [ fecha de nacimiento],
-                CASE 
-                    WHEN ISNUMERIC([ teléfono de contacto]) = 1 AND [ teléfono de contacto] IS NOT NULL
-                    THEN FORMAT(CAST([ teléfono de contacto] AS BIGINT), ''0'')
-                    ELSE CAST([ teléfono de contacto] AS VARCHAR(50))
-                END,
-                CASE 
-                    WHEN ISNUMERIC([ teléfono de contacto emergencia]) = 1 AND [ teléfono de contacto emergencia] IS NOT NULL
-                    THEN FORMAT(CAST([ teléfono de contacto emergencia] AS BIGINT), ''0'')
-                    ELSE CAST([ teléfono de contacto emergencia] AS VARCHAR(50))
-                END,
-                [ Nombre de la obra social o prepaga],
-                [nro# de socio obra social/prepaga ],
-                CASE 
-                    WHEN ISNUMERIC([teléfono de contacto de emergencia ]) = 1 AND [teléfono de contacto de emergencia ] IS NOT NULL
-                    THEN FORMAT(CAST([teléfono de contacto de emergencia ] AS BIGINT), ''0'')
-                    ELSE CAST([teléfono de contacto de emergencia ] AS VARCHAR(50))
-                END
-                FROM OPENROWSET(
-                    ''Microsoft.ACE.OLEDB.12.0'',
-                    ''Excel 12.0;HDR=YES;IMEX=1;TypeGuessRows=0;Database=' + @RutaArchivo + ''',
-                    ''SELECT * FROM [Responsables de Pago$]'')';
-        
-        EXEC sp_executesql @SQL;  -- Importa los registros
-
-        -- Declara el cursor para la tabla
-        DECLARE cur CURSOR FOR 
-        SELECT [Nro de Socio], 
-               [ DNI], 
-               [Nombre], 
-               [ apellido], 
-               [ email personal],
-               [ fecha de nacimiento], 
-               [ teléfono de contacto], 
-               [ teléfono de contacto emergencia],
-               [ Nombre de la obra social o prepaga], 
-               [nro# de socio obra social/prepaga ],
-               [teléfono de contacto de emergencia ]
-        FROM #TempDatos;
+        EXEC sp_executesql @sql;
+		
+		-- Variables auxiliares:  
+		DECLARE 
+			@nro_de_socio VARCHAR(7),
+            @nro_de_socio_RP VARCHAR(7),
+            @nombre VARCHAR(35),
+            @apellido VARCHAR(35),
+            @dni INT,
+            @email_personal VARCHAR(255),
+            @fec_nac DATE,
+            @tel_contacto VARCHAR(20),
+            @tel_emerg INT,
+            @nom_obra_social VARCHAR(35),
+            @nro_socio_obra_social VARCHAR(35),
+            @tel_cont_emerg VARCHAR(80);
+		-- 
+		DECLARE @i INT = 0; 
+		-- cursor para recorrer fila por fila
+        DECLARE cur CURSOR FOR
+            SELECT nro_de_socio, nro_de_socio_RP, nombre, apellido, dni, email_personal, fec_nac, tel_contacto, tel_emerg, nom_obra_social, nro_socio_obra_social, tel_cont_emerg
+            FROM #tempGrupoFamiliar;
 
         OPEN cur;
-        FETCH NEXT FROM cur INTO @nroSocio, 
-                                 @dni, 
-                                 @nombre, 
-                                 @apellido, 
-                                 @email, 
-                                 @fechaNac,
-                                 @telefono, 
-                                 @telefonoEmergencia, 
-                                 @obraSocial, 
-                                 @nroSocioObra,
-                                 @telefonoObraSocial;
 
+        FETCH NEXT FROM cur INTO 
+            @nro_de_socio, @nro_de_socio_RP, @nombre, @apellido, @dni, @email_personal, @fec_nac, @tel_contacto, @tel_emerg, @nom_obra_social, @nro_socio_obra_social, @tel_cont_emerg;
         WHILE @@FETCH_STATUS = 0
         BEGIN
-            BEGIN TRY
-                -- Reinicializar variables para cada iteración (si no queda usando la misma)
-                SET @id_ObSo = NULL;
+			-- Limpio el numero de los socios:  
+			SET @nro_de_socio_RP = SUBSTRING(@nro_de_socio_RP, CHARINDEX('-', @nro_de_socio_RP) + 1, LEN(@nro_de_socio_RP));
+			SET @nro_de_socio = SUBSTRING(@nro_de_socio, CHARINDEX('-', @nro_de_socio) + 1, LEN(@nro_de_socio));
+			
+			-- Obtengo el id del socio responsable: 
+			DECLARE @id_socio_rp INT = NULL; 
+			SELECT @id_socio_rp = id_socio
+			FROM usuarios.socio	
+			WHERE numero_socio = @nro_de_socio_RP;
 
-                -- Antes de insertar, normalizar los campos de texto
-                SET @nroSocio = REPLACE(LTRIM(RTRIM(@nroSocio)), 'SN-', '');
-                SET @dni = REPLACE(REPLACE(LTRIM(RTRIM(@dni)), '.', ''), '-', '');
-                SET @email = LOWER(REPLACE(LTRIM(RTRIM(@email)), ' ', ''));
-                SET @obraSocial = LTRIM(RTRIM(@obraSocial)); -- Corregido: faltaba paréntesis de cierre
+			IF @id_socio_rp IS NOT NULL 
+			BEGIN 
+			
+				-- Evaluo si existe el grupo familiar: 
+				DECLARE @idGrupo INT = NULL;
+				SELECT @idGrupo = g.id_grupo_familiar FROM usuarios.grupo_familiar  g WHERE g.id_socio_rp = @id_socio_rp;
+				IF @idGrupo IS NULL -- Si no existe lo creo: 
+				BEGIN
+					EXEC usuarios.CrearGrupoFamiliar @id_socio_rp = @id_socio_rp;
+				END
 
-                -- Buscar IDs existentes
-                SELECT @id_persona = id_persona FROM usuarios.persona WHERE dni = @dni;
-                SELECT @id_ObSo = id_obra_social FROM usuarios.obra_social WHERE descripcion = @obraSocial;
+				-- Obtengo la obra social o la creo
+				DECLARE @id_obra_social INT = NULL; 
+				SELECT @id_obra_social = id_obra_social 
+				FROM usuarios.obra_social o WHERE UPPER(o.descripcion) = UPPER(RTRIM(LTRIM(@nom_obra_social)));
+				IF @id_obra_social IS NULL AND @nom_obra_social IS NOT NULL 
+				BEGIN
+					EXEC usuarios.CrearObraSocial @nombre = @nom_obra_social, @nro_telefono = '11';
+				END
 
-                -- Si la obra social no existe, crearla y obtener el id
-                IF @obraSocial IS NOT NULL AND @obraSocial <> ''
-                BEGIN
-                    IF @id_ObSo IS NULL
-                    BEGIN
-                        DECLARE @new_id_obra_social INT;
-                        EXEC usuarios.CrearObraSocial
-                            @nombre = @obraSocial,
-                            @nro_telefono = @telefonoObraSocial,
-                            @id_obra_social = @new_id_obra_social OUTPUT;
-                        SET @id_ObSo = @new_id_obra_social;
-                    END
-                    ELSE
-                    BEGIN
-                        DECLARE @mod_id_obra_social INT;
-                        EXEC usuarios.ModificarObraSocial
-                            @id = @id_ObSo,
-                            @nombre_nuevo = @obraSocial,
-                            @nro_telefono = @telefonoObraSocial,
-                            @id_obra_social = @mod_id_obra_social OUTPUT;
-                        SET @id_ObSo = @mod_id_obra_social;
-                    END
-                END
+				-- Obtengo la categoria del nuevo socio: 
+				DECLARE @edad INT;
+				SET @edad = DATEDIFF(YEAR, @fec_nac, GETDATE());
 
-                -- Calcular categoría segun edad
-                DECLARE @edad INT = DATEDIFF(YEAR, @fechaNac, GETDATE());
-                
-                -- Logica para determinar categoría según edad
-                IF @edad >= 18
-                    SELECT @id_categoria = id_categoria FROM actividades.categoria WHERE nombre_categoria = 'mayor';
-                ELSE IF @edad >= 13
-                    SELECT @id_categoria = id_categoria FROM actividades.categoria WHERE nombre_categoria = 'cadete';
-                ELSE
-                    SELECT @id_categoria = id_categoria FROM actividades.categoria WHERE nombre_categoria = 'menor';
+				IF NOT EXISTS (SELECT 1 FROM usuarios.socio s WHERE s.numero_socio = @nro_de_socio)
+				BEGIN
+				PRINT 'creo socio';
+					-- obtengo el id de la categoria que corresponde: 
+					DECLARE @id_categoria INT = NULL; 
 
-                -- Crea o modifica el socio
-                EXEC usuarios.CrearSocio
-                     @id_persona = @id_persona,
-                     @dni = @dni,
-                     @nombre = @nombre,
-                     @apellido = @apellido,
-                     @email = @email,
-                     @fecha_nac = @fechaNac,
-                     @telefono = @telefono,
-                     @numero_socio = @nroSocio,
-                     @telefono_emergencia = @telefonoEmergencia,
-                     @obra_nro_socio = @nroSocioObra,
-                     @id_obra_social = @id_ObSo,
-                     @id_categoria = @id_categoria;
+					IF @edad > 17 
+					BEGIN 
+						SELECT @id_categoria = c.id_categoria  
+						FROM actividades.categoria c 
+						WHERE LOWER(nombre_categoria) = 'mayor';
+						END 
+						ELSE IF @edad <= 17 AND @edad > 12 
+						BEGIN
+							SELECT @id_categoria = c.id_categoria  
+							FROM actividades.categoria c 
+							WHERE LOWER(nombre_categoria) = 'cadete';
+						END 
+						ELSE 
+						BEGIN
+							SELECT @id_categoria = c.id_categoria  
+							FROM actividades.categoria c 
+							WHERE LOWER(nombre_categoria) = 'menor';
+						END;
 
-                FETCH NEXT FROM cur INTO @nroSocio, 
-                                         @dni, 
-                                         @nombre, 
-                                         @apellido, 
-                                         @email, 
-                                         @fechaNac,
-                                         @telefono, 
-                                         @telefonoEmergencia, 
-                                         @obraSocial, 
-                                         @nroSocioObra,
-                                         @telefonoObraSocial;
+						-- crear socio: 
+						SET @tel_contacto = ISNULL(@tel_contacto, '11');
+						DECLARE @email_new VARCHAR(255) =  'socio_' + CAST(@i AS NVARCHAR) + '@example.com';
+						EXEC usuarios.CrearSocio
+						@id_persona = NULL,
+						@dni = @dni,
+						@nombre = @nombre,
+						@apellido = @apellido,
+						@email =  @email_new,
+						@fecha_nac = @fec_nac,
+						@telefono = @tel_contacto, 
+						@numero_socio = @nro_de_socio,
+						@telefono_emergencia = @tel_cont_emerg,
+						@obra_nro_socio = @nro_socio_obra_social,
+						@id_obra_social = @id_obra_social,  
+						@id_categoria = @id_categoria,
+						@id_grupo = @idGrupo;
+						
+					SET @i = @i +1; 	
+					END  
+				ELSE 
+				BEGIN
+					UPDATE usuarios.socio
+					SET  id_grupo= @idGrupo
+					WHERE numero_socio = @nro_de_socio
+				END; 
+			END
+			ELSE 
+			BEGIN
+				PRINT 'socio responsable NO existe' + @nro_de_socio_RP;; 
+			END;
 
-            END TRY
-            BEGIN CATCH
-                -- Continuar con el siguiente registro
-                FETCH NEXT FROM cur INTO @nroSocio, 
-                                         @dni, 
-                                         @nombre, 
-                                         @apellido, 
-                                         @email, 
-                                         @fechaNac,
-                                         @telefono, 
-                                         @telefonoEmergencia, 
-                                         @obraSocial, 
-                                         @nroSocioObra,
-                                         @telefonoObraSocial;
-            END CATCH
+            -- Obtener siguiente fila
+            FETCH NEXT FROM cur INTO  @nro_de_socio, @nro_de_socio_RP, @nombre, @apellido, @dni, @email_personal, @fec_nac, @tel_contacto, @tel_emerg, @nom_obra_social, @nro_socio_obra_social, @tel_cont_emerg;
         END
 
-        -- Cleanup del cursor
         CLOSE cur;
         DEALLOCATE cur;
-
-        -- Cleanup de tabla temporal
-        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
-            DROP TABLE #TempDatos;
-
-        SELECT 'Éxito' AS Resultado, 'Proceso completado correctamente' AS Mensaje;
-
+        -- Mostrar los datos importados
+       -- SELECT * FROM #tempGrupoFamiliar;
+			
     END TRY
     BEGIN CATCH
-        -- Cleanup en caso de error general
-        IF CURSOR_STATUS('local', 'cur') >= 0
-        BEGIN
-            CLOSE cur;
-            DEALLOCATE cur;
-        END
-
-        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
-            DROP TABLE #TempDatos;
-
-        SELECT 'Error' AS Resultado, 
-               'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
-        RETURN -1;
-    END CATCH
-END
+        SELECT 
+            'ERROR' AS Resultado,
+            ERROR_MESSAGE() AS Mensaje,
+            ERROR_LINE() AS LineaError,
+            ERROR_NUMBER() AS CodigoError;
+    END CATCH;
+END;
 GO
 
 -- Importar Actividades - FUNCIONADO
@@ -1090,7 +1056,7 @@ BEGIN
 END
 GO
 
--- Importar Presentismo a Actividades - FUNCIONANDO (Creo, chequear).
+-- Importar Presentismo a Actividades - FUNCIONANDO
 CREATE OR ALTER PROCEDURE actividades.ImportarPresentismoActividades
     @RutaArchivo NVARCHAR(260)
 AS
@@ -1189,15 +1155,19 @@ BEGIN
 
                 -- Procesar nombre y apellido del profesor
                 DECLARE @profesor_nombre VARCHAR(100), @profesor_apellido VARCHAR(100), @profesor_username VARCHAR(100);
-                -- Suponemos que el nombre y apellido están separados por el último espacio
-                IF CHARINDEX(' ', REVERSE(LTRIM(RTRIM(@profesor)))) > 0
+                -- Quitar espacios al principio y final
+                SET @profesor = LTRIM(RTRIM(@profesor));
+                -- Buscar la posición del último espacio
+                DECLARE @posUltimoEspacio INT = LEN(@profesor) - CHARINDEX(' ', REVERSE(@profesor)) + 1;
+
+                IF CHARINDEX(' ', @profesor) > 0
                 BEGIN
-                    SET @profesor_apellido = RIGHT(LTRIM(RTRIM(@profesor)), CHARINDEX(' ', REVERSE(LTRIM(RTRIM(@profesor)))) - 1);
-                    SET @profesor_nombre = LEFT(LTRIM(RTRIM(@profesor)), LEN(LTRIM(RTRIM(@profesor))) - LEN(@profesor_apellido) - 1);
+                    SET @profesor_nombre = LEFT(@profesor, @posUltimoEspacio - 1);
+                    SET @profesor_apellido = SUBSTRING(@profesor, @posUltimoEspacio + 1, LEN(@profesor) - @posUltimoEspacio);
                 END
                 ELSE
                 BEGIN
-                    SET @profesor_nombre = LTRIM(RTRIM(@profesor));
+                    SET @profesor_nombre = @profesor;
                     SET @profesor_apellido = '';
                 END
                 -- Generar username: nombre.apellido en minúsculas, sin espacios
@@ -1305,11 +1275,11 @@ END
 GO
 
 -- IMPORTACION Y PRUEBAS
-EXEC actividades.ImportarCategorias 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx' 
+EXEC actividades.ImportarCategorias 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
 select * from actividades.categoria
 GO
 
-EXEC usuarios.ImportarSocios 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx'
+EXEC usuarios.ImportarSocios 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
 select s.*, os.descripcion AS obra_social_descripcion, os.nro_telefono AS obra_social_telefono
 FROM usuarios.socio s
 LEFT JOIN usuarios.obra_social os ON s.id_obra_social = os.id_obra_social
@@ -1331,11 +1301,11 @@ EXEC actividades.ImportarCostosPileta
      SELECT * FROM actividades.costo
 GO
 
-/*
-EXEC usuarios.ImportarGrupoFamiliares 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
+EXEC usuarios.importarGrupoFamiliar 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
 SELECT * FROM usuarios.grupo_familiar
 GO
-*/
+
+
 EXEC facturacion.ImportarFacturas 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 SELECT * FROM facturacion.factura;
 GO
@@ -1344,3 +1314,23 @@ EXEC actividades.ImportarPresentismoActividades 'C:\Users\tomas\Desktop\proyecto
 SELECT * FROM actividades.actividad_socio
 SELECT * FROM usuarios.usuario
 GO
+
+-- Consulta: Actividades por socio
+SELECT
+    s.numero_socio AS [Nro de Socio],
+    p_socio.nombre AS [Nombre Socio],
+    p_socio.apellido AS [Apellido Socio],
+    a.nombre AS [Actividad],
+    c.dia AS [Día],
+    c.horario AS [Horario],
+    p_prof.nombre AS [Nombre Profesor],
+    p_prof.apellido AS [Apellido Profesor],
+    u.username AS [Username Profesor]
+FROM actividades.actividad_socio as asoc
+INNER JOIN usuarios.socio s ON asoc.id_socio = s.id_socio
+INNER JOIN usuarios.persona p_socio ON s.id_persona = p_socio.id_persona
+INNER JOIN actividades.actividad a ON asoc.id_actividad = a.id_actividad
+INNER JOIN actividades.clase c ON c.id_actividad = a.id_actividad AND c.id_categoria = s.id_categoria
+INNER JOIN usuarios.usuario u ON c.id_usuario = u.id_usuario
+INNER JOIN usuarios.persona p_prof ON u.id_persona = p_prof.id_persona
+ORDER BY s.numero_socio, a.nombre, c.dia, c.horario;
