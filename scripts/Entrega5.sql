@@ -245,7 +245,7 @@ BEGIN
                 SET @id_ObSo = NULL;
 
                 -- Antes de insertar, normalizar los campos de texto
-                SET @nroSocio = REPLACE(@nroSocio, 'SN-', '');
+                SET @nroSocio = REPLACE(LTRIM(RTRIM(@nroSocio)), 'SN-', '');
                 SET @dni = REPLACE(REPLACE(LTRIM(RTRIM(@dni)), '.', ''), '-', '');
                 SET @email = LOWER(REPLACE(LTRIM(RTRIM(@email)), ' ', ''));
                 SET @obraSocial = LTRIM(RTRIM(@obraSocial)); -- Corregido: faltaba paréntesis de cierre
@@ -483,7 +483,7 @@ BEGIN
                 SET @id_ObSo = NULL;
 
                 -- Antes de insertar, normalizar los campos de texto
-                SET @nroSocio = REPLACE(@nroSocio, 'SN-', '');
+                SET @nroSocio = REPLACE(LTRIM(RTRIM(@nroSocio)), 'SN-', '');
                 SET @dni = REPLACE(REPLACE(LTRIM(RTRIM(@dni)), '.', ''), '-', '');
                 SET @email = LOWER(REPLACE(LTRIM(RTRIM(@email)), ' ', ''));
                 SET @obraSocial = LTRIM(RTRIM(@obraSocial)); -- Corregido: faltaba paréntesis de cierre
@@ -948,7 +948,7 @@ BEGIN
 END
 GO
 
--- Importar Facturas - FUNCIONANDO (Hay que corregir el ID de pago, se importa con notacion cientifica)
+-- Importar Facturas - FUNCIONANDO
 CREATE OR ALTER PROCEDURE facturacion.ImportarFacturas
     @RutaArchivo NVARCHAR(260)
 AS
@@ -961,7 +961,7 @@ BEGIN
     BEGIN TRY
         -- Crear tabla temporal 
         CREATE TABLE #TempDatos (
-            [Id de pago] VARCHAR(50),
+            [Id de pago] BIGINT,
             [fecha] DATE,
             [Responsable de pago] VARCHAR(20),
             [Valor] DECIMAL(10,2),
@@ -975,7 +975,7 @@ BEGIN
                 [Id de pago], [fecha], [Responsable de pago], [Valor], [Medio de pago]
             )
             SELECT 
-                CAST([Id de pago] AS VARCHAR(50)), 
+                CAST([Id de pago] AS BIGINT), 
                 [fecha], 
                 [Responsable de pago], 
                 [Valor], 
@@ -987,7 +987,7 @@ BEGIN
         EXEC sp_executesql @SQL; -- La ejecuta
     
         --  Variables auxiliares y cursor para recorrer la tabla
-        DECLARE @id_pago VARCHAR(50), @fecha DATE, @numero_socio VARCHAR(20), @valor DECIMAL(10,2), @medio_pago VARCHAR(50);
+        DECLARE @id_pago BIGINT, @fecha DATE, @numero_socio VARCHAR(20), @valor DECIMAL(10,2), @medio_pago VARCHAR(50);
         DECLARE @id_persona INT, @id_metodo_pago INT;
         DECLARE @ContadorExitosos INT = 0;
         DECLARE @ContadorErrores INT = 0;
@@ -1090,6 +1090,220 @@ BEGIN
 END
 GO
 
+-- Importar Presentismo a Actividades - FUNCIONANDO (Creo, chequear).
+CREATE OR ALTER PROCEDURE actividades.ImportarPresentismoActividades
+    @RutaArchivo NVARCHAR(260)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    SET LANGUAGE Spanish; -- Por las dudas (Voy a estar manejando mucho busqueda por palabras)
+
+    BEGIN TRY
+        -- Tabla temporal para importar los datos
+        CREATE TABLE #TempDatos (
+            [Nro de Socio] VARCHAR(20),
+            [Actividad] NVARCHAR(100),
+            [fecha de asistencia] DATE,
+            [Asistencia] VARCHAR(15),
+            [Profesor] NVARCHAR(100)
+        );
+
+        -- Arma el SQL para importar los datos
+        DECLARE @SQL NVARCHAR(MAX);
+        SET @SQL = N'
+            INSERT INTO #TempDatos (
+                [Nro de Socio], 
+                [Actividad], 
+                [fecha de asistencia], 
+                [Asistencia], 
+                [Profesor]
+            )
+            SELECT 
+                LTRIM(RTRIM(CAST([Nro de Socio] AS VARCHAR(20)))),
+                LTRIM(RTRIM(CAST([Actividad] AS NVARCHAR(100)))),
+                CAST([fecha de asistencia] AS DATE),
+                LTRIM(RTRIM(CAST([Asistencia] AS VARCHAR(15)))),
+                LTRIM(RTRIM(CAST([Profesor] AS NVARCHAR(100))))
+            FROM OPENROWSET(
+                ''Microsoft.ACE.OLEDB.12.0'',
+                ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
+                ''SELECT * FROM [presentismo_actividades$]'')';
+
+
+            EXEC sp_executesql @SQL; -- Ejecuta la sentencia
+
+            -- Variables para recorrer
+            DECLARE @nroSocio VARCHAR(20), 
+                    @actividad NVARCHAR(100), 
+                    @fecha DATE, 
+                    @asistencia VARCHAR(15), 
+                    @profesor NVARCHAR(100);
+
+            -- Variables auxiliares
+            DECLARE @id_socio INT, 
+                    @id_actividad INT, 
+                    @id_usuario INT, 
+                    @id_clase INT, 
+                    @id_persona INT,
+                    @id_categoria INT,
+                    @dia VARCHAR(9),
+                    @horario_clase TIME;
+
+            -- Cursor para recorrer los datos
+            DECLARE cur CURSOR FOR
+            SELECT [Nro de Socio], 
+                   [Actividad], 
+                   [fecha de asistencia], 
+                   [Asistencia], 
+                   [Profesor]
+            FROM #TempDatos
+
+            OPEN cur; -- Abre el cursor
+            FETCH NEXT FROM cur INTO @nroSocio, @actividad, @fecha, @asistencia, @profesor; -- Carga los datos dentro de las variables
+            
+            -- Hasta que no termine, carga los datos.
+            WHILE @@FETCH_STATUS = 0
+            BEGIN
+                -- Normaliza numero de socio
+                SET @nroSocio = REPLACE(LTRIM(RTRIM(@nroSocio)), 'SN-', '');
+                
+                -- Buscar id de socio en tabla de socios
+                SELECT @id_socio = id_socio
+                FROM usuarios.socio 
+                WHERE LTRIM(RTRIM(numero_socio)) = @nroSocio;
+                IF @id_socio IS NULL
+                BEGIN
+                    SELECT 'Error' as Estado, 'El usuario no existe' as Mensaje 
+                    GOTO SIGUIENTE_REGISTRO
+                END
+
+                -- Busca id de actividad en tabla de actividad
+                SELECT TOP 1 @id_actividad = id_actividad
+                FROM actividades.actividad
+                WHERE DIFFERENCE(nombre, @actividad) >= 3; -- Busco por sonido fonetico porque el excel tiene cosas mal escritas c:
+                IF @id_actividad IS NULL
+                BEGIN
+                    SELECT 'Error' as Estado, 'La actividad no existe' as Mensaje 
+                    GOTO SIGUIENTE_REGISTRO
+                END
+
+                -- Procesar nombre y apellido del profesor
+                DECLARE @profesor_nombre VARCHAR(100), @profesor_apellido VARCHAR(100), @profesor_username VARCHAR(100);
+                -- Suponemos que el nombre y apellido están separados por el último espacio
+                IF CHARINDEX(' ', REVERSE(LTRIM(RTRIM(@profesor)))) > 0
+                BEGIN
+                    SET @profesor_apellido = RIGHT(LTRIM(RTRIM(@profesor)), CHARINDEX(' ', REVERSE(LTRIM(RTRIM(@profesor)))) - 1);
+                    SET @profesor_nombre = LEFT(LTRIM(RTRIM(@profesor)), LEN(LTRIM(RTRIM(@profesor))) - LEN(@profesor_apellido) - 1);
+                END
+                ELSE
+                BEGIN
+                    SET @profesor_nombre = LTRIM(RTRIM(@profesor));
+                    SET @profesor_apellido = '';
+                END
+                -- Generar username: nombre.apellido en minúsculas, sin espacios
+                SET @profesor_username = LOWER(REPLACE(@profesor_nombre, ' ', '')) + '.' + LOWER(REPLACE(@profesor_apellido, ' ', ''));
+                
+                -- Busca el id de la persona (profesor)
+                SELECT TOP 1 @id_persona = id_persona
+                FROM usuarios.persona
+                WHERE DIFFERENCE(nombre + ' ' + apellido,@profesor) >= 3;
+                
+                -- Si la persona no existe, crearla
+                IF @id_persona IS NULL
+                BEGIN
+                    EXEC usuarios.CrearPersona
+                        @dni = NULL,
+                        @nombre = @profesor_nombre,
+                        @apellido = @profesor_apellido,
+                        @email = NULL,
+                        @fecha_nac = NULL,
+                        @telefono = NULL,
+                        @id_persona = @id_persona OUTPUT;
+                END
+
+                -- Busca el id del usuario (profesor)
+                SELECT TOP 1 @id_usuario = id_usuario
+                FROM usuarios.usuario
+                WHERE id_persona = @id_persona;
+                
+                -- Si el usuario no existe, crearlo
+                IF @id_usuario IS NULL
+                BEGIN
+                    EXEC usuarios.CrearUsuario
+                        @id_persona = @id_persona,
+                        @dni = NULL,
+                        @nombre = @profesor_nombre,
+                        @apellido = @profesor_apellido,
+                        @email = NULL,
+                        @fecha_nac = NULL,
+                        @telefono = NULL,
+                        @username = @profesor_username,
+                        @password_hash = 'default_hash';
+                    -- Buscar el id_usuario recién creado
+                    SELECT TOP 1 @id_usuario = id_usuario
+                    FROM usuarios.usuario
+                    WHERE id_persona = @id_persona;
+                END
+                IF @id_usuario IS NULL
+                BEGIN
+                    SELECT 'Error' as Estado, 'No se pudo crear el usuario para el profesor' as Mensaje 
+                    GOTO SIGUIENTE_REGISTRO
+                END
+
+                -- Busca si existe la clase
+                SET @dia = DATENAME(WEEKDAY, @fecha); -- Convierte la fecha a un dia
+
+                SELECT TOP 1 @id_clase = id_clase
+                FROM actividades.clase
+                WHERE id_actividad = @id_actividad AND dia = @dia;
+
+                -- Si la clase no existe, hay que crearla
+                IF @id_clase IS NULL
+                BEGIN
+                    -- Busca la categoria
+                    SELECT @id_categoria = id_categoria
+                    FROM usuarios.socio
+                    WHERE id_socio = @id_socio
+
+                    -- Crea la clase
+                    EXEC actividades.CrearClase
+                        @id_actividad = @id_actividad,
+                        @id_categoria = @id_categoria,
+                        @dia = @dia,
+                        @horario = '07:00', -- El excel no me da el horario. Realmente habria que rebotarlos todos
+                        @id_usuario = @id_usuario;
+
+                    -- Busca de nuevo
+                    SELECT TOP 1 @id_clase = id_clase
+                    FROM actividades.clase
+                    WHERE id_actividad = @id_actividad AND dia = @dia;
+                END
+
+                -- Coloca los datos en sus respectivas tabla
+                IF NOT EXISTS (
+                    SELECT 1 FROM actividades.actividad_socio
+                    WHERE id_socio = @id_socio AND id_actividad = @id_actividad
+                )
+                BEGIN
+                    INSERT INTO actividades.actividad_socio(id_socio, id_actividad)
+                    VALUES (@id_socio, @id_actividad);
+                END
+
+                SIGUIENTE_REGISTRO:
+                FETCH NEXT FROM cur INTO @nroSocio, @actividad, @fecha, @asistencia, @profesor;
+            END
+            
+    END TRY
+    BEGIN CATCH
+        DECLARE @ErrMsg NVARCHAR(4000), @ErrSeverity INT;
+        SELECT 
+            @ErrMsg = ERROR_MESSAGE(), 
+            @ErrSeverity = ERROR_SEVERITY();
+        RAISERROR(@ErrMsg, @ErrSeverity, 1);
+    END CATCH
+END
+GO
+
 -- IMPORTACION Y PRUEBAS
 EXEC actividades.ImportarCategorias 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 select * from actividades.categoria
@@ -1117,10 +1331,16 @@ EXEC actividades.ImportarCostosPileta
      SELECT * FROM actividades.costo
 GO
 
+/*
 EXEC usuarios.ImportarGrupoFamiliares 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
 SELECT * FROM usuarios.grupo_familiar
 GO
-
+*/
 EXEC facturacion.ImportarFacturas 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 SELECT * FROM facturacion.factura;
+GO
+
+EXEC actividades.ImportarPresentismoActividades 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
+SELECT * FROM actividades.actividad_socio
+SELECT * FROM usuarios.usuario
 GO

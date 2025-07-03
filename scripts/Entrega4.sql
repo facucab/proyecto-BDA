@@ -37,7 +37,7 @@ CREATE TABLE usuarios.persona(
 	fecha_alta DATE NOT NULL DEFAULT GETDATE(),
 	activo BIT NOT NULL DEFAULT 1,
     CONSTRAINT CK_persona_email CHECK (email LIKE '%@%.%' AND email NOT LIKE '@%' AND email NOT LIKE '%@%@%'),
-	CONSTRAINT CK_persona_dni CHECK (dni LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
+	CONSTRAINT CK_persona_dni CHECK (LEN(dni) BETWEEN 7 AND 9 AND dni NOT LIKE '%[^0-9]%'),
 	CONSTRAINT CK_persona_fecha_nac CHECK(fecha_nac < GETDATE()) 
 );
 GO
@@ -201,6 +201,7 @@ CREATE TABLE facturacion.factura (
 	id_factura    INT IDENTITY(1,1) PRIMARY KEY,
 	id_persona    INT NOT NULL,
 	id_metodo_pago INT NULL,
+    id_pago VARCHAR(50) NULL,
 	estado_pago   VARCHAR(20) NOT NULL,
 	fecha_emision DATE NOT NULL DEFAULT GETDATE(),
 	monto_a_pagar DECIMAL(10,2) NOT NULL,
@@ -2940,6 +2941,8 @@ GO
 *   @estado_pago   VARCHAR(20)     - Estado del pago.
 *   @monto_a_pagar DECIMAL(10,2)   - Monto a pagar.
 *   @detalle       VARCHAR(200) = NULL - Detalle de la factura. Opcional.
+*   @fecha_emision DATE = NULL         - Fecha de emisión. Opcional.
+*   @id_pago       VARCHAR(50) = NULL - Id de pago externo. Opcional.
 * Aclaracion: No se utilizan transacciones explicitas ya que:
 *   Solo se trabaja con una unica tabla y ejecutando sentencia DML
 */
@@ -2948,7 +2951,9 @@ CREATE OR ALTER PROCEDURE facturacion.CrearFactura
 	@id_metodo_pago INT    = NULL,
 	@estado_pago   VARCHAR(20),
 	@monto_a_pagar DECIMAL(10,2),
-	@detalle       VARCHAR(200) = NULL
+	@detalle       VARCHAR(200) = NULL,
+    @fecha_emision DATE = NULL,
+    @id_pago VARCHAR(50) = NULL
 AS
 BEGIN
 	SET NOCOUNT ON;
@@ -3995,5 +4000,308 @@ BEGIN
         IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
     END CATCH;
+END;
+GO
+
+/*
+* Nombre: CrearClase
+* Descripcion: Modifica los campos nombre y costo de una categoria. 
+* Parametros:
+* 	@id_actividad INT - ID de la actividad que se realiza en la clase.
+*	@id_categoria INT - ID de la categoria. 
+*	@dia VARCHAR(9) - Dia que se realiza la actividad. 
+*	@horario TIME - Horario de la clase. 
+* 	@id_usuario INT - ID del usuario que es responsable de la clase.
+*	
+* Valores de retorno:
+*	 0: Exito. 
+*	-1: Actividad no existe.
+*	-2: Categoria no existe.
+*	-3: El usuario no existe. 
+*	-4: Dia invalido. 
+*	-5: Horario invalido. 
+*	-6: 'Ya existe una clase con la misma actividad, categoría, día y horario.
+*	-7: El profesor ya tiene otra clase asignada en ese dia y horario
+*	-99: Error desconocido.
+*/
+GO
+
+
+CREATE OR ALTER PROCEDURE actividades.CrearClase
+	@id_actividad INT,
+	@id_categoria INT,
+	@dia VARCHAR(9),
+	@horario TIME,
+	@id_usuario INT
+AS
+BEGIN
+
+	SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+	BEGIN TRANSACTION;
+
+	BEGIN TRY
+		-- validar que la actividad exista
+		IF NOT EXISTS (SELECT 1 FROM actividades.actividad WHERE id_actividad = @id_actividad)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La actividad no existe' AS Mensaje;
+			RETURN -1;
+		END
+
+		-- validar que la categoria exista
+
+		IF NOT EXISTS (SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'La categoría no existe' AS Mensaje;
+			RETURN -2;
+		END
+
+		-- validar que el usuario profesor exista
+		IF NOT EXISTS (SELECT 1 FROM usuarios.usuario WHERE id_usuario = @id_usuario)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El usuario no existe' AS Mensaje;
+			RETURN -3;
+		END
+
+		-- valdar formato del dia
+
+		SET @dia = UPPER(@dia);
+
+		IF @dia NOT IN ('LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO')
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El dia debe ser un dia de la semana valido' AS Mensaje;
+			RETURN -4;
+		END
+
+		--validar horario (entre 6am y 22pm por ejemplo)
+
+		DECLARE @hora_minima TIME = '06:00:00';
+		DECLARE @hora_maxima TIME = '22:00:00';
+
+		IF @horario < @hora_minima OR @horario > @hora_maxima
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El horario debe ser entre 06 am y 22 pm' AS Mensaje;
+			RETURN -5;
+		END
+
+		-- verficar la no existencia de otra clase con misma actividad, categoria, dia y horario
+		IF EXISTS ( SELECT 1 FROM actividades.clase WHERE id_actividad = @id_actividad AND id_categoria = @id_categoria AND dia = @dia AND horario = @horario)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'Ya existe una clase con la misma actividad, categoría, día y horario' AS Mensaje;
+			RETURN -6;
+		END
+
+		-- verificar que el profesor no tenga otra clase a la misma hora
+		IF EXISTS (SELECT 1 FROM actividades.clase WHERE id_usuario = @id_usuario AND dia = @dia AND horario = @horario)
+		BEGIN
+			ROLLBACK TRANSACTION;
+			SELECT 'Error' AS Resultado, 'El profesor ya tiene otra clase asignada en ese dia y horario' AS Mensaje;
+			RETURN -7;
+		END
+
+		-- insertar la nueva clase
+
+		INSERT INTO actividades.clase(id_actividad, id_categoria, dia, horario, id_usuario)
+		VALUES (@id_actividad, @id_categoria, @dia, @horario, @id_usuario);
+
+		COMMIT TRANSACTION;
+
+		SELECT 'Exito' AS Resultado, 'Clase creada correctamente' AS Mensaje;
+		RETURN 0;
+	END TRY
+	BEGIN CATCH
+		ROLLBACK TRANSACTION;
+		SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+		RETURN -99;
+	END CATCH
+END;
+
+GO
+
+
+CREATE OR ALTER PROCEDURE actividades.ModificarClase
+    @id_clase INT,
+    @id_actividad INT = NULL,
+    @id_categoria INT = NULL,
+    @dia VARCHAR(9) = NULL,
+    @horario TIME = NULL,
+    @id_usuario INT = NULL
+AS
+BEGIN
+    
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+    
+    BEGIN TRY
+        -- verificamos que la clase exista
+        IF NOT EXISTS (SELECT 1 FROM actividades.clase WHERE id_clase = @id_clase)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La clase no existe' AS Mensaje;
+            RETURN -1;
+        END
+        
+        -- verificamos actividad si se proporciona
+        IF @id_actividad IS NOT NULL AND NOT EXISTS (SELECT 1 FROM actividades.actividad WHERE id_actividad = @id_actividad)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La actividad no existe' AS Mensaje;
+            RETURN -2;
+        END
+        
+        -- verificamos categoría si se proporciona
+        IF @id_categoria IS NOT NULL AND NOT EXISTS (SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La categoría no existe' AS Mensaje;
+            RETURN -3;
+        END
+        
+        -- verificamos usuario si se proporciona
+        IF @id_usuario IS NOT NULL AND NOT EXISTS (SELECT 1 FROM usuarios.usuario WHERE id_usuario = @id_usuario)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'El usuario no existe' AS Mensaje;
+            RETURN -4;
+        END
+        
+        -- verificamos formato del día si se proporciona y convertir a mayúsculas
+        IF @dia IS NOT NULL
+        BEGIN
+            SET @dia = UPPER(@dia);
+            IF @dia NOT IN ('LUNES', 'MARTES', 'MIERCOLES', 'JUEVES', 'VIERNES', 'SABADO', 'DOMINGO')
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El día debe ser un día de la semana válido' AS Mensaje;
+                RETURN -5;
+            END
+        END
+        
+        -- verificamos horario si se proporciona
+        IF @horario IS NOT NULL
+        BEGIN
+            DECLARE @hora_minima TIME = '06:00:00';
+            DECLARE @hora_maxima TIME = '22:00:00';
+          
+            IF @horario < @hora_minima OR @horario > @hora_maxima
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El horario debe estar entre 06:00 y 22:00' AS Mensaje;
+                RETURN -6;
+            END
+        END
+        
+        -- verificamos que no haya otra clase con la misma combinación (si cambiamos algun valor)
+        IF @id_actividad IS NOT NULL OR @id_categoria IS NOT NULL OR @dia IS NOT NULL OR @horario IS NOT NULL
+        BEGIN
+            IF EXISTS (SELECT 1 FROM actividades.clase WHERE id_actividad = ISNULL(@id_actividad, id_actividad) 
+				AND id_categoria = ISNULL(@id_categoria, id_categoria) 
+				AND dia = ISNULL(@dia, dia) 
+				AND horario = ISNULL(@horario, horario)
+                AND id_clase <> @id_clase
+            )
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'Ya existe otra clase con la misma actividad, categoría, día y horario' AS Mensaje;
+                RETURN -7;
+            END
+        END
+        
+        -- verificamos que el profesor no tenga otra clase a la misma hora (solo si cambiamos profesor/día/hora)
+        IF @id_usuario IS NOT NULL OR @dia IS NOT NULL OR @horario IS NOT NULL
+        BEGIN
+            IF EXISTS (SELECT 1 FROM actividades.clase WHERE id_usuario = ISNULL(@id_usuario, id_usuario)
+                AND dia = ISNULL(@dia, dia)
+                AND horario = ISNULL(@horario, horario)
+                AND id_clase <> @id_clase
+            )
+            BEGIN
+                ROLLBACK TRANSACTION;
+                SELECT 'Error' AS Resultado, 'El profesor ya tiene otra clase asignada en ese día y horario' AS Mensaje;
+                RETURN -8;
+            END
+        END
+        
+        -- verificamos la clase
+        UPDATE actividades.clase
+        SET id_actividad = ISNULL(@id_actividad, id_actividad),
+            id_categoria = ISNULL(@id_categoria, id_categoria),
+            dia = ISNULL(@dia, dia),
+            horario = ISNULL(@horario, horario),
+            id_usuario = ISNULL(@id_usuario, id_usuario)
+        WHERE id_clase = @id_clase;
+        
+        COMMIT TRANSACTION;
+        
+        SELECT 'Éxito' AS Resultado, 'Clase modificada correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+
+    END CATCH
+
+END;
+GO
+
+
+CREATE OR ALTER PROCEDURE actividades.EliminarClase
+    @id_clase INT
+AS
+BEGIN
+    
+    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
+    BEGIN TRANSACTION;
+    
+    BEGIN TRY
+        -- verificamos que la clase exista y esté activa
+        IF NOT EXISTS (SELECT 1 FROM actividades.clase WHERE id_clase = @id_clase AND estado = 1)
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'La clase no existe o ya está inactiva' AS Mensaje;
+            RETURN -1;
+        END
+        
+        -- verificamos si hay socios inscritos en esta actividad y categoría
+        IF EXISTS (SELECT 1 FROM usuarios.socio_actividad sa
+            JOIN usuarios.socio s ON sa.id_socio = s.id_socio
+            JOIN actividades.clase c ON c.id_clase = @id_clase
+            WHERE sa.id_actividad = c.id_actividad
+            AND s.id_categoria = c.id_categoria
+        )
+        BEGIN
+            ROLLBACK TRANSACTION;
+            SELECT 'Error' AS Resultado, 'No se puede eliminar la clase porque hay socios inscritos en esta actividad y categoría' AS Mensaje;
+            RETURN -2;
+        END
+		-- esto casi seguro habria que cambiarlo/repensarlo porque no se eliminaria la clase aun si el socio esta inscrito en actividad y categoria pero 
+		-- en otra clase, capaz habria que unir de alguna forma socio con clase. !!!
+		-- aparte tiene que hacer joins y dudo que sea optimo
+
+        -- realizamos borrado lógico cambiando el estado a inactivo
+        UPDATE actividades.clase
+        SET estado = 0 -- agregue atributo activo a clase para hacer borrado lógico, si les parece que no deberia de haber borrado lógico lo cambiamos
+        WHERE id_clase = @id_clase;
+        
+        COMMIT TRANSACTION;
+        
+        SELECT 'Éxito' AS Resultado, 'Clase inactivada correctamente' AS Mensaje;
+        RETURN 0;
+
+    END TRY
+    BEGIN CATCH
+
+        ROLLBACK TRANSACTION;
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+        RETURN -99;
+    END CATCH
 END;
 GO
