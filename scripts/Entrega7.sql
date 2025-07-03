@@ -63,7 +63,7 @@ DROP ROLE Vocal;
 
 /* Política de Respaldo:
 
-Se realiza automáticamente un respaldo completo una vez por semana, durante la madrugada del día lunes.  
+Decidimos que se realiza automáticamente un respaldo completo una vez por semana, durante la madrugada del día lunes.  
 Luego, se realiza un respaldo diferencial cada 24 horas (también durante la madrugada), y un respaldo del log de transacciones cada 10 minutos.
 
 Justificación: El sistema gestiona la facturación de un local con carga de trabajo intermitente. 
@@ -77,4 +77,4 @@ Por ese motivo:
 (Segun lo que pudimos ver en Google Maps, es el período de menor concurrencia en este tipo de negocios).
 - Elegimos el dia lunes para el respaldo completo porque (Segun maps) es de los días de menor actividad.
 
-Esta estrategia asegura una recuperación eficiente sin comprometer el rendimiento diario del sistema. */
+En caso de poder acceder a una nube, haríamos un respaldo adicional en ella para complementar los respaldos locales en caso de que fallase uno u otro.*/

@@ -25,6 +25,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Elementos de la solución",
 		15_pruebasSPNotaCredito.sql = 15_pruebasSPNotaCredito.sql
 		Entrega4.sql = Entrega4.sql
 		Entrega5.sql = Entrega5.sql
+		Entrega6.sql = Entrega6.sql
+		Entrega7.sql = Entrega7.sql
 		Reportes.sql = Reportes.sql
 		Roles y permisos.sql = Roles y permisos.sql
 	EndProjectSection
@@ -35,7 +37,7 @@ Global
 	EndGlobalSection
 	GlobalSection(ProjectConfigurationPlatforms) = postSolution
 		{FC3DF230-76E7-3903-5A0C-93F690F11CE7}.Default|Default.ActiveCfg = Default
-		{3B70BA1C-E007-40AF-A221-E036194D4811}.Default|Default.ActiveCfg = Default
+		{674FBE3E-4901-4ABE-BF28-8B1F34215A51}.Default|Default.ActiveCfg = Default
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

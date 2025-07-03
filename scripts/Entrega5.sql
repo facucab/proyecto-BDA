@@ -13,6 +13,7 @@ EXEC sp_MSSet_oledb_prop N'Microsoft.ACE.OLEDB.12.0', N'DynamicParameters', 1;
 RECONFIGURE;
 GO
 
+
 USE Com5600G01;
 GO
 
