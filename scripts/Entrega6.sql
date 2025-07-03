@@ -9,9 +9,6 @@
 	40993965 | Cornara Perez, Tomas Andres
 */
 
-USE Com5600G01;
-GO
-
 -- Reporte 1: Morosos Recurrentes
 IF OBJECT_ID('reportes.morosos_recurrentes', 'P') IS NOT NULL
     DROP PROCEDURE reportes.morosos_recurrentes;

@@ -22,6 +22,8 @@ GO
 CREATE SCHEMA actividades; 
 GO
 CREATE SCHEMA facturacion;
+GO
+CREATE SCHEMA reportes; 
 
 GO
 -- Crear tablas:
@@ -2983,8 +2985,8 @@ BEGIN
 		RETURN;
 	END;
 	BEGIN TRY
-		INSERT INTO facturacion.factura(id_persona, id_metodo_pago, estado_pago, monto_a_pagar, detalle)
-		VALUES(@id_persona, @id_metodo_pago, @estado_pago, @monto_a_pagar, @detalle);
+		INSERT INTO facturacion.factura(id_persona, id_metodo_pago, estado_pago, monto_a_pagar, detalle, fecha_emision)
+		VALUES(@id_persona, @id_metodo_pago, @estado_pago, @monto_a_pagar, @detalle, @fecha_emision);
 		SELECT 'OK' AS Resultado, 'Factura creada correctamente' AS Mensaje, '200' AS Estado;
 	END TRY 
 	BEGIN CATCH
