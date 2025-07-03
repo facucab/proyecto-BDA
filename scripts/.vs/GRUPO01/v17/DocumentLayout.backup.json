@@ -3,12 +3,16 @@
   "WorkspaceRootPath": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\",
   "Documents": [
     {
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Entrega5.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:Entrega5.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+    },
+    {
       "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Entrega4.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
       "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:Entrega4.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
     },
     {
-      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Entrega5.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
-      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:Entrega5.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
+      "AbsoluteMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\05_pruebasSPUsuarios.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}",
+      "RelativeMoniker": "D:0:0:{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|Elementos de la soluci\u00F3n{D107F4C8-89CC-BEA8-D3D7-CA6B7733353D}|solutionrelative:05_pruebasSPUsuarios.sql||{B5A506EB-11BE-4782-9A18-21265C2CA0B4}"
     }
   ],
   "DocumentGroupContainers": [
@@ -22,27 +26,39 @@
           "Children": [
             {
               "$type": "Document",
-              "DocumentIndex": 1,
-              "Title": "Entrega5.sql - localhost.master (tPcWin\\tomas (52))",
-              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Entrega5.sql",
-              "RelativeDocumentMoniker": "Entrega5.sql",
-              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Entrega5.sql - localhost.master (tPcWin\\tomas (52))",
-              "RelativeToolTip": "Entrega5.sql - localhost.master (tPcWin\\tomas (52))",
+              "DocumentIndex": 2,
+              "Title": "05_pruebasSPUsuarios.sql - localhost.Com5600G01 (tPcWin\\tomas (79))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\05_pruebasSPUsuarios.sql",
+              "RelativeDocumentMoniker": "05_pruebasSPUsuarios.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\05_pruebasSPUsuarios.sql - localhost.Com5600G01 (tPcWin\\tomas (79))",
+              "RelativeToolTip": "05_pruebasSPUsuarios.sql - localhost.Com5600G01 (tPcWin\\tomas (79))",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
-              "WhenOpened": "2025-07-02T22:48:18.808Z",
-              "EditorCaption": " - localhost.master (tPcWin\\tomas (52))"
+              "WhenOpened": "2025-07-03T14:14:53.296Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (79))"
             },
             {
               "$type": "Document",
               "DocumentIndex": 0,
-              "Title": "Entrega4.sql - localhost.master (tPcWin\\tomas (58))",
+              "Title": "Entrega5.sql - localhost.Com5600G01 (tPcWin\\tomas (72))",
+              "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Entrega5.sql",
+              "RelativeDocumentMoniker": "Entrega5.sql",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Entrega5.sql - localhost.Com5600G01 (tPcWin\\tomas (72))",
+              "RelativeToolTip": "Entrega5.sql - localhost.Com5600G01 (tPcWin\\tomas (72))",
+              "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
+              "WhenOpened": "2025-07-02T22:48:18.808Z",
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (72))"
+            },
+            {
+              "$type": "Document",
+              "DocumentIndex": 1,
+              "Title": "Entrega4.sql - localhost.Com5600G01 (tPcWin\\tomas (68))",
               "DocumentMoniker": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Entrega4.sql",
               "RelativeDocumentMoniker": "Entrega4.sql",
-              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Entrega4.sql - localhost.master (tPcWin\\tomas (58))",
-              "RelativeToolTip": "Entrega4.sql - localhost.master (tPcWin\\tomas (58))",
+              "ToolTip": "C:\\Users\\tomas\\Desktop\\proyecto-BDA\\scripts\\Entrega4.sql - localhost.Com5600G01 (tPcWin\\tomas (68))",
+              "RelativeToolTip": "Entrega4.sql - localhost.Com5600G01 (tPcWin\\tomas (68))",
               "Icon": "ae27a6b0-e345-4288-96df-5eaf394ee369.000826|",
               "WhenOpened": "2025-06-27T16:49:03.99Z",
-              "EditorCaption": " - localhost.master (tPcWin\\tomas (58))"
+              "EditorCaption": " - localhost.Com5600G01 (tPcWin\\tomas (68))"
             }
           ]
         }
