@@ -22,9 +22,9 @@ DECLARE @uid1 INT, @uid2 INT;
 PRINT 'Caso normal 1: crear usuario Juan';
 EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
-    @dni           = '12345678',
-    @nombre        = 'Juan',
-    @apellido      = 'Perez',
+    @dni           = '123456789',
+    @nombre        = 'Pablo',
+    @apellido      = 'Rodriguez',
     @email         = 'juan.perez@example.com',
     @fecha_nac     = '1985-05-05',
     @telefono      = '555111222',
@@ -35,7 +35,7 @@ EXEC usuarios.CrearUsuario
 PRINT 'Caso normal 2: crear usuario Luis';
 EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
-    @dni           = '9876543',
+    @dni           = '98765439',
     @nombre        = 'Luis',
     @apellido      = 'Mandioca',
     @email         = 'luis.mandioca@example.com',
@@ -48,7 +48,7 @@ EXEC usuarios.CrearUsuario
 PRINT 'Caso normal 3: crear usuario Mario';
 EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
-    @dni           = '12312231',
+    @dni           = '123122319',
     @nombre        = 'Mario',
     @apellido      = 'Catañeda',
     @email         = 'mario.casta@example.com',
@@ -61,7 +61,7 @@ EXEC usuarios.CrearUsuario
 PRINT 'Caso normal 4: crear usuario Laura';
 EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
-    @dni           = '22334455',
+    @dni           = '223344559',
     @nombre        = 'Laura',
     @apellido      = 'González',
     @email         = 'laura.gonzalez@example.com',
@@ -74,7 +74,7 @@ EXEC usuarios.CrearUsuario
 PRINT 'Caso normal 5: crear usuario Pablo';
 EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
-    @dni           = '33445566',
+    @dni           = '334455669',
     @nombre        = 'Pablo',
     @apellido      = 'Martínez',
     @email         = 'pablo.martinez@example.com',
@@ -87,7 +87,7 @@ EXEC usuarios.CrearUsuario
 PRINT 'Caso normal 6: crear usuario Julieta';
 EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
-    @dni           = '44556677',
+    @dni           = '445566779',
     @nombre        = 'Julieta',
     @apellido      = 'Rodríguez',
     @email         = 'julieta.rod@example.com',
@@ -100,7 +100,7 @@ EXEC usuarios.CrearUsuario
 PRINT 'Caso normal 7: crear usuario Ernesto';
 EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
-    @dni           = '55667788',
+    @dni           = '556677889',
     @nombre        = 'Ernesto',
     @apellido      = 'López',
     @email         = 'ernesto.lopez@example.com',
@@ -110,6 +110,102 @@ EXEC usuarios.CrearUsuario
     @password_hash = 'hash7';
 -- Esperado: OK, Usuario creado correctamente.
 
+-- Caso normal 8: crear usuario Pablo;
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '123122320',
+    @nombre        = 'Pablo',
+    @apellido      = 'Rodriguez',
+    @email         = 'pablo.rodriguez@example.com',
+    @fecha_nac     = '1984-04-04',
+    @telefono      = '6666666667',
+    @username      = 'XXpabloRodXX',
+    @password_hash = 'hash8';
+
+-- Caso normal 9: crear usuario Ana Paula;
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '123122321',
+    @nombre        = 'Ana Paula',
+    @apellido      = 'Alvarez',
+    @email         = 'ana.alvarez@example.com',
+    @fecha_nac     = '1990-09-09',
+    @telefono      = '6666666668',
+    @username      = 'XXanaAlvXX',
+    @password_hash = 'hash9';
+
+-- Caso normal 10: crear usuario Kito;
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '123122322',
+    @nombre        = 'Kito',
+    @apellido      = 'Mihaji',
+    @email         = 'kito.mihaji@example.com',
+    @fecha_nac     = '1992-02-02',
+    @telefono      = '6666666669',
+    @username      = 'XXkitoMihXX',
+    @password_hash = 'hash10';
+
+-- Caso normal 11: crear usuario Carolina;
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '123122323',
+    @nombre        = 'Carolina',
+    @apellido      = 'Herreta',
+    @email         = 'carolina.herreta@example.com',
+    @fecha_nac     = '1986-06-06',
+    @telefono      = '6666666670',
+    @username      = 'XXcaroHerXX',
+    @password_hash = 'hash11';
+
+-- Caso normal 12: crear usuario Paula;
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '123122324',
+    @nombre        = 'Paula',
+    @apellido      = 'Quiroga',
+    @email         = 'paula.quiroga@example.com',
+    @fecha_nac     = '1991-01-01',
+    @telefono      = '6666666671',
+    @username      = 'XXpaulaQuiXX',
+    @password_hash = 'hash12';
+
+-- Caso normal 13: crear usuario Hector 1;
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '123122325',
+    @nombre        = 'Hector',
+    @apellido      = 'Alvarez',
+    @email         = 'hector.alvarez1@example.com',
+    @fecha_nac     = '1983-03-03',
+    @telefono      = '6666666672',
+    @username      = 'XXhectorAlv1XX',
+    @password_hash = 'hash13';
+
+-- Caso normal 14: crear usuario Roxana;
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '123122326',
+    @nombre        = 'Roxana',
+    @apellido      = 'Guiterrez',
+    @email         = 'roxana.guiterrez@example.com',
+    @fecha_nac     = '1989-09-09',
+    @telefono      = '6666666673',
+    @username      = 'XXroxaGuiXX',
+    @password_hash = 'hash14';
+
+-- Caso normal 15: crear usuario Hector 2;
+EXEC usuarios.CrearUsuario
+    @id_persona    = NULL,
+    @dni           = '123122327',
+    @nombre        = 'Hector',
+    @apellido      = 'Alvarez',
+    @email         = 'hector.alvarez2@example.com',
+    @fecha_nac     = '1983-03-04',
+    @telefono      = '6666666674',
+    @username      = 'XXhectorAlv2XX',
+    @password_hash = 'hash15';
+
 
 -------------------------------------------------------------------------------
 -- 1b) CrearUsuario: otro usuario para duplicados
@@ -117,7 +213,7 @@ EXEC usuarios.CrearUsuario
 PRINT 'Caso normal 2: crear usuario Maria';
 EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
-    @dni           = '22223333',
+    @dni           = '222233339',
     @nombre        = 'Maria',
     @apellido      = 'Gomez',
     @email         = 'maria.gomez@example.com',
@@ -137,7 +233,7 @@ SELECT @uid2 = id_usuario
 PRINT 'Username duplicado';
 EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
-    @dni           = '33334444',
+    @dni           = '333344449',
     @nombre        = 'Luis',
     @apellido      = 'Lopez',
     @email         = 'luis.lopez@example.com',
@@ -153,7 +249,7 @@ EXEC usuarios.CrearUsuario
 PRINT 'Username vacío';
 EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
-    @dni           = '44445555',
+    @dni           = '444455559',
     @nombre        = 'Ana',
     @apellido      = 'Ruiz',
     @email         = 'ana.ruiz@example.com',
@@ -169,7 +265,7 @@ EXEC usuarios.CrearUsuario
 PRINT 'Password_hash vacío';
 EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
-    @dni           = '55556666',
+    @dni           = '555566669',
     @nombre        = 'Pedro',
     @apellido      = 'Diaz',
     @email         = 'pedro.diaz@example.com',
@@ -233,7 +329,7 @@ DELETE FROM usuarios.usuario
  WHERE id_usuario IN (@uid1, @uid2);
 
 DELETE FROM usuarios.persona
- WHERE dni IN ('12345678','22223333','33334444','44445555','55556666');
+ WHERE dni IN ('123456789','222233339','333344449','444455559','555566669');
 
 GO
 
