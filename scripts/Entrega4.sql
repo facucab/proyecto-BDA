@@ -448,7 +448,7 @@ GO
 CREATE OR ALTER PROCEDURE usuarios.CrearObraSocial
 	@nombre VARCHAR(50),
 	@nro_telefono VARCHAR(20),
-	@id_obra_social INT OUTPUT
+	@id_obra_social INT =  NULL OUTPUT
 AS
 BEGIN
 	BEGIN TRY

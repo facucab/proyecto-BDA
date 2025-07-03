@@ -144,3 +144,25 @@ GO
 GO
 EXEC usuarios.importarGrupoFamiliar @path = 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx'
 
+
+EXEC usuarios.CrearSocio
+    @id_persona = NULL,
+    @dni = '40200123',
+    @nombre = 'Lucía',
+    @apellido = 'Fernández',
+    @email = 'lucia.fernandez@example.com',
+    @fecha_nac = '1990-05-20',
+    @telefono = '1155555555',
+    @numero_socio = 'S123456',
+    @telefono_emergencia = '1166666666',
+    @obra_nro_socio = 'OBR-9988',
+    @id_obra_social = 2,   -- Debe existir
+    @id_categoria = 1,     -- Debe existir
+    @id_grupo = 3;   
+
+GO
+USE Com5600G01;
+EXEC usuarios.CrearObraSocial 	
+	@nombre = 'sancor',
+	@nro_telefono = '1133455'
+
