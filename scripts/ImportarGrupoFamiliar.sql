@@ -79,10 +79,54 @@ BEGIN
 
     BEGIN TRY
         EXEC sp_executesql @sql;
-        
+		
+		-- Variables auxiliares:  
+		DECLARE 
+			@nro_de_socio VARCHAR(7),
+            @nro_de_socio_RP VARCHAR(7),
+            @nombre VARCHAR(35),
+            @apellido VARCHAR(35),
+            @dni INT,
+            @email_personal VARCHAR(255),
+            @fec_nac DATE,
+            @tel_contacto VARCHAR(20),
+            @tel_emerg INT,
+            @nom_obra_social VARCHAR(35),
+            @nro_socio_obra_social VARCHAR(35),
+            @tel_cont_emerg VARCHAR(80);
+
+        -- cursor para recorrer fila por fila
+        DECLARE cur CURSOR FOR
+            SELECT nro_de_socio, nro_de_socio_RP, nombre, apellido, dni, email_personal, fec_nac, tel_contacto, tel_emerg, nom_obra_social, nro_socio_obra_social, tel_cont_emerg
+            FROM #tempGrupoFamiliar;
+
+        OPEN cur;
+
+        FETCH NEXT FROM cur INTO 
+            @nro_de_socio, @nro_de_socio_RP, @nombre, @apellido, @dni, @email_personal, @fec_nac, @tel_contacto, @tel_emerg, @nom_obra_social, @nro_socio_obra_social, @tel_cont_emerg;
+        WHILE @@FETCH_STATUS = 0
+        BEGIN
+			-- Limpio el numero de los socios:  
+			SET @nro_de_socio_RP = SUBSTRING(@nro_de_socio_RP, CHARINDEX('-', @nro_de_socio_RP) + 1, LEN(@nro_de_socio_RP));
+			SET @nro_de_socio = SUBSTRING(@nro_de_socio, CHARINDEX('-', @nro_de_socio) + 1, LEN(@nro_de_socio));
+			
+			IF EXISTS (SELECT 1 FROM usuarios.socio WHERE numero_socio = @nro_de_socio_RP)
+			BEGIN
+				EXEC 
+			END
+			ELSE BEGIN 
+				PRINT 'socio NO existe'; 
+			END
+
+            -- Obtener siguiente fila
+            FETCH NEXT FROM cur INTO  @nro_de_socio, @nro_de_socio_RP, @nombre, @apellido, @dni, @email_personal, @fec_nac, @tel_contacto, @tel_emerg, @nom_obra_social, @nro_socio_obra_social, @tel_cont_emerg;
+        END
+
+        CLOSE cur;
+        DEALLOCATE cur;
         -- Mostrar los datos importados
-        SELECT * FROM #tempGrupoFamiliar;
-     
+       -- SELECT * FROM #tempGrupoFamiliar;
+			
     END TRY
     BEGIN CATCH
         SELECT 
@@ -99,3 +143,4 @@ GO
 
 GO
 EXEC usuarios.importarGrupoFamiliar @path = 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx'
+
