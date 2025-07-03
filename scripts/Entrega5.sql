@@ -1305,11 +1305,11 @@ END
 GO
 
 -- IMPORTACION Y PRUEBAS
-EXEC actividades.ImportarCategorias 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
+EXEC actividades.ImportarCategorias 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx' 
 select * from actividades.categoria
 GO
 
-EXEC usuarios.ImportarSocios 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
+EXEC usuarios.ImportarSocios 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx'
 select s.*, os.descripcion AS obra_social_descripcion, os.nro_telefono AS obra_social_telefono
 FROM usuarios.socio s
 LEFT JOIN usuarios.obra_social os ON s.id_obra_social = os.id_obra_social

@@ -94,8 +94,9 @@ BEGIN
             @nom_obra_social VARCHAR(35),
             @nro_socio_obra_social VARCHAR(35),
             @tel_cont_emerg VARCHAR(80);
-
-        -- cursor para recorrer fila por fila
+		-- 
+		DECLARE @i INT = 0; 
+		-- cursor para recorrer fila por fila
         DECLARE cur CURSOR FOR
             SELECT nro_de_socio, nro_de_socio_RP, nombre, apellido, dni, email_personal, fec_nac, tel_contacto, tel_emerg, nom_obra_social, nro_socio_obra_social, tel_cont_emerg
             FROM #tempGrupoFamiliar;
@@ -118,6 +119,7 @@ BEGIN
 
 			IF @id_socio_rp IS NOT NULL 
 			BEGIN 
+			
 				-- Evaluo si existe el grupo familiar: 
 				DECLARE @idGrupo INT = NULL;
 				SELECT @idGrupo = g.id_grupo_familiar FROM usuarios.grupo_familiar  g WHERE g.id_socio_rp = @id_socio_rp;
@@ -130,22 +132,71 @@ BEGIN
 				DECLARE @id_obra_social INT = NULL; 
 				SELECT @id_obra_social = id_obra_social 
 				FROM usuarios.obra_social o WHERE UPPER(o.descripcion) = UPPER(RTRIM(LTRIM(@nom_obra_social)));
-				IF @id_obra_social IS NULL 
+				IF @id_obra_social IS NULL AND @nom_obra_social IS NOT NULL 
 				BEGIN
-					PRINT 'CREAR OBRA SOCIAL'; 
 					EXEC usuarios.CrearObraSocial @nombre = @nom_obra_social, @nro_telefono = '11';
 				END
 
 				-- Obtengo la categoria del nuevo socio: 
+				DECLARE @edad INT;
+				SET @edad = DATEDIFF(YEAR, @fec_nac, GETDATE());
 
+				IF NOT EXISTS (SELECT 1 FROM usuarios.socio s WHERE s.numero_socio = @nro_de_socio)
+				BEGIN
+				PRINT 'creo socio';
+					-- obtengo el id de la categoria que corresponde: 
+					DECLARE @id_categoria INT = NULL; 
 
-				PRINT 'socio  existe' + @nro_de_socio_RP;  
+					IF @edad > 17 
+					BEGIN 
+						SELECT @id_categoria = c.id_categoria  
+						FROM actividades.categoria c 
+						WHERE LOWER(nombre_categoria) = 'mayor';
+						END 
+						ELSE IF @edad <= 17 AND @edad > 12 
+						BEGIN
+							SELECT @id_categoria = c.id_categoria  
+							FROM actividades.categoria c 
+							WHERE LOWER(nombre_categoria) = 'cadete';
+						END 
+						ELSE 
+						BEGIN
+							SELECT @id_categoria = c.id_categoria  
+							FROM actividades.categoria c 
+							WHERE LOWER(nombre_categoria) = 'menor';
+						END;
+
+						-- crear socio: 
+						SET @tel_contacto = ISNULL(@tel_contacto, '11');
+						DECLARE @email_new VARCHAR(255) =  'socio_' + CAST(@i AS NVARCHAR) + '@example.com';
+						EXEC usuarios.CrearSocio
+						@id_persona = NULL,
+						@dni = @dni,
+						@nombre = @nombre,
+						@apellido = @apellido,
+						@email =  @email_new,
+						@fecha_nac = @fec_nac,
+						@telefono = @tel_contacto, 
+						@numero_socio = @nro_de_socio,
+						@telefono_emergencia = @tel_cont_emerg,
+						@obra_nro_socio = @nro_socio_obra_social,
+						@id_obra_social = @id_obra_social,  
+						@id_categoria = @id_categoria,
+						@id_grupo = @idGrupo;
+						
+					SET @i = @i +1; 	
+					END  
+				ELSE 
+				BEGIN
+					UPDATE usuarios.socio
+					SET  id_grupo= @idGrupo
+					WHERE numero_socio = @nro_de_socio
+				END; 
 			END
 			ELSE 
 			BEGIN
-				PRINT 'socio NO existe' + @nro_de_socio_RP;; 
-			END
-
+				PRINT 'socio responsable NO existe' + @nro_de_socio_RP;; 
+			END;
 
             -- Obtener siguiente fila
             FETCH NEXT FROM cur INTO  @nro_de_socio, @nro_de_socio_RP, @nombre, @apellido, @dni, @email_personal, @fec_nac, @tel_contacto, @tel_emerg, @nom_obra_social, @nro_socio_obra_social, @tel_cont_emerg;
