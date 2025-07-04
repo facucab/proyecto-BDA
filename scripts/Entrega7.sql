@@ -124,13 +124,13 @@ GO
 */
 
 /*
-Caso Negativo: usuario_cobranza con rol Administrativo_Cobranza
+Caso Negativo: usuario_cobranza con rol Administrativo_Cobranza accede a tabla factura sin permisos
 USE Com5600G01;
 GO
 
 EXECUTE AS USER = 'usuario_cobranza'; 
 
-PRINT 'Iniciando test negativo: usuario_cobranza intentando INSERT (debería fallar)';
+PRINT 'Iniciando test negativo: usuario_cobranza intentando INSERT';
 
 BEGIN TRY
     INSERT INTO facturacion.Factura DEFAULT VALUES;  -- Acción prohibida
