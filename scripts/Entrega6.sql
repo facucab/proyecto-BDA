@@ -126,6 +126,35 @@ BEGIN
 END;
 GO
 -- Reporte 4: 
+CREATE OR ALTER PROCEDURE actividades.SociosConInasistenciasEnClases
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT 
+        p.nombre,
+        p.apellido,
+        DATEDIFF(YEAR, p.fecha_nac, GETDATE()) - 
+            CASE 
+                WHEN MONTH(p.fecha_nac) > MONTH(GETDATE()) 
+                     OR (MONTH(p.fecha_nac) = MONTH(GETDATE()) AND DAY(p.fecha_nac) > DAY(GETDATE())) 
+                THEN 1 ELSE 0 
+            END AS edad,
+        c.nombre_categoria,
+        a.nombre AS nombre_actividad
+    FROM actividades.actividad_socio act_s
+    INNER JOIN usuarios.socio s ON act_s.id_socio = s.id_socio
+    INNER JOIN usuarios.persona p ON s.id_persona = p.id_persona
+    INNER JOIN actividades.categoria c ON s.id_categoria = c.id_categoria
+    INNER JOIN actividades.actividad a ON act_s.id_actividad = a.id_actividad
+    WHERE act_s.presentismo IS NULL OR UPPER(act_s.presentismo) <> 'P'
+    GROUP BY 
+        p.nombre, p.apellido, p.fecha_nac,
+        c.nombre_categoria, a.nombre
+    ORDER BY 
+        p.apellido, p.nombre;
+END;
+GO
 
 GO
 -- PRUEBAS
@@ -137,5 +166,8 @@ GO
 --EXEC facturacion.IngresosMensualesActividades;
 GO
 -- Reporte 3: 
-EXEC actividades.SociosConInasistencias
+-- EXEC actividades.SociosConInasistencias
+GO
+-- Reporte 4: 
+EXEC actividades.SociosConInasistenciasEnClases; 
 GO
