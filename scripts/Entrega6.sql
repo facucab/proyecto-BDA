@@ -101,15 +101,41 @@ BEGIN
     ORDER BY total_recaudado DESC;
     
 END
+GO
 -- Reporte 3:
+GO
+CREATE OR ALTER PROCEDURE actividades.SociosConInasistencias
+AS
+BEGIN
+    SET NOCOUNT ON;
 
+    SELECT 
+        c.nombre_categoria,
+        a.nombre AS nombre_actividad,
+        COUNT(*) AS cantidad_inasistencias
+    FROM actividades.actividad_socio act_s
+    INNER JOIN usuarios.socio s ON act_s.id_socio = s.id_socio
+    INNER JOIN actividades.categoria c ON s.id_categoria = c.id_categoria
+    INNER JOIN actividades.actividad a ON act_s.id_actividad = a.id_actividad
+    WHERE UPPER(act_s.presentismo) <> 'P'
+    GROUP BY 
+        c.nombre_categoria,
+        a.nombre
+    ORDER BY 
+        cantidad_inasistencias DESC;
+END;
+GO
+-- Reporte 4: 
 
+GO
 -- PRUEBAS
-
+GO
 -- Reporte 1: 
 -- EXEC usuarios.MorososRecurrentes @fechaInicio = '2024-01-05', @fechaFin= '2024-02-06' 
 GO
-
 -- reporte 2
-EXEC facturacion.IngresosMensualesActividades;
+--EXEC facturacion.IngresosMensualesActividades;
+GO
+-- Reporte 3: 
+EXEC actividades.SociosConInasistencias
 GO
