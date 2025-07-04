@@ -1276,63 +1276,42 @@ END
 GO
 
 -- IMPORTACION Y PRUEBAS
-
-EXEC actividades.ImportarCategorias 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx' --'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
+EXEC actividades.ImportarCategorias 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
 select * from actividades.categoria
 GO
 
-EXEC usuarios.ImportarSocios 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx'--'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
+EXEC usuarios.ImportarSocios 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
 select s.*, os.descripcion AS obra_social_descripcion, os.nro_telefono AS obra_social_telefono
 FROM usuarios.socio s
 LEFT JOIN usuarios.obra_social os ON s.id_obra_social = os.id_obra_social
 GO
 
-EXEC actividades.ImportarActividades 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx' --'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
+EXEC actividades.ImportarActividades 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
 SELECT * FROM actividades.actividad
 GO
 
 EXEC facturacion.ImportarClima 
-    @RutaBase = 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx', --N'C:\Users\tomas\Desktop\proyecto-BDA\docs\',
+    @RutaBase = 'C:\Users\tomas\Desktop\proyecto-BDA\docs\',
     @Anio = 2024;
 select * from facturacion.clima 
 GO
 
 EXEC actividades.ImportarCostosPileta
-     @RutaArchivo = 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx',-- 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx',
+     @RutaArchivo = 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx',
      @id_pileta = 1;
      SELECT * FROM actividades.costo
 GO
 
-EXEC usuarios.importarGrupoFamiliar 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx' -- 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
+EXEC usuarios.importarGrupoFamiliar 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
 SELECT * FROM usuarios.grupo_familiar
 GO
 
 
-EXEC facturacion.ImportarFacturas 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx' --'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
+EXEC facturacion.ImportarFacturas 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx' 
 SELECT * FROM facturacion.factura;
 GO
 
-EXEC actividades.ImportarPresentismoActividades 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx'--'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
+EXEC actividades.ImportarPresentismoActividades 'C:\Users\tomas\Desktop\proyecto-BDA\docs\Datos socios.xlsx'
 SELECT * FROM actividades.actividad_socio
 SELECT * FROM usuarios.usuario
 GO
-
--- Consulta: Actividades por socio
-SELECT
-    s.numero_socio AS [Nro de Socio],
-    p_socio.nombre AS [Nombre Socio],
-    p_socio.apellido AS [Apellido Socio],
-    a.nombre AS [Actividad],
-    c.dia AS [Día],
-    c.horario AS [Horario],
-    p_prof.nombre AS [Nombre Profesor],
-    p_prof.apellido AS [Apellido Profesor],
-    u.username AS [Username Profesor]
-FROM actividades.actividad_socio as asoc
-INNER JOIN usuarios.socio s ON asoc.id_socio = s.id_socio
-INNER JOIN usuarios.persona p_socio ON s.id_persona = p_socio.id_persona
-INNER JOIN actividades.actividad a ON asoc.id_actividad = a.id_actividad
-INNER JOIN actividades.clase c ON c.id_actividad = a.id_actividad AND c.id_categoria = s.id_categoria
-INNER JOIN usuarios.usuario u ON c.id_usuario = u.id_usuario
-INNER JOIN usuarios.persona p_prof ON u.id_persona = p_prof.id_persona
-ORDER BY s.numero_socio, a.nombre, c.dia, c.horario;

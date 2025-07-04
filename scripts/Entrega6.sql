@@ -52,9 +52,9 @@ AS
 BEGIN
     SET NOCOUNT ON;
     
-    -- Obtener el año actual para calcular desde enero
+    -- Obtener el aï¿½o actual para calcular desde enero
     DECLARE @anioActual INT = YEAR(GETDATE());
-    DECLARE @fechaInicio DATE = DATEFROMPARTS(@anioActual, 1, 1); -- 1 de enero del año actual
+    DECLARE @fechaInicio DATE = DATEFROMPARTS(@anioActual, 1, 1); -- 1 de enero del aï¿½o actual
     DECLARE @fechaFin DATE = GETDATE(); -- Hasta hoy
     
     -- Resumen total por actividad usando Windows Functions
@@ -90,7 +90,7 @@ BEGIN
     )
     SELECT 
         nombre_actividad AS [Actividad Deportiva],
-        cantidad_socios AS [Total de Socios en el Año],
+        cantidad_socios AS [Total de Socios en el Aï¿½o],
         ROUND(costo_mensual, 2) AS [Costo Unitario],
         ROUND(total_recaudado, 2) AS [Total Recaudado],
         -- Windows Function para ranking final
