@@ -262,7 +262,7 @@ CREATE TABLE actividades.actividad_socio(
 	id_asistencia  INT IDENTITY(1,1) PRIMARY KEY,
 	id_socio INT NOT NULL,
 	id_actividad INT NOT NULL,
-	presentismo  CHAR(2) NULL,
+	presentismo  VARCHAR(2) NULL,
 	fecha DATE NULL
 	CONSTRAINT FK_socio FOREIGN KEY (id_socio) REFERENCES usuarios.socio(id_socio),
 	CONSTRAINT FK_actividad FOREIGN KEY (id_actividad) REFERENCES actividades.actividad(id_actividad)
@@ -3742,7 +3742,7 @@ CREATE OR ALTER PROCEDURE actividades.RegistrarAsistencia
     @id_socio     INT,
     @id_actividad INT,
     @fecha        DATE,
-    @presentismo  CHAR(2) -- 'SI' o 'NO' u otros valores válidos
+    @presentismo  VARCHAR(2) -- 'SI' o 'NO' u otros valores válidos
 AS
 BEGIN
     SET NOCOUNT ON;
@@ -3824,7 +3824,7 @@ BEGIN
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
     END CATCH;
 END;
-GOGO
+GO
 -- ############################################################
 -- ################# SP NOTA DE CRÉDITO #################
 -- ############################################################

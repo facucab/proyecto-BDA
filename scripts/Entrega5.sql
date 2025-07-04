@@ -1105,7 +1105,6 @@ BEGIN
                     @fecha DATE, 
                     @asistencia VARCHAR(15), 
                     @profesor NVARCHAR(100);
-
             -- Variables auxiliares
             DECLARE @id_socio INT, 
                     @id_actividad INT, 
@@ -1114,6 +1113,7 @@ BEGIN
                     @id_persona INT,
                     @id_categoria INT,
                     @dia VARCHAR(9),
+
                     @horario_clase TIME;
 
             -- Cursor para recorrer los datos
@@ -1256,8 +1256,8 @@ BEGIN
                     WHERE id_socio = @id_socio AND id_actividad = @id_actividad
                 )
                 BEGIN
-                    INSERT INTO actividades.actividad_socio(id_socio, id_actividad)
-                    VALUES (@id_socio, @id_actividad);
+                    INSERT INTO actividades.actividad_socio(id_socio, id_actividad, [presentismo], [fecha])
+                    VALUES (@id_socio, @id_actividad,@asistencia, @fecha);
                 END
 
                 SIGUIENTE_REGISTRO:
