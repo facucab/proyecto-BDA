@@ -71,7 +71,6 @@ GRANT SELECT ON actividades.VistaSociosPorClase TO Secretario;
 GRANT EXECUTE ON facturacion.IngresosMensualesActividades TO Secretario;
 GO
 /* TEST*/
-
 /*
 USE Com5600G01;
 CREATE USER usuario_tesoreria WITHOUT LOGIN;
