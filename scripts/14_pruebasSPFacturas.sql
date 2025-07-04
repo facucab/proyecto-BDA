@@ -1,12 +1,12 @@
 /*
-	Entrega 4 - Documento de instalación y configuración
+	Entrega 4 - Documento de instalacion y configuracion
 
 	Trabajo Practico DDBBA Entrega 3 - Grupo 1
 	Comision 5600 - Viernes Tarde 
-	43990422 | Aguirre, Alex Rubén 
-	45234709 | Gauto, Gastón Santiago 
+	43990422 | Aguirre, Alex Ruben 
+	45234709 | Gauto, Gaston Santiago 
 	44363498 | Caballero, Facundo 
-	40993965 | Cornara Perez, Tomás Andrés
+	40993965 | Cornara Perez, Tomas Andres
 
 	Pruebas para Stored Procedures de Factura
 */
@@ -54,7 +54,7 @@ EXEC facturacion.CrearFactura
 	@detalle        = NULL;
 -- Resultado esperado: Error, Metodo de pago no existe.
 
--- Estado de pago vacío
+-- Estado de pago vacï¿½o
 EXEC facturacion.CrearFactura
 	@id_persona     = 3,
 	@id_metodo_pago = 1,
@@ -63,7 +63,7 @@ EXEC facturacion.CrearFactura
 	@detalle        = NULL;
 -- Resultado esperado: Error, El estado de pago es obligatorio.
 
--- Monto a pagar inválido (<= 0)
+-- Monto a pagar invï¿½lido (<= 0)
 EXEC facturacion.CrearFactura
 	@id_persona     = 3,
 	@id_metodo_pago = 1,
@@ -100,19 +100,19 @@ EXEC facturacion.ModificarFactura
 	@estado_pago = 'X';
 -- Resultado esperado: Error, Factura no encontrada.
 
--- Metodo de pago inválido
+-- Metodo de pago invï¿½lido
 EXEC facturacion.ModificarFactura
 	@id_factura     = @fid1,
 	@id_metodo_pago = 999;
 -- Resultado esperado: Error, Metodo de pago no existe.
 
--- Estado de pago vacío
+-- Estado de pago vacï¿½o
 EXEC facturacion.ModificarFactura
 	@id_factura  = @fid1,
 	@estado_pago = '';
 -- Resultado esperado: Error, El estado de pago no puede estar vacio.
 
--- Monto inválido
+-- Monto invï¿½lido
 EXEC facturacion.ModificarFactura
 	@id_factura    = @fid1,
 	@monto_a_pagar = -10.00;

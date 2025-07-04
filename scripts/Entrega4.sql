@@ -1,3 +1,13 @@
+/*
+	Entrega 4 - Documento de instalación y configuración
+	
+	Comision 5600 - Viernes Tarde 
+	43990422 | Aguirre, Alex Rubén 
+	45234709 | Gauto, Gastón Santiago 
+	44363498 | Caballero, Facundo 
+	40993965 | Cornara Perez, Tomás Andrés
+*/
+
 USE master;
 GO
 -- Elimino la BD, si existe: 
@@ -123,7 +133,7 @@ CREATE TABLE usuarios.usuario(
 	ON DELETE CASCADE,
 	CONSTRAINT CK_usuario_username CHECK (
         username NOT LIKE '% %' AND  -- No espacios en blanco
-        username = LOWER(username)  -- Solo min�sculas
+        username = LOWER(username)  -- Solo minusculas
     )
 );
 GO
@@ -259,13 +269,119 @@ CREATE TABLE facturacion.detalle(
 );
 GO
 CREATE TABLE actividades.actividad_socio(
+	id_asistencia  INT IDENTITY(1,1) PRIMARY KEY,
 	id_socio INT NOT NULL,
 	id_actividad INT NOT NULL,
-	PRIMARY KEY (id_socio, id_actividad),
+	presentismo  VARCHAR(2) NULL,
+	fecha DATE NULL
 	CONSTRAINT FK_socio FOREIGN KEY (id_socio) REFERENCES usuarios.socio(id_socio),
 	CONSTRAINT FK_actividad FOREIGN KEY (id_actividad) REFERENCES actividades.actividad(id_actividad)
 );
+
+-- ############################################################
+-- ######################## VISTAS ############################
+-- ############################################################
 GO
+-- Vista completa de socios con datos de persona, obra social, categoría, grupo familiar y pileta
+CREATE OR ALTER VIEW usuarios.VistaSociosCompleta AS
+SELECT
+    s.id_socio,
+    s.numero_socio,
+    p.id_persona,
+    p.dni,
+    p.nombre,
+    p.apellido,
+    p.email,
+    p.fecha_nac,
+    p.telefono,
+    s.telefono_emergencia,
+    s.obra_nro_socio,
+    s.fecha_alta,
+    s.fecha_baja,
+    s.activo AS socio_activo,
+    os.id_obra_social,
+    os.descripcion AS obra_social,
+    os.nro_telefono AS obra_social_telefono,
+    c.id_categoria,
+    c.nombre_categoria,
+    c.costo_membrecia,
+    c.vigencia AS categoria_vigencia,
+    gf.id_grupo_familiar,
+    gf.estado AS grupo_familiar_activo,
+    gf.parentesco AS parentesco_grupo,
+    pl.id_pileta,
+    pl.detalle AS pileta_detalle,
+    pl.metro_cuadrado AS pileta_metro_cuadrado
+FROM usuarios.socio s
+INNER JOIN usuarios.persona p ON s.id_persona = p.id_persona
+LEFT JOIN usuarios.obra_social os ON s.id_obra_social = os.id_obra_social
+INNER JOIN actividades.categoria c ON s.id_categoria = c.id_categoria
+LEFT JOIN usuarios.grupo_familiar gf ON s.id_grupo = gf.id_grupo_familiar
+LEFT JOIN actividades.pileta pl ON s.id_pileta = pl.id_pileta;
+GO
+-- Vista completa de invitados con datos de persona, socio invitador y pileta
+CREATE OR ALTER VIEW usuarios.VistaInvitadosCompleta AS
+SELECT
+    i.id_invitado,
+    p.id_persona,
+    p.dni,
+    p.nombre,
+    p.apellido,
+    p.email,
+    p.fecha_nac,
+    p.telefono,
+    i.fecha_invitacion,
+    s.id_socio AS id_socio_invitador,
+    s.numero_socio AS numero_socio_invitador,
+    sp.nombre AS nombre_socio_invitador,
+    sp.apellido AS apellido_socio_invitador,
+    pl.id_pileta,
+    pl.detalle AS pileta_detalle
+FROM usuarios.invitado i
+INNER JOIN usuarios.persona p ON i.id_persona = p.id_persona
+INNER JOIN usuarios.socio s ON i.id_socio = s.id_socio
+INNER JOIN usuarios.persona sp ON s.id_persona = sp.id_persona
+LEFT JOIN actividades.pileta pl ON i.id_pileta = pl.id_pileta;
+GO
+-- Vista de socios inscriptos por clase (actividad, profesor username, etc.)
+CREATE OR ALTER VIEW actividades.VistaSociosPorClase AS
+SELECT
+    c.id_clase,
+    c.estado AS clase_activa,
+    a.id_actividad,
+    a.nombre AS nombre_actividad,
+    u.id_usuario AS id_profesor,
+    u.username AS username_profesor,
+    s.id_socio,
+    s.numero_socio,
+    ps.nombre AS nombre_socio,
+    ps.apellido AS apellido_socio
+FROM actividades.clase c
+INNER JOIN actividades.actividad a ON c.id_actividad = a.id_actividad
+INNER JOIN actividades.categoria cat ON c.id_categoria = cat.id_categoria
+INNER JOIN usuarios.usuario u ON c.id_usuario = u.id_usuario
+INNER JOIN usuarios.persona up ON u.id_persona = up.id_persona
+LEFT JOIN usuarios.socio s ON s.id_categoria = c.id_categoria
+    AND s.activo = 1
+LEFT JOIN usuarios.persona ps ON s.id_persona = ps.id_persona
+WHERE c.estado = 1;
+GO
+
+CREATE OR ALTER VIEW facturacion.VistaFacturasCompleta AS
+    SELECT 
+        id_factura,
+        id_metodo_pago,
+        estado_pago,
+        fecha_emision,
+        monto_a_pagar,
+        dni,
+        nombre,
+        apellido,
+        email
+    FROM facturacion.factura f
+    INNER JOIN usuarios.persona p ON f.id_persona = p.id_persona
+GO
+
 -- ############################################################
 -- ######################## SP PERSONA ########################
 -- ############################################################
@@ -303,7 +419,7 @@ BEGIN
 	END;
 	-- Valido email: 
 	 IF @email NOT LIKE '%@%.%' OR @email LIKE '@%' OR @email LIKE '%@%@%' BEGIN
-        SELECT 'Error' AS Resultado, 'Formato de email inv�lido.' AS Mensaje, '400' AS Estado;
+        SELECT 'Error' AS Resultado, 'Formato de email invalido.' AS Mensaje, '400' AS Estado;
         RETURN;
     END; 
 	-- Valido nombre
@@ -323,7 +439,7 @@ BEGIN
     END; 
 	-- Valido telefono: 
 	IF @telefono IS NULL OR LEN(@telefono) = 0 BEGIN
-        SELECT 'Error' AS Resultado, 'Tel�fono obligatorio.' AS Mensaje;
+        SELECT 'Error' AS Resultado, 'Telefono obligatorio.' AS Mensaje;
         RETURN;
     END; 
 	-- Inserto en la tabla: 
@@ -366,7 +482,7 @@ AS BEGIN
 	END; 
 	-- Valido email: 
 	 IF @email NOT LIKE '%@%.%' OR @email LIKE '@%' OR @email LIKE '%@%@%' BEGIN
-        SELECT 'Error' AS Resultado, 'Formato de email inv�lido.' AS Mensaje, '400' AS Estado;
+        SELECT 'Error' AS Resultado, 'Formato de email invalido.' AS Mensaje, '400' AS Estado;
         RETURN;
     END; 
 	-- Valido nombre
@@ -386,7 +502,7 @@ AS BEGIN
     END; 
 	-- Valido telefono: 
 	IF @telefono IS NULL OR LEN(@telefono) = 0 BEGIN
-        SELECT 'Error' AS Resultado, 'Tel�fono obligatorio.' AS Mensaje;
+        SELECT 'Error' AS Resultado, 'Telefono obligatorio.' AS Mensaje;
         RETURN;
     END; 
 	BEGIN TRY
@@ -741,8 +857,8 @@ GO
 *   @email                VARCHAR(320)     - Email de la persona.
 *   @fecha_nac            DATE             - Fecha de nacimiento de la persona.
 *   @telefono             VARCHAR(20)      - Telefono de la persona.
-*   @numero_socio         VARCHAR(7)       - Numero de socio (�nico).
-*   @telefono_emergencia  VARCHAR(20) = NULL - Tel�fono de emergencia.
+*   @numero_socio         VARCHAR(7)       - Numero de socio (unico).
+*   @telefono_emergencia  VARCHAR(20) = NULL - Telefono de emergencia.
 *   @obra_nro_socio       VARCHAR(20) = NULL - Numero en obra social.
 *   @id_obra_social       INT         = NULL - FK a usuarios.obra_social.
 *   @id_categoria         INT               - FK a actividades.categoria.
@@ -920,7 +1036,7 @@ BEGIN
             END
         END
 
-        -- 3) Validar email �nico si se proporciona
+        -- 3) Validar email unico si se proporciona
         IF @email IS NOT NULL
            AND EXISTS(SELECT 1 FROM usuarios.persona WHERE email = @email AND id_persona <> @persona_id) 
         BEGIN
@@ -929,7 +1045,7 @@ BEGIN
             RETURN;
         END;
 
-        -- 4) Numero_socio �nico
+        -- 4) Numero_socio unico
         IF @numero_socio IS NOT NULL
            AND EXISTS(SELECT 1 FROM usuarios.socio WHERE numero_socio = @numero_socio AND id_socio <> @id_socio) 
         BEGIN
@@ -961,7 +1077,7 @@ BEGIN
            AND NOT EXISTS(SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @id_grupo AND estado = 1)
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Grupo familiar no existe o est� inactivo' AS Mensaje, '404' AS Estado;
+            SELECT 'Error' AS Resultado, 'Grupo familiar no existe o esta inactivo' AS Mensaje, '404' AS Estado;
             RETURN;
         END;
 
@@ -1047,10 +1163,10 @@ GO
 * Nombre: CrearInvitado
 * Descripcion: Crea un invitado, reutilizando o creando la persona asociada.
 *   - @id_socio es obligatorio y debe existir y estar activo.
-*   - Si se pasa @id_persona y existe y est� activa, se reutiliza.
+*   - Si se pasa @id_persona y existe y esta activa, se reutiliza.
 *   - Si no, se requieren todos los datos de persona para crearla.
-*   - Verifica que la persona no est� ya invitada.
-* Transacci�n expl�cita porque afecta a dos tablas: persona e invitado.
+*   - Verifica que la persona no esta ya invitada.
+* Transaccion explicita porque afecta a dos tablas: persona e invitado.
 */
 CREATE OR ALTER PROCEDURE usuarios.CrearInvitado
     @id_persona     INT           = NULL,
@@ -1095,7 +1211,7 @@ BEGIN
         END
         ELSE
         BEGIN
-            -- Validar que todos los campos obligatorios est�n presentes
+            -- Validar que todos los campos obligatorios estan presentes
             IF @dni IS NULL OR @nombre IS NULL OR @apellido IS NULL
                OR @email IS NULL OR @fecha_nac IS NULL OR @telefono IS NULL
             BEGIN
@@ -1127,7 +1243,7 @@ BEGIN
             SET @new_persona = SCOPE_IDENTITY();
         END;
 
-        -- 3) Verificar que la persona no est� ya invitada por el mismo socio
+        -- 3) Verificar que la persona no esta ya invitada por el mismo socio
         IF EXISTS(
             SELECT 1 
             FROM usuarios.invitado 
@@ -1136,11 +1252,11 @@ BEGIN
         )
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'La persona ya est� invitada por este socio' AS Mensaje, '400' AS Estado;
+            SELECT 'Error' AS Resultado, 'La persona ya esta invitada por este socio' AS Mensaje, '400' AS Estado;
             RETURN;
         END;
 
-        -- 4) Verificar que la pileta exista (si se proporcion�)
+        -- 4) Verificar que la pileta exista (si se proporciona)
         IF @id_pileta IS NOT NULL 
            AND NOT EXISTS(SELECT 1 FROM actividades.pileta WHERE id_pileta = @id_pileta)
         BEGIN
@@ -1168,8 +1284,8 @@ GO
 *   - @id_invitado obligatorio.
 *   - Permite cambiar datos de la persona (dni, nombre, apellido, email, fecha_nac, telefono).
 *   - Permite cambiar el socio invitador (@new_id_socio).
-*   - No crea nuevas personas: actualiza la existente v�a usuarios.ModificarPersona.
-* Transacci�n expl�cita porque puede afectar persona e invitado.
+*   - No crea nuevas personas: actualiza la existente via usuarios.ModificarPersona.
+* Transaccion explicita porque puede afectar persona e invitado.
 */
 CREATE OR ALTER PROCEDURE usuarios.ModificarInvitado
     @id_invitado    INT,             
@@ -1288,7 +1404,7 @@ GO
 *   - @id_invitado obligatorio.
 *   - Marca activo=0 a la persona usando usuarios.EliminarPersona.
 *   - Luego elimina el registro de invitado.
-* Transacci�n expl�cita porque afecta invitado y persona.
+* Transaccion explicita porque afecta invitado y persona.
 */
 CREATE OR ALTER PROCEDURE usuarios.EliminarInvitado
     @id_invitado INT
@@ -1339,15 +1455,15 @@ GO
 * Nombre: CrearUsuario
 * Descripcion: Crea un usuario reutilizando o creando la persona asociada.
 * Parametros:
-*   @id_persona    INT           = NULL  � Si existe y activo, se reutiliza; si no, se crea.
-*   @dni           VARCHAR(9)           � DNI de la persona.
-*   @nombre        VARCHAR(50)          � Nombre de la persona.
-*   @apellido      VARCHAR(50)          � Apellido de la persona.
-*   @email         VARCHAR(320)         � Email de la persona.
-*   @fecha_nac     DATE                 � Fecha de nacimiento de la persona.
-*   @telefono      VARCHAR(20)          � Tel�fono de la persona.
-*   @username      VARCHAR(50)          � Nombre de usuario (�nico, sin espacios, min�sculas).
-*   @password_hash VARCHAR(256)         � Hash de la contrase�a.
+*   @id_persona    INT           = NULL   Si existe y activo, se reutiliza; si no, se crea.
+*   @dni           VARCHAR(9)            DNI de la persona.
+*   @nombre        VARCHAR(50)           Nombre de la persona.
+*   @apellido      VARCHAR(50)           Apellido de la persona.
+*   @email         VARCHAR(320)          Email de la persona.
+*   @fecha_nac     DATE                  Fecha de nacimiento de la persona.
+*   @telefono      VARCHAR(20)           Telefono de la persona.
+*   @username      VARCHAR(50)           Nombre de usuario (unico, sin espacios, minusculas).
+*   @password_hash VARCHAR(256)          Hash de la contraseña.
 */
 CREATE OR ALTER PROCEDURE usuarios.CrearUsuario
     @id_persona    INT           = NULL,
@@ -1396,7 +1512,7 @@ BEGIN
         IF @username LIKE '% %' OR @username <> LOWER(@username)
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'El username no debe tener espacios y debe estar en min�sculas' AS Mensaje, '400' AS Estado;
+            SELECT 'Error' AS Resultado, 'El username no debe tener espacios y debe estar en minusculas' AS Mensaje, '400' AS Estado;
             RETURN;
         END
         IF EXISTS(SELECT 1 FROM usuarios.usuario WHERE LOWER(username) = LOWER(@username))
@@ -1431,17 +1547,17 @@ GO
 * Nombre: ModificarUsuario
 * Descripcion: Modifica un usuario y/o sus datos de persona asociados.
 * Parametros:
-*   @id_usuario     INT             � ID del usuario a modificar.
-*   @new_id_persona INT           = NULL � (Opcional) Reasignar o crear nueva persona.
-*   @dni            VARCHAR(9)    = NULL � (Opcional) Nuevo DNI.
-*   @nombre         VARCHAR(50)   = NULL � (Opcional) Nuevo nombre.
-*   @apellido       VARCHAR(50)   = NULL � (Opcional) Nuevo apellido.
-*   @email          VARCHAR(320)  = NULL � (Opcional) Nuevo email.
-*   @fecha_nac      DATE          = NULL � (Opcional) Nueva fecha de nacimiento.
-*   @telefono       VARCHAR(20)   = NULL � (Opcional) Nuevo tel�fono.
-*   @username       VARCHAR(50)   = NULL � (Opcional) Nuevo username.
-*   @password_hash  VARCHAR(256)  = NULL � (Opcional) Nuevo hash de contrase�a.
-*   @estado         BIT           = NULL � (Opcional) Nuevo estado (1=activo,0=inactivo).
+*   @id_usuario     INT             ID del usuario a modificar.
+*   @new_id_persona INT           = NULL (Opcional) Reasignar o crear nueva persona.
+*   @dni            VARCHAR(9)    = NULL (Opcional) Nuevo DNI.
+*   @nombre         VARCHAR(50)   = NULL (Opcional) Nuevo nombre.
+*   @apellido       VARCHAR(50)   = NULL (Opcional) Nuevo apellido.
+*   @email          VARCHAR(320)  = NULL (Opcional) Nuevo email.
+*   @fecha_nac      DATE          = NULL (Opcional) Nueva fecha de nacimiento.
+*   @telefono       VARCHAR(20)   = NULL (Opcional) Nuevo telefono.
+*   @username       VARCHAR(50)   = NULL (Opcional) Nuevo username.
+*   @password_hash  VARCHAR(256)  = NULL (Opcional) Nuevo hash de contraseña.
+*   @estado         BIT           = NULL (Opcional) Nuevo estado (1=activo,0=inactivo).
 */
 CREATE OR ALTER PROCEDURE usuarios.ModificarUsuario
     @id_usuario     INT,
@@ -1477,7 +1593,7 @@ BEGIN
           FROM usuarios.usuario
          WHERE id_usuario = @id_usuario;
 
-        -- 3) Reasignar o crear persona si se pidi�
+        -- 3) Reasignar o crear persona si se pide
         IF @new_id_persona IS NOT NULL
         BEGIN
             IF EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @new_id_persona AND activo = 1)
@@ -1557,7 +1673,7 @@ BEGIN
                OR @username <> LOWER(@username)
             BEGIN
                 ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'Username inv�lido (espacios o may�sculas)' AS Mensaje, '400' AS Estado;
+                SELECT 'Error' AS Resultado, 'Username invalido (espacios o mayusculas)' AS Mensaje, '400' AS Estado;
                 RETURN;
             END;
             IF EXISTS(SELECT 1 FROM usuarios.usuario WHERE username = @username AND id_usuario <> @id_usuario)
@@ -1572,7 +1688,7 @@ BEGIN
         IF @password_hash IS NOT NULL AND LEN(@password_hash) = 0
         BEGIN
             ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'Password_hash inv�lido' AS Mensaje, '400' AS Estado;
+            SELECT 'Error' AS Resultado, 'Password_hash invalido' AS Mensaje, '400' AS Estado;
             RETURN;
         END;
 
@@ -1595,9 +1711,9 @@ END;
 GO
 /*
 * Nombre: EliminarUsuario
-* Descripcion: Realiza eliminaci�n l�gica de un usuario (marca estado=0).
+* Descripcion: Realiza eliminacion logica de un usuario (marca estado=0).
 * Parametros:
-*   @id_usuario INT � ID del usuario a eliminar.
+*   @id_usuario INT ID del usuario a eliminar.
 */
 CREATE OR ALTER PROCEDURE usuarios.EliminarUsuario
     @id_usuario INT
@@ -1629,16 +1745,16 @@ GO
 * Nombre: CrearResponsable
 * Descripcion: Crea un responsable, reutilizando o creando la persona asociada.
 * Parametros:
-*   @id_persona  INT           = NULL  � Si existe y activo, se reutiliza; si no, se crea.
-*   @dni         VARCHAR(9)           � DNI de la persona.
-*   @nombre      VARCHAR(50)          � Nombre de la persona.
-*   @apellido    VARCHAR(50)          � Apellido de la persona.
-*   @email       VARCHAR(320)         � Email de la persona.
-*   @fecha_nac   DATE                 � Fecha de nacimiento.
-*   @telefono    VARCHAR(20)          � Tel�fono de la persona.
-*   @id_grupo    INT                  � FK a usuarios.grupo_familiar.
-*   @parentesco  VARCHAR(10)          � Parentesco de la persona con el grupo.
-* Aclaracion: Se utiliza transacci�n expl�cita porque se afectan dos tablas.
+*   @id_persona  INT           = NULL   Si existe y activo, se reutiliza; si no, se crea.
+*   @dni         VARCHAR(9)            DNI de la persona.
+*   @nombre      VARCHAR(50)           Nombre de la persona.
+*   @apellido    VARCHAR(50)           Apellido de la persona.
+*   @email       VARCHAR(320)          Email de la persona.
+*   @fecha_nac   DATE                  Fecha de nacimiento.
+*   @telefono    VARCHAR(20)           Telefono de la persona.
+*   @id_grupo    INT                  FK a usuarios.grupo_familiar.
+*   @parentesco  VARCHAR(10)           Parentesco de la persona con el grupo.
+* Aclaracion: Se utiliza transaccion explicita porque se afectan dos tablas.
 */
 CREATE OR ALTER PROCEDURE usuarios.CrearResponsable
     @id_persona  INT = NULL,
@@ -1731,17 +1847,17 @@ GO
 * Nombre: ModificarResponsable
 * Descripcion: Modifica un responsable y/o sus datos de persona asociados.
 * Parametros:
-*   @id_responsable INT           � ID del responsable a modificar.
-*   @new_id_persona  INT     = NULL � (Opcional) Reasignar o crear nueva persona.
-*   @dni             VARCHAR(9)    = NULL � (Opcional) Nuevo DNI.
-*   @nombre          VARCHAR(50)   = NULL � (Opcional) Nuevo nombre.
-*   @apellido        VARCHAR(50)   = NULL � (Opcional) Nuevo apellido.
-*   @email           VARCHAR(320)  = NULL � (Opcional) Nuevo email.
-*   @fecha_nac       DATE          = NULL � (Opcional) Nueva fecha de nacimiento.
-*   @telefono        VARCHAR(20)   = NULL � (Opcional) Nuevo tel�fono.
-*   @new_id_grupo    INT           = NULL � (Opcional) Nuevo grupo familiar.
-*   @parentesco      VARCHAR(10)   = NULL � (Opcional) Nuevo parentesco.
-* Aclaracion: Se utiliza transacci�n expl�cita porque puede afectar varias tablas.
+*   @id_responsable INT           ID del responsable a modificar.
+*   @new_id_persona  INT     = NULL (Opcional) Reasignar o crear nueva persona.
+*   @dni             VARCHAR(9)    = NULL (Opcional) Nuevo DNI.
+*   @nombre          VARCHAR(50)   = NULL (Opcional) Nuevo nombre.
+*   @apellido        VARCHAR(50)   = NULL (Opcional) Nuevo apellido.
+*   @email           VARCHAR(320)  = NULL (Opcional) Nuevo email.
+*   @fecha_nac       DATE          = NULL (Opcional) Nueva fecha de nacimiento.
+*   @telefono        VARCHAR(20)   = NULL (Opcional) Nuevo telefono.
+*   @new_id_grupo    INT           = NULL (Opcional) Nuevo grupo familiar.
+*   @parentesco      VARCHAR(10)   = NULL (Opcional) Nuevo parentesco.
+* Aclaracion: Se utiliza transaccion explicita porque puede afectar varias tablas.
 */
 CREATE OR ALTER PROCEDURE usuarios.ModificarResponsable
     @id_responsable INT,
@@ -1776,7 +1892,7 @@ BEGIN
           FROM usuarios.responsable
          WHERE id_responsable = @id_responsable;
 
-        -- 3) Reasignar o crear persona si se pidi�
+        -- 3) Reasignar o crear persona si se pide
         IF @new_id_persona IS NOT NULL
         BEGIN
             IF EXISTS(SELECT 1 FROM usuarios.persona WHERE id_persona = @new_id_persona AND activo = 1)
@@ -1803,7 +1919,7 @@ BEGIN
 			IF LEN(@dni) < 7 OR LEN(@dni) > 9 OR @dni LIKE '%[^0-9]%'
 			BEGIN
 				ROLLBACK TRANSACTION;
-				SELECT 'Error' AS Resultado, 'DNI inv�lido. Debe contener entre 7 y 9 digitos numericos.' AS Mensaje, '400' AS Estado;
+				SELECT 'Error' AS Resultado, 'DNI invalido. Debe contener entre 7 y 9 digitos numericos.' AS Mensaje, '400' AS Estado;
 				RETURN;
 			END;
 			-- 4.2) Unicidad
@@ -1844,7 +1960,7 @@ BEGIN
                 @telefono   = @telefono;
         END;
 
-        -- 6) Validar grupo si se pidi�
+        -- 6) Validar grupo si se pide
         IF @new_id_grupo IS NOT NULL
         BEGIN
             IF NOT EXISTS(SELECT 1 FROM usuarios.grupo_familiar WHERE id_grupo_familiar = @new_id_grupo AND estado = 1)
@@ -1861,13 +1977,13 @@ BEGIN
             END;
         END;
 
-        -- 7) Validar parentesco si se pidi�
+        -- 7) Validar parentesco si se pide
         IF @parentesco IS NOT NULL
         BEGIN
             IF LTRIM(RTRIM(@parentesco)) = ''
             BEGIN
                 ROLLBACK TRANSACTION;
-                SELECT 'Error' AS Resultado, 'El parentesco no puede estar vac�o' AS Mensaje, '400' AS Estado;
+                SELECT 'Error' AS Resultado, 'El parentesco no puede estar vacio' AS Mensaje, '400' AS Estado;
                 RETURN;
             END;
         END;
@@ -1893,10 +2009,10 @@ END;
 GO
 /*
 * Nombre: EliminarResponsable
-* Descripcion: Realiza eliminaci�n f�sica de un responsable.
+* Descripcion: Realiza eliminacion fisica de un responsable.
 * Parametros:
-*   @id_responsable INT � ID del responsable a eliminar.
-* Aclaracion: No se utiliza transacci�n expl�cita ya que solo se trabaja con una �nica tabla.
+*   @id_responsable INT ID del responsable a eliminar.
+* Aclaracion: No se utiliza transaccion explicita ya que solo se trabaja con una unica tabla.
 */
 CREATE OR ALTER PROCEDURE usuarios.EliminarResponsable
     @id_responsable INT
@@ -2097,12 +2213,12 @@ BEGIN
 			WHERE id_usuario = @id_usuario AND id_rol = @id_rol
 		)
 		BEGIN
-			SELECT 'Error' AS Resultado, 'El rol ya est� asignado al usuario' AS Mensaje, '409' AS Estado;
+			SELECT 'Error' AS Resultado, 'El rol ya esta asignado al usuario' AS Mensaje, '409' AS Estado;
 			ROLLBACK;
 			RETURN;
 		END;
 
-		-- Insertar asignaci�n
+		-- Insertar asignacion
 		INSERT INTO usuarios.usuario_rol (id_usuario, id_rol)
 		VALUES (@id_usuario, @id_rol);
 
@@ -2157,12 +2273,12 @@ GO
 GO
 /*
 * Nombre: CrearCategoria
-* Descripcion: Inserta una nueva categor�a en la tabla actividades.categoria, validando su informaci�n.
+* Descripcion: Inserta una nueva categoria en la tabla actividades.categoria, validando su informacion.
 * Parametros:
-*   @nombre_categoria VARCHAR(50) - Nombre de la categor�a.
-*   @costo_membrecia  DECIMAL(10,2) - Costo de membres�a (debe ser > 0).
-*   @vigencia         DATE - Fecha de vigencia de la categor�a.
-* Aclaracion: No se utilizan transacciones expl�citas ya que solo se trabaja con una �nica tabla.
+*   @nombre_categoria VARCHAR(50) - Nombre de la categoria.
+*   @costo_membrecia  DECIMAL(10,2) - Costo de membresia (debe ser > 0).
+*   @vigencia         DATE - Fecha de vigencia de la categoria.
+* Aclaracion: No se utilizan transacciones explicitas ya que solo se trabaja con una unica tabla.
 */
 CREATE OR ALTER PROCEDURE actividades.CrearCategoria
     @nombre_categoria VARCHAR(50),
@@ -2210,13 +2326,13 @@ END;
 GO
 /*
 * Nombre: ModificarCategoria
-* Descripcion: Modifica los datos de una categor�a existente, validando su informaci�n.
+* Descripcion: Modifica los datos de una categoria existente, validando su informacion.
 * Parametros:
-*   @id_categoria     INT - ID de la categor�a a modificar.
-*   @nombre_categoria VARCHAR(50) - Nuevo nombre de la categor�a.
-*   @costo_membrecia  DECIMAL(10,2) - Nuevo costo de membres�a (debe ser > 0).
+*   @id_categoria     INT - ID de la categoria a modificar.
+*   @nombre_categoria VARCHAR(50) - Nuevo nombre de la categoria.
+*   @costo_membrecia  DECIMAL(10,2) - Nuevo costo de membresia (debe ser > 0).
 *   @vigencia         DATE - Nueva fecha de vigencia.
-* Aclaracion: No se utilizan transacciones expl�citas ya que solo se trabaja con una �nica tabla.
+* Aclaracion: No se utilizan transacciones explicitas ya que solo se trabaja con una unica tabla.
 */
 CREATE OR ALTER PROCEDURE actividades.ModificarCategoria
     @id_categoria     INT,
@@ -2288,10 +2404,10 @@ END;
 GO
 /*
 * Nombre: EliminarCategoria
-* Descripcion: Elimina f�sicamente una categor�a de la tabla actividades.categoria.
+* Descripcion: Elimina fisicamente una categoria de la tabla actividades.categoria.
 * Parametros:
-*   @id_categoria INT - ID de la categor�a a eliminar.
-* Aclaracion: No se utilizan transacciones expl�citas ya que solo se trabaja con una �nica tabla.
+*   @id_categoria INT - ID de la categoria a eliminar.
+* Aclaracion: No se utilizan transacciones explicitas ya que solo se trabaja con una unica tabla.
 */
 CREATE OR ALTER PROCEDURE actividades.EliminarCategoria
     @id_categoria INT
@@ -2301,13 +2417,13 @@ BEGIN
     -- Valido existencia
     IF NOT EXISTS (SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
     BEGIN
-        SELECT 'Error' AS Resultado, 'Categor�a no encontrada' AS Mensaje, '404' AS Estado;
+        SELECT 'Error' AS Resultado, 'Categoria no encontrada' AS Mensaje, '404' AS Estado;
         RETURN;
     END;
     BEGIN TRY
         DELETE FROM actividades.categoria
         WHERE id_categoria = @id_categoria;
-        SELECT 'OK' AS Resultado, 'Categor�a eliminada correctamente' AS Mensaje, '200' AS Estado;
+        SELECT 'OK' AS Resultado, 'Categoria eliminada correctamente' AS Mensaje, '200' AS Estado;
     END TRY
 
     BEGIN CATCH
@@ -2322,15 +2438,15 @@ GO
 GO
 /*
 * Nombre: CrearActividad
-* Descripcion: Crea una nueva actividad, validando que el nombre no exista y que el costo sea v�lido.
+* Descripcion: Crea una nueva actividad, validando que el nombre no exista y que el costo sea valido.
 * Parametros:
 *   @nombre_actividad VARCHAR(100) - Nombre de la actividad.
 *   @costo_mensual DECIMAL(10,2) - Costo mensual de la actividad.
 * Valores de retorno:
-*    0: �xito.
-*   -1: El nombre de la actividad es nulo o vac�o.
+*    0: Exito.
+*   -1: El nombre de la actividad es nulo o vacio.
 *   -2: Ya existe una actividad con ese nombre.
-*   -3: El costo mensual es inv�lido.
+*   -3: El costo mensual es invalido.
 *  -999: Error desconocido.
 */
 CREATE OR ALTER PROCEDURE actividades.CrearActividad
@@ -2381,18 +2497,18 @@ END;
 GO
 /*
 * Nombre: ModificarActividad
-* Descripcion: Modifica el nombre y el costo mensual de una actividad existente, validando que el nombre no se repita y que el costo sea v�lido.
+* Descripcion: Modifica el nombre y el costo mensual de una actividad existente, validando que el nombre no se repita y que el costo sea valido.
 * Parametros:
 *   @id INT - ID de la actividad a modificar.
 *   @nombre_actividad VARCHAR(100) - Nuevo nombre de la actividad.
 *   @costo_mensual DECIMAL(10,2) - Nuevo costo mensual de la actividad.
 * Valores de retorno:
-*    0: �xito.
+*    0: Exito.
 *   -1: ID nulo.
 *   -2: ID no existente.
-*   -3: El nombre de la actividad es nulo o vac�o.
+*   -3: El nombre de la actividad es nulo o vacio.
 *   -4: Ya existe una actividad con ese nombre.
-*   -5: El costo mensual es inv�lido.
+*   -5: El costo mensual es invalido.
 *  -999: Error desconocido.
 */
 CREATE OR ALTER PROCEDURE actividades.ModificarActividad
@@ -2463,11 +2579,11 @@ END;
 GO
 /*
 * Nombre: EliminarActividad
-* Descripcion: Realiza una eliminaci�n l�gica de una actividad, cambiando su estado a inactiva.
+* Descripcion: Realiza una eliminacion logica de una actividad, cambiando su estado a inactiva.
 * Parametros:
 *   @id INT - ID de la actividad a eliminar.
 * Valores de retorno:
-*    0: �xito.
+*    0: Exito.
 *   -1: ID nulo.
 *   -2: ID no existente o ya eliminada.
 *  -999: Error desconocido.
@@ -2484,17 +2600,17 @@ BEGIN
 			RETURN -1;
 		END
 
-		-- Verifico que exista en la tabla y que est� activa
+		-- Verifico que exista en la tabla y que esta activa.
 		IF NOT EXISTS (SELECT 1 FROM actividades.actividad WHERE id_actividad = @id AND estado = 1)
 		BEGIN
 			SELECT 'Error' AS Resultado, 'id no existente o ya eliminada' AS Mensaje;
 			RETURN -2;
 		END
 
-		-- Eliminaci�n logica
+		-- Eliminacion logica
 		UPDATE actividades.actividad SET estado = 0 WHERE id_actividad = @id;
 
-		SELECT 'Exito' AS Resultado, 'Actividad eliminada l�gicamente correctamente' AS Mensaje;
+		SELECT 'Exito' AS Resultado, 'Actividad eliminada logicamente correctamente' AS Mensaje;
 		RETURN 0;
 	END TRY
 
@@ -2542,11 +2658,11 @@ BEGIN
 		IF NOT EXISTS (SELECT 1 FROM actividades.actividad WHERE id_actividad = @id_actividad AND estado = 1)
 		BEGIN
 			ROLLBACK TRANSACTION;
-			SELECT 'Error' AS Resultado, 'La actividad no existe o no est� activa' AS Mensaje, '404' AS Estado;
+			SELECT 'Error' AS Resultado, 'La actividad no existe o no esta activa' AS Mensaje, '404' AS Estado;
 			RETURN -1;
 		END;
 		
-		-- 2) Validar categoria (asumiendo que tambi�n tiene estado)
+		-- 2) Validar categoria (asumiendo que tambien tiene estado)
 		IF NOT EXISTS (SELECT 1 FROM actividades.categoria WHERE id_categoria = @id_categoria)
 		BEGIN
 			ROLLBACK TRANSACTION;
@@ -2562,7 +2678,7 @@ BEGIN
 			RETURN -3;
 		END;
 		
-		-- 4) Normalizar d�a (la validaci�n la hace el constraint de la tabla)
+		-- 4) Normalizar dia (la validacion la hace el constraint de la tabla)
 		SET @dia = LOWER(LTRIM(RTRIM(@dia)));
 		
 		-- 5) Validar horario
@@ -2804,10 +2920,10 @@ GO
 GO	
 /*
 * Nombre: CrearMetodoPago
-* Descripcion: Crea un nuevo m�todo de pago, validando que el nombre no sea nulo, vac�o ni repetido.
+* Descripcion: Crea un nuevo metodo de pago, validando que el nombre no sea nulo, vacio ni repetido.
 * Parametros:
-*   @nombre VARCHAR(50) - Nombre del m�todo de pago.
-* Aclaracion: No se utilizan transacciones expl�citas ya que solo se trabaja con una �nica tabla.
+*   @nombre VARCHAR(50) - Nombre del metodo de pago.
+* Aclaracion: No se utilizan transacciones explicitas ya que solo se trabaja con una unica tabla.
 */
 CREATE OR ALTER PROCEDURE facturacion.CrearMetodoPago
     @nombre VARCHAR(50)
@@ -2825,14 +2941,14 @@ BEGIN
     -- Valido duplicado
     IF EXISTS (SELECT 1 FROM facturacion.metodo_pago WHERE nombre = LTRIM(RTRIM(@nombre)))
     BEGIN
-        SELECT 'Error' AS Resultado, 'Ya existe un m�todo de pago con ese nombre' AS Mensaje, '400' AS Estado;
+        SELECT 'Error' AS Resultado, 'Ya existe un metodo de pago con ese nombre' AS Mensaje, '400' AS Estado;
         RETURN;
     END;
 
     BEGIN TRY
         INSERT INTO facturacion.metodo_pago(nombre)
         VALUES (LTRIM(RTRIM(@nombre)));
-        SELECT 'OK' AS Resultado, 'M�todo de pago creado correctamente' AS Mensaje, '200' AS Estado;
+        SELECT 'OK' AS Resultado, 'Metodo de pago creado correctamente' AS Mensaje, '200' AS Estado;
     END TRY
 
     BEGIN CATCH
@@ -2843,11 +2959,11 @@ END;
 GO
 /*
 * Nombre: ModificarMetodoPago
-* Descripcion: Modifica el nombre de un m�todo de pago existente, validando par�metros y unicidad.
+* Descripcion: Modifica el nombre de un metodo de pago existente, validando parametros y unicidad.
 * Parametros:
-*   @id_metodo_pago INT     - ID del m�todo de pago a modificar.
+*   @id_metodo_pago INT     - ID del metodo de pago a modificar.
 *   @nombre          VARCHAR(50) - Nuevo nombre. Opcional.
-* Aclaracion: No se utilizan transacciones expl�citas ya que solo se trabaja con una �nica tabla.
+* Aclaracion: No se utilizan transacciones explicitas ya que solo se trabaja con una unica tabla.
 */
 CREATE OR ALTER PROCEDURE facturacion.ModificarMetodoPago
     @id_metodo_pago INT,
@@ -2859,7 +2975,7 @@ BEGIN
     -- Valido existencia
     IF NOT EXISTS (SELECT 1 FROM facturacion.metodo_pago WHERE id_metodo_pago = @id_metodo_pago)
     BEGIN
-        SELECT 'Error' AS Resultado, 'M�todo de pago no encontrado' AS Mensaje, '404' AS Estado;
+        SELECT 'Error' AS Resultado, 'Metodo de pago no encontrado' AS Mensaje, '404' AS Estado;
         RETURN;
     END;
 
@@ -2873,7 +2989,7 @@ BEGIN
     -- Valido duplicado en otro registro
     IF EXISTS (SELECT 1 FROM facturacion.metodo_pago WHERE nombre = LTRIM(RTRIM(@nombre)) AND id_metodo_pago <> @id_metodo_pago)
     BEGIN
-        SELECT 'Error' AS Resultado, 'Ya existe otro m�todo de pago con ese nombre' AS Mensaje, '400' AS Estado;
+        SELECT 'Error' AS Resultado, 'Ya existe otro metodo de pago con ese nombre' AS Mensaje, '400' AS Estado;
         RETURN;
     END;
 
@@ -2881,7 +2997,7 @@ BEGIN
         UPDATE facturacion.metodo_pago
         SET nombre = LTRIM(RTRIM(@nombre))
         WHERE id_metodo_pago = @id_metodo_pago;
-        SELECT 'OK' AS Resultado, 'M�todo de pago modificado correctamente' AS Mensaje, '200' AS Estado;
+        SELECT 'OK' AS Resultado, 'Metodo de pago modificado correctamente' AS Mensaje, '200' AS Estado;
     END TRY
 
     BEGIN CATCH
@@ -2892,10 +3008,10 @@ END;
 GO
 /*
 * Nombre: EliminarMetodoPago
-* Descripcion: Elimina f�sicamente un m�todo de pago.
+* Descripcion: Elimina fisicamente un metodo de pago.
 * Parametros:
-*   @id_metodo_pago INT - ID del m�todo de pago a eliminar.
-* Aclaracion: No se utilizan transacciones expl�citas ya que solo se trabaja con una �nica tabla.
+*   @id_metodo_pago INT - ID del metodo de pago a eliminar.
+* Aclaracion: No se utilizan transacciones explicitas ya que solo se trabaja con una unica tabla.
 */
 CREATE OR ALTER PROCEDURE facturacion.EliminarMetodoPago
     @id_metodo_pago INT
@@ -2906,14 +3022,14 @@ BEGIN
     -- Valido existencia
     IF NOT EXISTS (SELECT 1 FROM facturacion.metodo_pago WHERE id_metodo_pago = @id_metodo_pago)
     BEGIN
-        SELECT 'Error' AS Resultado, 'M�todo de pago no encontrado' AS Mensaje, '404' AS Estado;
+        SELECT 'Error' AS Resultado, 'Metodo de pago no encontrado' AS Mensaje, '404' AS Estado;
         RETURN;
     END;
 
     BEGIN TRY
         DELETE FROM facturacion.metodo_pago
         WHERE id_metodo_pago = @id_metodo_pago;
-        SELECT 'OK' AS Resultado, 'M�todo de pago eliminado correctamente' AS Mensaje, '200' AS Estado;
+        SELECT 'OK' AS Resultado, 'Metodo de pago eliminado correctamente' AS Mensaje, '200' AS Estado;
     END TRY
 
     BEGIN CATCH
@@ -3099,11 +3215,11 @@ GO
 GO
 /*
 * Nombre: CrearDescuento
-* Descripcion: Inserta un nuevo descuento en la tabla facturacion.descuento, validando su informaci�n.
+* Descripcion: Inserta un nuevo descuento en la tabla facturacion.descuento, validando su informacion.
 * Parametros:
-*   @descripcion VARCHAR(100) - Descripci�n del descuento.
+*   @descripcion VARCHAR(100) - Descripcion del descuento.
 *   @cantidad    DECIMAL(10,2) - Valor del descuento (>= 0).
-* Aclaracion: No se utilizan transacciones expl�citas ya que solo se trabaja con una �nica tabla.
+* Aclaracion: No se utilizan transacciones explicitas ya que solo se trabaja con una unica tabla.
 */
 CREATE OR ALTER PROCEDURE facturacion.CrearDescuento
     @descripcion VARCHAR(100),
@@ -3112,17 +3228,17 @@ AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Valido descripci�n
+    -- Valido descripcion
     IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
     BEGIN
-        SELECT 'Error' AS Resultado, 'La descripci�n es obligatoria' AS Mensaje, '400' AS Estado;
+        SELECT 'Error' AS Resultado, 'La descripcion es obligatoria' AS Mensaje, '400' AS Estado;
         RETURN;
     END;
 
     -- Valido cantidad
     IF @cantidad < 0
     BEGIN
-        SELECT 'Error' AS Resultado, 'Cantidad inv�lida. Debe ser mayor o igual a 0' AS Mensaje, '400' AS Estado;
+        SELECT 'Error' AS Resultado, 'Cantidad invalida. Debe ser mayor o igual a 0' AS Mensaje, '400' AS Estado;
         RETURN;
     END;
 
@@ -3143,9 +3259,9 @@ GO
 * Descripcion: Modifica los datos de un descuento existente.
 * Parametros:
 *   @id_descuento INT           - ID del descuento a modificar.
-*   @descripcion  VARCHAR(100)  - Nueva descripci�n. Obligatoria.
+*   @descripcion  VARCHAR(100)  - Nueva descripcion. Obligatoria.
 *   @cantidad     DECIMAL(10,2) - Nuevo valor del descuento (>= 0). Obligatorio.
-* Aclaracion: No se utilizan transacciones expl�citas ya que solo se trabaja con una �nica tabla.
+* Aclaracion: No se utilizan transacciones explicitas ya que solo se trabaja con una unica tabla.
 */
 CREATE OR ALTER PROCEDURE facturacion.ModificarDescuento
     @id_descuento INT,
@@ -3162,17 +3278,17 @@ BEGIN
         RETURN;
     END;
 
-    -- Valido descripci�n
+    -- Valido descripcion
     IF @descripcion IS NULL OR LTRIM(RTRIM(@descripcion)) = ''
     BEGIN
-        SELECT 'Error' AS Resultado, 'La descripci�n es obligatoria' AS Mensaje, '400' AS Estado;
+        SELECT 'Error' AS Resultado, 'La descripcion es obligatoria' AS Mensaje, '400' AS Estado;
         RETURN;
     END;
 
     -- Valido cantidad
     IF @cantidad < 0
     BEGIN
-        SELECT 'Error' AS Resultado, 'Cantidad inv�lida. Debe ser mayor o igual a 0' AS Mensaje, '400' AS Estado;
+        SELECT 'Error' AS Resultado, 'Cantidad invalida. Debe ser mayor o igual a 0' AS Mensaje, '400' AS Estado;
         RETURN;
     END;
 
@@ -3193,10 +3309,10 @@ END;
 GO
 /*
 * Nombre: EliminarDescuento
-* Descripcion: Elimina f�sicamente un descuento de la tabla facturacion.descuento.
+* Descripcion: Elimina fisicamente un descuento de la tabla facturacion.descuento.
 * Parametros:
 *   @id_descuento INT - ID del descuento a eliminar.
-* Aclaracion: No se utilizan transacciones expl�citas ya que solo se trabaja con una �nica tabla.
+* Aclaracion: No se utilizan transacciones explicitas ya que solo se trabaja con una unica tabla.
 */
 CREATE OR ALTER PROCEDURE facturacion.EliminarDescuento
     @id_descuento INT
@@ -3229,12 +3345,12 @@ GO
 GO
 /*
 * Nombre: RegistrarClima
-* Descripci�n: Registra un nuevo registro de clima.
+* Descripcion: Registra un nuevo registro de clima.
 * Parametros:
-*   @fecha   DATE         � Fecha del registro clim�tico.
-*   @lluvia  DECIMAL(5,2) � Mil�metros de lluvia (>= 0).
-* Aclaraci�n:
-*   No se utiliza transacci�n expl�cita ya que se inserta en una �nica tabla.
+*   @fecha   DATE          Fecha del registro climatico.
+*   @lluvia  DECIMAL(5,2)  Milimetros de lluvia (>= 0).
+* Aclaracion:
+*   No se utiliza transaccion explicita ya que se inserta en una unica tabla.
 */
 CREATE OR ALTER PROCEDURE facturacion.RegistrarClima
     @fecha  DATE,
@@ -3284,14 +3400,14 @@ GO
 GO
 /*
 * Nombre: CrearEmpresa
-* Descripci�n: Inserta una nueva empresa en la tabla facturacion.datos_empresa.
+* Descripcion: Inserta una nueva empresa en la tabla facturacion.datos_empresa.
 * Parsmetros:
-*   @cuit_emisor         VARCHAR(20) � CUIT del emisor (obligatorio).
-*   @domicilio_comercial VARCHAR(25) � Domicilio comercial (obligatorio).
-*   @condicion_IVA       VARCHAR(25) � Condici�n frente al IVA (obligatorio).
-*   @nombre              VARCHAR(35) � Nombre de la empresa (opcional).
-* Aclaraci�n:
-*   No se utiliza transacci�n expl�cita ya que solo se afecta una tabla.
+*   @cuit_emisor         VARCHAR(20)  CUIT del emisor (obligatorio).
+*   @domicilio_comercial VARCHAR(25)  Domicilio comercial (obligatorio).
+*   @condicion_IVA       VARCHAR(25)  Condicion frente al IVA (obligatorio).
+*   @nombre              VARCHAR(35)  Nombre de la empresa (opcional).
+* Aclaracion:
+*   No se utiliza transaccion explicita ya que solo se afecta una tabla.
 */
 CREATE OR ALTER PROCEDURE facturacion.CrearEmpresa
     @cuit_emisor         VARCHAR(20),
@@ -3315,7 +3431,7 @@ BEGIN
     END;
     IF @condicion_IVA IS NULL OR LTRIM(RTRIM(@condicion_IVA)) = ''
     BEGIN
-        SELECT 'Error' AS Resultado, 'La condici�n frente al IVA es obligatoria.' AS Mensaje, '400' AS Estado;
+        SELECT 'Error' AS Resultado, 'La condicion frente al IVA es obligatoria.' AS Mensaje, '400' AS Estado;
         RETURN;
     END;
 
@@ -3337,15 +3453,15 @@ END;
 GO
 /*
 * Nombre: ModificarEmpresa
-* Descripci�n: Modifica los datos de una empresa.
-* Par�metros:
-*   @id_empresa          INT         � ID de la empresa (obligatorio).
-*   @cuit_emisor         VARCHAR(20) � Nuevo CUIT del emisor (opcional).
-*   @domicilio_comercial VARCHAR(25) � Nuevo domicilio comercial (opcional).
-*   @condicion_IVA       VARCHAR(25) � Nueva condici�n frente al IVA (opcional).
-*   @nombre              VARCHAR(35) � Nuevo nombre de la empresa (opcional).
-* Aclaraci�n:
-*   No se utiliza transacci�n expl�cita ya que solo se trabaja con una �nica tabla.
+* Descripcion: Modifica los datos de una empresa.
+* Parametros:
+*   @id_empresa          INT          ID de la empresa (obligatorio).
+*   @cuit_emisor         VARCHAR(20)  Nuevo CUIT del emisor (opcional).
+*   @domicilio_comercial VARCHAR(25)  Nuevo domicilio comercial (opcional).
+*   @condicion_IVA       VARCHAR(25)  Nueva condicion frente al IVA (opcional).
+*   @nombre              VARCHAR(35)  Nuevo nombre de la empresa (opcional).
+* Aclaracion:
+*   No se utiliza transaccion explicita ya que solo se trabaja con una unica tabla.
 */
 CREATE OR ALTER PROCEDURE facturacion.ModificarEmpresa
     @id_empresa          INT,
@@ -3380,11 +3496,11 @@ END;
 GO
 /*
 * Nombre: EliminarEmpresa
-* Descripci�n: Elimina una empresa f�sicamente de la base.
-* Par�metros:
-*   @id_empresa INT � ID de la empresa a eliminar.
-* Aclaraci�n:
-*   No se utiliza transacci�n expl�cita ya que solo se afecta una tabla.
+* Descripcion: Elimina una empresa fisicamente de la base.
+* Parametros:
+*   @id_empresa INT ID de la empresa a eliminar.
+* Aclaracion:
+*   No se utiliza transaccion explicita ya que solo se afecta una tabla.
 */
 CREATE OR ALTER PROCEDURE facturacion.EliminarEmpresa
     @id_empresa INT
@@ -3736,59 +3852,51 @@ GO
 * Aclaración:
 *   Se usa transacción explícita para evitar duplicaciones y asegurar atomicidad.
 */
-CREATE OR ALTER PROCEDURE actividades.InscribirSocioActividad
+CREATE OR ALTER PROCEDURE actividades.RegistrarAsistencia
     @id_socio     INT,
-    @id_actividad INT
+    @id_actividad INT,
+    @fecha        DATE,
+    @presentismo  VARCHAR(2) -- 'SI' o 'NO' u otros valores válidos
 AS
 BEGIN
     SET NOCOUNT ON;
-    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 
     BEGIN TRY
-        BEGIN TRANSACTION;
-
         -- Validar existencia del socio activo
         IF NOT EXISTS (
-            SELECT 1 FROM usuarios.socio 
-            WHERE id_socio = @id_socio AND activo = 1
+            SELECT 1 FROM usuarios.socio WHERE id_socio = @id_socio AND activo = 1
         )
         BEGIN
-            ROLLBACK TRANSACTION;
             SELECT 'Error' AS Resultado, 'Socio no encontrado o inactivo.' AS Mensaje, '404' AS Estado;
             RETURN;
         END;
 
         -- Validar existencia de la actividad activa
         IF NOT EXISTS (
-            SELECT 1 FROM actividades.actividad 
-            WHERE id_actividad = @id_actividad AND estado = 1
+            SELECT 1 FROM actividades.actividad WHERE id_actividad = @id_actividad AND estado = 1
         )
         BEGIN
-            ROLLBACK TRANSACTION;
             SELECT 'Error' AS Resultado, 'Actividad no encontrada o inactiva.' AS Mensaje, '404' AS Estado;
             RETURN;
         END;
 
-        -- Verificar si ya está inscripto
+        -- Evitar duplicado exacto para misma fecha
         IF EXISTS (
             SELECT 1 FROM actividades.actividad_socio
-            WHERE id_socio = @id_socio AND id_actividad = @id_actividad
+            WHERE id_socio = @id_socio AND id_actividad = @id_actividad AND fecha = @fecha
         )
         BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'El socio ya está inscripto en la actividad.' AS Mensaje, '400' AS Estado;
+            SELECT 'Error' AS Resultado, 'Ya existe un registro para esa fecha.' AS Mensaje, '400' AS Estado;
             RETURN;
         END;
 
-        -- Insertar inscripción
-        INSERT INTO actividades.actividad_socio (id_socio, id_actividad)
-        VALUES (@id_socio, @id_actividad);
+        -- Insertar el registro de asistencia
+        INSERT INTO actividades.actividad_socio (id_socio, id_actividad, fecha, presentismo)
+        VALUES (@id_socio, @id_actividad, @fecha, @presentismo);
 
-        COMMIT TRANSACTION;
-        SELECT 'OK' AS Resultado, 'Socio inscripto correctamente en la actividad.' AS Mensaje, '200' AS Estado;
+        SELECT 'OK' AS Resultado, 'Asistencia registrada correctamente.' AS Mensaje, '200' AS Estado;
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
     END CATCH;
 END;
@@ -3802,28 +3910,29 @@ GO
 * Aclaración:
 *   No requiere transacción explícita ya que sólo afecta una fila.
 */
-CREATE OR ALTER PROCEDURE actividades.QuitarSocioActividad
+CREATE OR ALTER PROCEDURE actividades.EliminarAsistencia
     @id_socio     INT,
-    @id_actividad INT
+    @id_actividad INT,
+    @fecha        DATE
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Verificar si existe la inscripción
+    -- Verificar existencia del registro
     IF NOT EXISTS (
         SELECT 1 FROM actividades.actividad_socio
-        WHERE id_socio = @id_socio AND id_actividad = @id_actividad
+        WHERE id_socio = @id_socio AND id_actividad = @id_actividad AND fecha = @fecha
     )
     BEGIN
-        SELECT 'Error' AS Resultado, 'El socio no está inscripto en la actividad.' AS Mensaje, '404' AS Estado;
+        SELECT 'Error' AS Resultado, 'No existe registro de asistencia para esa fecha.' AS Mensaje, '404' AS Estado;
         RETURN;
     END;
 
     BEGIN TRY
         DELETE FROM actividades.actividad_socio
-        WHERE id_socio = @id_socio AND id_actividad = @id_actividad;
+        WHERE id_socio = @id_socio AND id_actividad = @id_actividad AND fecha = @fecha;
 
-        SELECT 'OK' AS Resultado, 'Socio eliminado correctamente de la actividad.' AS Mensaje, '200' AS Estado;
+        SELECT 'OK' AS Resultado, 'Asistencia eliminada correctamente.' AS Mensaje, '200' AS Estado;
     END TRY
     BEGIN CATCH
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
@@ -4302,5 +4411,50 @@ BEGIN
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
         RETURN -99;
     END CATCH
+END;
+GO
+
+-- Procedimiento para que pueda consultar el usuario
+CREATE OR ALTER PROCEDURE usuarios.MiInformacion
+    @numero_socio VARCHAR(7)
+AS
+BEGIN
+    SET NOCOUNT ON;
+
+    SELECT
+        s.id_socio,
+        s.numero_socio,
+        p.id_persona,
+        p.dni,
+        p.nombre,
+        p.apellido,
+        p.email,
+        p.fecha_nac,
+        p.telefono,
+        s.telefono_emergencia,
+        s.obra_nro_socio,
+        s.fecha_alta,
+        s.fecha_baja,
+        s.activo AS socio_activo,
+        os.id_obra_social,
+        os.descripcion AS obra_social,
+        os.nro_telefono AS obra_social_telefono,
+        c.id_categoria,
+        c.nombre_categoria,
+        c.costo_membrecia,
+        c.vigencia AS categoria_vigencia,
+        gf.id_grupo_familiar,
+        gf.estado AS grupo_familiar_activo,
+        gf.parentesco AS parentesco_grupo,
+        pl.id_pileta,
+        pl.detalle AS pileta_detalle,
+        pl.metro_cuadrado AS pileta_metro_cuadrado
+    FROM usuarios.socio s
+    INNER JOIN usuarios.persona p ON s.id_persona = p.id_persona
+    LEFT JOIN usuarios.obra_social os ON s.id_obra_social = os.id_obra_social
+    INNER JOIN actividades.categoria c ON s.id_categoria = c.id_categoria
+    LEFT JOIN usuarios.grupo_familiar gf ON s.id_grupo = gf.id_grupo_familiar
+    LEFT JOIN actividades.pileta pl ON s.id_pileta = pl.id_pileta
+    WHERE s.numero_socio = @numero_socio;
 END;
 GO

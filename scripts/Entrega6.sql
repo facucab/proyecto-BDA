@@ -1,3 +1,12 @@
+/*
+	Entrega 6 - Reportes
+	
+	Comision 5600 - Viernes Tarde 
+	43990422 | Aguirre, Alex RubÃ©n 
+	45234709 | Gauto, GastÃ³n Santiago 
+	44363498 | Caballero, Facundo 
+	40993965 | Cornara Perez, TomÃ¡s AndrÃ©s
+*/
 
 USE Com5600G01;
 GO
@@ -52,9 +61,9 @@ AS
 BEGIN
     SET NOCOUNT ON;
     
-    -- Obtener el año actual para calcular desde enero
+    -- Obtener el aÃ±o actual para calcular desde enero
     DECLARE @anioActual INT = YEAR(GETDATE());
-    DECLARE @fechaInicio DATE = DATEFROMPARTS(@anioActual, 1, 1); -- 1 de enero del año actual
+    DECLARE @fechaInicio DATE = DATEFROMPARTS(@anioActual, 1, 1); -- 1 de enero del aï¿½o actual
     DECLARE @fechaFin DATE = GETDATE(); -- Hasta hoy
     
     -- Resumen total por actividad usando Windows Functions
@@ -90,7 +99,7 @@ BEGIN
     )
     SELECT 
         nombre_actividad AS [Actividad Deportiva],
-        cantidad_socios AS [Total de Socios en el Año],
+        cantidad_socios AS [Total de Socios en el Aï¿½o],
         ROUND(costo_mensual, 2) AS [Costo Unitario],
         ROUND(total_recaudado, 2) AS [Total Recaudado],
         -- Windows Function para ranking final
@@ -101,15 +110,73 @@ BEGIN
     ORDER BY total_recaudado DESC;
     
 END
+GO
 -- Reporte 3:
+GO
+CREATE OR ALTER PROCEDURE actividades.SociosConInasistencias
+AS
+BEGIN
+    SET NOCOUNT ON;
 
+    SELECT 
+        c.nombre_categoria,
+        a.nombre AS nombre_actividad,
+        COUNT(*) AS cantidad_inasistencias
+    FROM actividades.actividad_socio act_s
+    INNER JOIN usuarios.socio s ON act_s.id_socio = s.id_socio
+    INNER JOIN actividades.categoria c ON s.id_categoria = c.id_categoria
+    INNER JOIN actividades.actividad a ON act_s.id_actividad = a.id_actividad
+    WHERE UPPER(act_s.presentismo) <> 'P'
+    GROUP BY 
+        c.nombre_categoria,
+        a.nombre
+    ORDER BY 
+        cantidad_inasistencias DESC;
+END;
+GO
+-- Reporte 4: 
+CREATE OR ALTER PROCEDURE actividades.SociosConInasistenciasEnClases
+AS
+BEGIN
+    SET NOCOUNT ON;
 
--- PRUEBAS
-
--- Reporte 1: 
--- EXEC usuarios.MorososRecurrentes @fechaInicio = '2024-01-05', @fechaFin= '2024-02-06' 
+    SELECT 
+        p.nombre,
+        p.apellido,
+        DATEDIFF(YEAR, p.fecha_nac, GETDATE()) - 
+            CASE 
+                WHEN MONTH(p.fecha_nac) > MONTH(GETDATE()) 
+                     OR (MONTH(p.fecha_nac) = MONTH(GETDATE()) AND DAY(p.fecha_nac) > DAY(GETDATE())) 
+                THEN 1 ELSE 0 
+            END AS edad,
+        c.nombre_categoria,
+        a.nombre AS nombre_actividad
+    FROM actividades.actividad_socio act_s
+    INNER JOIN usuarios.socio s ON act_s.id_socio = s.id_socio
+    INNER JOIN usuarios.persona p ON s.id_persona = p.id_persona
+    INNER JOIN actividades.categoria c ON s.id_categoria = c.id_categoria
+    INNER JOIN actividades.actividad a ON act_s.id_actividad = a.id_actividad
+    WHERE act_s.presentismo IS NULL OR UPPER(act_s.presentismo) <> 'P'
+    GROUP BY 
+        p.nombre, p.apellido, p.fecha_nac,
+        c.nombre_categoria, a.nombre
+    ORDER BY 
+        p.apellido, p.nombre;
+END;
 GO
 
+GO
+-- PRUEBAS
+GO
+-- Reporte 1: 
+ EXEC usuarios.MorososRecurrentes @fechaInicio = '2024-01-05', @fechaFin= '2024-02-06' 
+GO
 -- reporte 2
 EXEC facturacion.IngresosMensualesActividades;
+GO
+-- Reporte 3: 
+EXEC actividades.SociosConInasistencias
+GO
+-- Reporte 4: 
+-- EXEC actividades.SociosConInasistenciasEnClases; 
 GO
