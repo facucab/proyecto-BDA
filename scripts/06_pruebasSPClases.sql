@@ -1,12 +1,12 @@
 /*
-	Entrega 4 - Documento de instalaci�n y configuraci�n
+	Entrega 4 - Documento de instalacion y configuracion
 
 	Trabajo Practico DDBBA Entrega 3 - Grupo 1
 	Comision 5600 - Viernes Tarde 
-	43990422 | Aguirre, Alex Rub�n 
-	45234709 | Gauto, Gast�n Santiago 
+	43990422 | Aguirre, Alex Ruben 
+	45234709 | Gauto, Gaston Santiago 
 	44363498 | Caballero, Facundo 
-	40993965 | Cornara Perez, Tom�s Andr�s
+	40993965 | Cornara Perez, Tomas Andres
 
 	Pruebas para Crear, Modificar y Eliminar Clase
 */

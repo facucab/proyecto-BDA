@@ -1,3 +1,13 @@
+/*
+	Entrega 4 - Documento de instalación y configuración
+	
+	Comision 5600 - Viernes Tarde 
+	43990422 | Aguirre, Alex Rubén 
+	45234709 | Gauto, Gastón Santiago 
+	44363498 | Caballero, Facundo 
+	40993965 | Cornara Perez, Tomás Andrés
+*/
+
 USE master;
 GO
 -- Elimino la BD, si existe: 
@@ -357,6 +367,20 @@ LEFT JOIN usuarios.persona ps ON s.id_persona = ps.id_persona
 WHERE c.estado = 1;
 GO
 
+CREATE OR ALTER VIEW facturacion.VistaFacturasCompleta AS
+    SELECT 
+        id_factura,
+        id_metodo_pago,
+        estado_pago,
+        fecha_emision,
+        monto_a_pagar,
+        dni,
+        nombre,
+        apellido,
+        email
+    FROM facturacion.factura f
+    INNER JOIN usuarios.persona p ON f.id_persona = p.id_persona
+GO
 
 -- ############################################################
 -- ######################## SP PERSONA ########################

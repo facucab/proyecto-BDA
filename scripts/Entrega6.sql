@@ -1,3 +1,12 @@
+/*
+	Entrega 6 - Reportes
+	
+	Comision 5600 - Viernes Tarde 
+	43990422 | Aguirre, Alex Rubén 
+	45234709 | Gauto, Gastón Santiago 
+	44363498 | Caballero, Facundo 
+	40993965 | Cornara Perez, Tomás Andrés
+*/
 
 USE Com5600G01;
 GO
@@ -52,7 +61,7 @@ AS
 BEGIN
     SET NOCOUNT ON;
     
-    -- Obtener el a�o actual para calcular desde enero
+    -- Obtener el año actual para calcular desde enero
     DECLARE @anioActual INT = YEAR(GETDATE());
     DECLARE @fechaInicio DATE = DATEFROMPARTS(@anioActual, 1, 1); -- 1 de enero del a�o actual
     DECLARE @fechaFin DATE = GETDATE(); -- Hasta hoy
@@ -160,13 +169,13 @@ GO
 -- PRUEBAS
 GO
 -- Reporte 1: 
--- EXEC usuarios.MorososRecurrentes @fechaInicio = '2024-01-05', @fechaFin= '2024-02-06' 
+ EXEC usuarios.MorososRecurrentes @fechaInicio = '2024-01-05', @fechaFin= '2024-02-06' 
 GO
 -- reporte 2
---EXEC facturacion.IngresosMensualesActividades;
+EXEC facturacion.IngresosMensualesActividades;
 GO
 -- Reporte 3: 
--- EXEC actividades.SociosConInasistencias
+EXEC actividades.SociosConInasistencias
 GO
 -- Reporte 4: 
 EXEC actividades.SociosConInasistenciasEnClases; 

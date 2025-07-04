@@ -1,12 +1,12 @@
 /*
-	Entrega 4 - Documento de instalación y configuración
+	Entrega 4 - Documento de instalacion y configuracion
 
 	Trabajo Practico DDBBA Entrega 3 - Grupo 1
 	Comision 5600 - Viernes Tarde 
-	43990422 | Aguirre, Alex Rubén 
-	45234709 | Gauto, Gastón Santiago 
+	43990422 | Aguirre, Alex Ruben 
+	45234709 | Gauto, Gaston Santiago 
 	44363498 | Caballero, Facundo 
-	40993965 | Cornara Perez, Tomás Andrés
+	40993965 | Cornara Perez, Tomas Andres
 
 	Pruebas para Crear, Modificar y Eliminar Descuento
 */
@@ -63,32 +63,32 @@ EXEC facturacion.CrearDescuento
 -- Resultado esperado: OK, Descuento creado correctamente.
 GO
 
--- Descripción vacía
+-- Descripciï¿½n vacï¿½a
 EXEC facturacion.CrearDescuento
 	@descripcion = '',
 	@cantidad    = 5.00;
--- Resultado esperado: Error, La descripción es obligatoria.
+-- Resultado esperado: Error, La descripciï¿½n es obligatoria.
 GO
 
--- Descripción nula
+-- Descripciï¿½n nula
 EXEC facturacion.CrearDescuento
 	@descripcion = NULL,
 	@cantidad    = 5.00;
--- Resultado esperado: Error, La descripción es obligatoria.
+-- Resultado esperado: Error, La descripciï¿½n es obligatoria.
 GO
 
 -- Cantidad negativa
 EXEC facturacion.CrearDescuento
 	@descripcion = 'Negativo',
 	@cantidad    = -1.00;
--- Resultado esperado: Error, Cantidad inválida. Debe ser mayor o igual a 0.
+-- Resultado esperado: Error, Cantidad invï¿½lida. Debe ser mayor o igual a 0.
 GO
 
--- Descripción duplicada
+-- Descripciï¿½n duplicada
 EXEC facturacion.CrearDescuento
 	@descripcion = 'Descuento A',
 	@cantidad    = 20.00;
--- Resultado esperado: Error, Ya existe un descuento con esa descripción.
+-- Resultado esperado: Error, Ya existe un descuento con esa descripciï¿½n.
 GO
 
 
@@ -110,12 +110,12 @@ EXEC facturacion.ModificarDescuento
 -- Resultado esperado: Error, Descuento no encontrado.
 GO
 
--- Descripción vacía
+-- Descripciï¿½n vacï¿½a
 EXEC facturacion.ModificarDescuento
 	@id_descuento = 1,
 	@descripcion  = '',
 	@cantidad     = 15.50;
--- Resultado esperado: Error, La descripción es obligatoria.
+-- Resultado esperado: Error, La descripciï¿½n es obligatoria.
 GO
 
 -- Cantidad negativa
@@ -123,7 +123,7 @@ EXEC facturacion.ModificarDescuento
 	@id_descuento = 1,
 	@descripcion  = 'Valido',
 	@cantidad     = -5.00;
--- Resultado esperado: Error, Cantidad inválida. Debe ser mayor o igual a 0.
+-- Resultado esperado: Error, Cantidad invï¿½lida. Debe ser mayor o igual a 0.
 GO
 
 

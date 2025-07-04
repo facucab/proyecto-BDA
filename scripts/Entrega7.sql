@@ -15,7 +15,7 @@ CREATE ROLE Vocal;
 GO
 
 -- Asigna permisos específicos según rol
-
+GO
 -- Jefe de Tesorería: acceso total al esquema de pagos y facturas
 GRANT SELECT, INSERT, UPDATE, DELETE, EXECUTE ON SCHEMA::facturacion TO Jefe_Tesoreria;
 GO
@@ -26,19 +26,6 @@ GO
 
 -- Morosidad: puede ejecutar SP de morosos recurrentes
 GRANT EXECUTE ON usuarios.MorososRecurrentes TO Administrativo_Morosidad;
-GO
-
--- Crea roles para distintos perfiles del club
-CREATE ROLE Jefe_Tesoreria;
-CREATE ROLE Administrativo_Cobranza;
-CREATE ROLE Administrativo_Morosidad;
-CREATE ROLE Administrativo_Facturacion;
-CREATE ROLE Administrativo_Socio;
-CREATE ROLE Socio_Web;
-CREATE ROLE Presidente;
-CREATE ROLE Vicepresidente;
-CREATE ROLE Secretario;
-CREATE ROLE Vocal;
 GO
 
 -- Asigna permisos específicos según rol
@@ -67,7 +54,7 @@ GRANT SELECT ON SCHEMA::usuarios TO Administrativo_Socio;
 GO
 
 -- Socio Web: solo puede ver su propia información
-GRANT SELECT ON usuarios.MiInformacion TO Socio_Web;
+GRANT EXECUTE ON usuarios.MiInformacion TO Socio_Web;
 GO
 
 -- Autoridades: permisos de lectura variados
@@ -75,16 +62,18 @@ GRANT SELECT ON SCHEMA::usuarios TO Presidente;
 GRANT SELECT ON SCHEMA::facturacion TO Presidente;
 GRANT SELECT ON SCHEMA::usuarios TO Vicepresidente;
 GRANT SELECT ON SCHEMA::facturacion TO Vicepresidente;
+GO
 
 -- Secretario: acceso a vistas completas e ingresos mensuales
 GRANT SELECT ON usuarios.VistaSociosCompleta TO Secretario;
 GRANT SELECT ON usuarios.VistaInvitadosCompleta TO Secretario;
 GRANT SELECT ON actividades.VistaSociosPorClase TO Secretario;
-GRANT SELECT ON facturacion.IngresosMensualesActividades TO Secretario;
+GRANT EXECUTE ON facturacion.IngresosMensualesActividades TO Secretario;
 GO
 
-/*
+
 -- Elimina todos los roles creados
+/*
 DROP ROLE Jefe_Tesoreria;
 DROP ROLE Administrativo_Cobranza;
 DROP ROLE Administrativo_Morosidad;
