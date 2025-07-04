@@ -70,6 +70,83 @@ GRANT SELECT ON usuarios.VistaInvitadosCompleta TO Secretario;
 GRANT SELECT ON actividades.VistaSociosPorClase TO Secretario;
 GRANT EXECUTE ON facturacion.IngresosMensualesActividades TO Secretario;
 GO
+/* TEST*/
+
+/*
+USE Com5600G01;
+CREATE USER usuario_tesoreria WITHOUT LOGIN;
+CREATE USER usuario_cobranza WITHOUT LOGIN;
+CREATE USER usuario_morosidad WITHOUT LOGIN;
+CREATE USER usuario_facturacion WITHOUT LOGIN;
+CREATE USER usuario_socio WITHOUT LOGIN;
+CREATE USER usuario_web WITHOUT LOGIN;
+CREATE USER usuario_secretario WITHOUT LOGIN;
+
+GO
+EXEC sp_addrolemember 'Jefe_Tesoreria', 'usuario_tesoreria';
+EXEC sp_addrolemember 'Administrativo_Cobranza', 'usuario_cobranza';
+EXEC sp_addrolemember 'Administrativo_Morosidad', 'usuario_morosidad';
+EXEC sp_addrolemember 'Administrativo_Facturacion', 'usuario_facturacion';
+EXEC sp_addrolemember 'Administrativo_Socio', 'usuario_socio';
+EXEC sp_addrolemember 'Socio_Web', 'usuario_web';
+EXEC sp_addrolemember 'Secretario', 'usuario_secretario';
+*/
+
+/*
+ CASO POSITIVO: 
+USE Com5600G01;
+GO
+
+EXECUTE AS USER = 'usuario_tesoreria';
+-- Probar SELECT (debería funcionar)
+BEGIN TRY
+    SELECT TOP 1 * FROM facturacion.Factura;
+    PRINT 'SELECT: OK';
+END TRY
+BEGIN CATCH
+    PRINT 'SELECT: ERROR - ' + ERROR_MESSAGE();
+END CATCH;
+
+-- Probar INSERT (debería funcionar)
+BEGIN TRY
+    -- Insertar fila temporal (ejemplo, ajusta columnas si es necesario)
+    INSERT INTO facturacion.Factura DEFAULT VALUES;
+    PRINT 'INSERT: OK';
+    
+    -- Borrar fila insertada para limpiar test
+    DELETE TOP (1) FROM facturacion.Factura;
+END TRY
+BEGIN CATCH
+    PRINT 'INSERT: ERROR - ' + ERROR_MESSAGE();
+END CATCH;
+
+REVERT;
+GO
+*/
+
+/*
+
+USE Com5600G01;
+GO
+
+EXECUTE AS USER = 'usuario_cobranza';  -- Usuario con rol Administrativo_Cobranza
+
+PRINT 'Iniciando test negativo: usuario_cobranza intentando INSERT (debería fallar)';
+
+BEGIN TRY
+    INSERT INTO facturacion.Factura DEFAULT VALUES;  -- Acción prohibida
+    PRINT 'ERROR: INSERT realizado correctamente (NO debería pasar)';
+END TRY
+BEGIN CATCH
+    PRINT 'INSERT falló como se esperaba: ' + ERROR_MESSAGE();
+END CATCH;
+
+REVERT;
+GO
+*/
+
+
+
 
 
 -- Elimina todos los roles creados
