@@ -10,7 +10,7 @@
 
 	Pruebas para Crear, Modificar y Eliminar Clase
 */
-
+-- DEPENDE DEL TEST 02 y 03 [FUNCIONANDO] 
 USE Com5600G01;
 GO
 
