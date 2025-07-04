@@ -10,7 +10,7 @@
 
 	Pruebas para Crear, Modificar y Eliminar Categoria
 */
-
+-- [FUNCIONANDO]
 USE Com5600G01
 GO
 
