@@ -1,23 +1,6 @@
 
 USE Com5600G01;
 GO
-/*
-DECLARE @fechaInicio DATE ,@fechaFin DATE; 
-
-SET @fechaInicio = '2024-01-05';
-SET @fechaFin = '2025-05-04';
-
- SELECT
-            f.id_factura,
-            f.id_persona,
-            FORMAT(f.fecha_emision, 'yyyy-MM') AS mes_incumplido,
-            f.estado_pago,
-            f.fecha_emision
-        FROM facturacion.factura f
-        WHERE f.estado_pago = 'Pendiente'
-          AND f.fecha_emision BETWEEN @fechaInicio AND @fechaFin
-		  */
-GO
 
 -- SPS
 
@@ -63,18 +46,70 @@ BEGIN
 END;
 GO
 
---Reporte 2
+--Reporte 2: 
 CREATE OR ALTER PROCEDURE facturacion.IngresosMensualesActividades
+AS
 BEGIN
+    SET NOCOUNT ON;
+    
+    -- Obtener el año actual para calcular desde enero
+    DECLARE @anioActual INT = YEAR(GETDATE());
+    DECLARE @fechaInicio DATE = DATEFROMPARTS(@anioActual, 1, 1); -- 1 de enero del año actual
+    DECLARE @fechaFin DATE = GETDATE(); -- Hasta hoy
+    
+    -- Resumen total por actividad usando Windows Functions
+    WITH MESES_DEL_ANIO AS (
+        SELECT 
+            DATEFROMPARTS(@anioActual, 1, 1) AS fecha_inicio_mes,
+            EOMONTH(DATEFROMPARTS(@anioActual, 1, 1)) AS fecha_fin_mes,
+            1 AS numero_mes
+        UNION ALL
+        SELECT 
+            DATEADD(MONTH, numero_mes, DATEFROMPARTS(@anioActual, 1, 1)),
+            EOMONTH(DATEADD(MONTH, numero_mes, DATEFROMPARTS(@anioActual, 1, 1))),
+            numero_mes + 1
+        FROM MESES_DEL_ANIO
+        WHERE numero_mes < MONTH(@fechaFin)
+    ),
+    RESUMEN_ACTIVIDADES AS (
+        SELECT 
+            a.id_actividad,
+            a.nombre AS nombre_actividad,
+            a.costo_mensual,
+            COUNT(DISTINCT asoc.id_socio) AS cantidad_socios,
+            COUNT(DISTINCT asoc.id_socio) * a.costo_mensual AS total_recaudado
+        FROM actividades.actividad a
+        INNER JOIN actividades.actividad_socio asoc ON a.id_actividad = asoc.id_actividad
+        INNER JOIN usuarios.socio s ON asoc.id_socio = s.id_socio
+        CROSS JOIN MESES_DEL_ANIO m
+        WHERE a.estado = 1 -- Solo actividades activas
+          AND s.activo = 1 -- Solo socios activos
+          AND s.fecha_alta <= m.fecha_fin_mes -- Socio debe estar activo en ese mes
+          AND (s.fecha_baja IS NULL OR s.fecha_baja >= m.fecha_inicio_mes) -- Socio no debe haberse dado de baja
+        GROUP BY a.id_actividad, a.nombre, a.costo_mensual
+    )
+    SELECT 
+        nombre_actividad AS [Actividad Deportiva],
+        cantidad_socios AS [Total de Socios en el Año],
+        ROUND(costo_mensual, 2) AS [Costo Unitario],
+        ROUND(total_recaudado, 2) AS [Total Recaudado],
+        -- Windows Function para ranking final
+        RANK() OVER (
+            ORDER BY total_recaudado DESC
+        ) AS [Ranking Final]
+    FROM RESUMEN_ACTIVIDADES
+    ORDER BY total_recaudado DESC;
     
 END
-GO
+-- Reporte 3:
+
 
 -- PRUEBAS
 
--- Rerpote 1
-EXEC usuarios.MorososRecurrentes @fechaInicio = '2024-01-05', @fechaFin= '2024-02-06' 
+-- Reporte 1: 
+-- EXEC usuarios.MorososRecurrentes @fechaInicio = '2024-01-05', @fechaFin= '2024-02-06' 
 GO
 
-EXEC facturacion.IngresosPorActividad;
+-- reporte 2
+EXEC facturacion.IngresosMensualesActividades;
 GO
