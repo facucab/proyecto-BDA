@@ -1,5 +1,6 @@
 
 USE Com5600G01;
+GO
 /*
 DECLARE @fechaInicio DATE ,@fechaFin DATE; 
 
@@ -16,9 +17,12 @@ SET @fechaFin = '2025-05-04';
         WHERE f.estado_pago = 'Pendiente'
           AND f.fecha_emision BETWEEN @fechaInicio AND @fechaFin
 		  */
-
 GO
-CREATE OR ALTER PROCEDURE reportes.MorososRecurrentes
+
+-- SPS
+
+-- Reporte 1
+CREATE OR ALTER PROCEDURE usuarios.MorososRecurrentes
     @fechaInicio DATE,
     @fechaFin DATE
 AS
@@ -57,7 +61,20 @@ BEGIN
 	ORDER BY ranking, c.id_persona, c.mes_incumplido;
 	
 END;
-
 GO
 
-EXEC reportes.MorososRecurrentes @fechaInicio = '2024-01-05', @fechaFin= '2024-02-06' 
+--Reporte 2
+CREATE OR ALTER PROCEDURE facturacion.IngresosMensualesActividades
+BEGIN
+    
+END
+GO
+
+-- PRUEBAS
+
+-- Rerpote 1
+EXEC usuarios.MorososRecurrentes @fechaInicio = '2024-01-05', @fechaFin= '2024-02-06' 
+GO
+
+EXEC facturacion.IngresosPorActividad;
+GO

@@ -23,9 +23,6 @@ CREATE SCHEMA actividades;
 GO
 CREATE SCHEMA facturacion;
 GO
-CREATE SCHEMA reportes; 
-
-GO
 -- Crear tablas:
 CREATE TABLE usuarios.persona(
 	id_persona INT IDENTITY(1,1) PRIMARY KEY,
