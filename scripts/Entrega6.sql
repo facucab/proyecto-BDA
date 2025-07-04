@@ -1,3 +1,12 @@
+/*
+	Entrega 6 - Reportes
+	
+	Comision 5600 - Viernes Tarde 
+	43990422 | Aguirre, Alex RubÃ©n 
+	45234709 | Gauto, GastÃ³n Santiago 
+	44363498 | Caballero, Facundo 
+	40993965 | Cornara Perez, TomÃ¡s AndrÃ©s
+*/
 
 USE Com5600G01;
 GO
@@ -52,9 +61,9 @@ AS
 BEGIN
     SET NOCOUNT ON;
     
-    -- Obtener el año actual para calcular desde enero
+    -- Obtener el aÃ±o actual para calcular desde enero
     DECLARE @anioActual INT = YEAR(GETDATE());
-    DECLARE @fechaInicio DATE = DATEFROMPARTS(@anioActual, 1, 1); -- 1 de enero del año actual
+    DECLARE @fechaInicio DATE = DATEFROMPARTS(@anioActual, 1, 1); -- 1 de enero del aï¿½o actual
     DECLARE @fechaFin DATE = GETDATE(); -- Hasta hoy
     
     -- Resumen total por actividad usando Windows Functions
@@ -90,7 +99,7 @@ BEGIN
     )
     SELECT 
         nombre_actividad AS [Actividad Deportiva],
-        cantidad_socios AS [Total de Socios en el Año],
+        cantidad_socios AS [Total de Socios en el Aï¿½o],
         ROUND(costo_mensual, 2) AS [Costo Unitario],
         ROUND(total_recaudado, 2) AS [Total Recaudado],
         -- Windows Function para ranking final
@@ -160,13 +169,13 @@ GO
 -- PRUEBAS
 GO
 -- Reporte 1: 
--- EXEC usuarios.MorososRecurrentes @fechaInicio = '2024-01-05', @fechaFin= '2024-02-06' 
+ EXEC usuarios.MorososRecurrentes @fechaInicio = '2024-01-05', @fechaFin= '2024-02-06' 
 GO
 -- reporte 2
---EXEC facturacion.IngresosMensualesActividades;
+EXEC facturacion.IngresosMensualesActividades;
 GO
 -- Reporte 3: 
--- EXEC actividades.SociosConInasistencias
+EXEC actividades.SociosConInasistencias
 GO
 -- Reporte 4: 
 -- EXEC actividades.SociosConInasistenciasEnClases; 

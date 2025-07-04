@@ -1,7 +1,6 @@
 /*
 	Entrega 4 - Documento de instalación y configuración
-
-	Trabajo Practico DDBBA Entrega 3 - Grupo 1
+	
 	Comision 5600 - Viernes Tarde 
 	43990422 | Aguirre, Alex Rubén 
 	45234709 | Gauto, Gastón Santiago 

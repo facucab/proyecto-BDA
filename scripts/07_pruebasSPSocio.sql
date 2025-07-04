@@ -1,12 +1,12 @@
 /*
-	Entrega 4 - Documento de instalaci�n y configuraci�n
+	Entrega 4 - Documento de instalacion y configuracion
 
 	Trabajo Practico DDBBA Entrega 3 - Grupo 1
 	Comision 5600 - Viernes Tarde 
-	43990422 | Aguirre, Alex Rub�n 
-	45234709 | Gauto, Gast�n Santiago 
+	43990422 | Aguirre, Alex Ruben 
+	45234709 | Gauto, Gaston Santiago 
 	44363498 | Caballero, Facundo 
-	40993965 | Cornara Perez, Tom�s Andr�s
+	40993965 | Cornara Perez, Tomas Andres
 
 	Pruebas para Crear, Modificar y Eliminar Socio
 */
@@ -21,7 +21,7 @@ EXEC usuarios.CrearSocio
 	@id_persona          = NULL,
 	@dni                 = '12345678',
 	@nombre              = 'Juan',
-	@apellido            = 'P�rez',
+	@apellido            = 'Perez',
 	@email               = 'juan.perez@example.com',
 	@fecha_nac           = '1990-05-15',
 	@telefono            = '123456789',
@@ -50,12 +50,12 @@ EXEC usuarios.CrearSocio
 	@id_grupo            = 1;
 -- Resultado esperado: OK, Socio creado correctamente
 
--- DNI inv�lido
+-- DNI invalido
 EXEC usuarios.CrearSocio
 	@id_persona          = NULL,
 	@dni                 = 'ABC123',
 	@nombre              = 'Ana',
-	@apellido            = 'G�mez',
+	@apellido            = 'Gomez',
 	@email               = 'ana.gomez@example.com',
 	@fecha_nac           = '1985-07-20',
 	@telefono            = '222333444',
@@ -65,14 +65,14 @@ EXEC usuarios.CrearSocio
 	@id_obra_social      = NULL,
 	@id_categoria        = 1,
 	@id_grupo            = NULL;
--- Resultado esperado: Error, DNI inv�lido. Debe contener entre 7 y 8 d�gitos num�ricos.
+-- Resultado esperado: Error, DNI invalido. Debe contener entre 7 y 8 digitos numericos.
 
--- N�mero de socio duplicado
+-- Numero de socio duplicado
 EXEC usuarios.CrearSocio
 	@id_persona          = NULL,
 	@dni                 = '22334455',
 	@nombre              = 'Luis',
-	@apellido            = 'Mart�nez',
+	@apellido            = 'Martinez',
 	@email               = 'luis.martinez@example.com',
 	@fecha_nac           = '1992-03-10',
 	@telefono            = '555666777',
@@ -88,8 +88,8 @@ EXEC usuarios.CrearSocio
 EXEC usuarios.CrearSocio
 	@id_persona          = NULL,
 	@dni                 = '33445566',
-	@nombre              = 'Mar�a',
-	@apellido            = 'L�pez',
+	@nombre              = 'Maria',
+	@apellido            = 'Lopez',
 	@email               = 'maria.lopez@example.com',
 	@fecha_nac           = '1988-11-05',
 	@telefono            = '888999000',
@@ -101,7 +101,7 @@ EXEC usuarios.CrearSocio
 	@id_grupo            = NULL;
 -- Resultado esperado: Error, Obra social no existe
 
--- Categor�a inexistente
+-- Categoria inexistente
 EXEC usuarios.CrearSocio
 	@id_persona          = NULL,
 	@dni                 = '44556677',
@@ -123,7 +123,7 @@ EXEC usuarios.CrearSocio
 	@id_persona          = NULL,
 	@dni                 = '55667788',
 	@nombre              = 'Elena',
-	@apellido            = 'D�az',
+	@apellido            = 'Diaz',
 	@email               = 'elena.diaz@example.com',
 	@fecha_nac           = '1993-02-14',
 	@telefono            = '777888999',
@@ -138,7 +138,7 @@ EXEC usuarios.CrearSocio
 
 -- ModificarSocio
 
--- Caso normal: cambiar n�mero de socio y tel�fono de emergencia
+-- Caso normal: cambiar numero de socio y telefono de emergencia
 EXEC usuarios.ModificarSocio
 	@id_socio            = 1,
 	@numero_socio        = 'S000010',
@@ -157,7 +157,7 @@ EXEC usuarios.ModificarSocio
 	@numero_socio = 'S000011';
 -- Resultado esperado: Error, Socio no encontrado
 
--- N�mero de socio duplicado
+-- Numero de socio duplicado
 EXEC usuarios.ModificarSocio
 	@id_socio     = 1,
 	@numero_socio = 'S000002';
@@ -169,7 +169,7 @@ EXEC usuarios.ModificarSocio
 	@id_obra_social = 999;
 -- Resultado esperado: Error, Obra social no existe
 
--- Categor�a inexistente
+-- Categoria inexistente
 EXEC usuarios.ModificarSocio
 	@id_socio     = 1,
 	@id_categoria = 999;

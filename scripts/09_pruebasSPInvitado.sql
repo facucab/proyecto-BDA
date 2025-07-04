@@ -2,25 +2,25 @@ USE Com5600G01;
 GO
 
 /*
-	Entrega 4 – Pruebas para Crear, Modificar y Eliminar Invitado
+	Entrega 4 - Pruebas para Crear, Modificar y Eliminar Invitado
 
-	Trabajo Practico DDBBA Entrega 3 – Grupo 1
-	Comision 5600 – Viernes Tarde 
-	43990422 | Aguirre, Alex Rubén 
-	45234709 | Gauto, Gastón Santiago 
+	Trabajo Practico DDBBA Entrega 3 - Grupo 1
+	Comision 5600 - Viernes Tarde 
+	43990422 | Aguirre, Alex Ruben 
+	45234709 | Gauto, Gaston Santiago 
 	44363498 | Caballero, Facundo 
-	40993965 | Cornara Perez, Tomás Andrés
+	40993965 | Cornara Perez, Tomas Andres
 */
 
 DECLARE 
     @pidSocio   INT,     -- para crear socios
     @sid1       INT,     -- primer socio invitador
-    @sid2       INT,     -- segundo socio (reasignación)
+    @sid2       INT,     -- segundo socio (reasignacion)
     @pidInv     INT,     -- persona invitada
     @iid1       INT;     -- id_invitado
 
 -------------------------------------------------------------------------------
--- 0) Crear categoría  (para que CrearSocio funcione)
+-- 0) Crear categoria  (para que CrearSocio funcione)
 -------------------------------------------------------------------------------
 IF NOT EXISTS (SELECT 1 FROM actividades.categoria WHERE id_categoria = 1)
 BEGIN
@@ -29,7 +29,7 @@ BEGIN
 END;
 
 -------------------------------------------------------------------------------
--- 1) Preparación: crear dos socios de prueba
+-- 1) Preparacion: crear dos socios de prueba
 -------------------------------------------------------------------------------
 
 -- Socio 1
@@ -99,9 +99,9 @@ SELECT
 
 PRINT 'Error duplicado: misma persona';
 EXEC usuarios.CrearInvitado
-    @id_persona = @pidInv,  -- ahora sí el id_persona correcto
+    @id_persona = @pidInv,  -- ahora si el id_persona correcto
     @id_socio   = @sid1;
--- Esperado: Error, La persona ya está invitada.
+-- Esperado: Error, La persona ya esta invitada.
 
 PRINT 'Error: falta datos para crear persona';
 EXEC usuarios.CrearInvitado

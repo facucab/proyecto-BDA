@@ -2,14 +2,14 @@ USE Com5600G01;
 GO
 
 /*
-	Entrega 4 - Documento de instalación y configuración
+	Entrega 4 - Documento de instalacion y configuracion
 
 	Trabajo Practico DDBBA Entrega 3 - Grupo 1
 	Comision 5600 - Viernes Tarde 
-	43990422 | Aguirre, Alex Rubén 
-	45234709 | Gauto, Gastón Santiago 
+	43990422 | Aguirre, Alex Ruben 
+	45234709 | Gauto, Gaston Santiago 
 	44363498 | Caballero, Facundo 
-	40993965 | Cornara Perez, Tomás Andrés
+	40993965 | Cornara Perez, Tomas Andres
 
     Pruebas para Crear, Modificar y Eliminar Usuario
 */
@@ -50,7 +50,7 @@ EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
     @dni           = '123122319',
     @nombre        = 'Mario',
-    @apellido      = 'Catañeda',
+    @apellido      = 'Cataï¿½eda',
     @email         = 'mario.casta@example.com',
     @fecha_nac     = '1985-05-05',
     @telefono      = '6666666666',
@@ -63,7 +63,7 @@ EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
     @dni           = '223344559',
     @nombre        = 'Laura',
-    @apellido      = 'González',
+    @apellido      = 'Gonzï¿½lez',
     @email         = 'laura.gonzalez@example.com',
     @fecha_nac     = '1990-08-12',
     @telefono      = '1162349876',
@@ -76,7 +76,7 @@ EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
     @dni           = '334455669',
     @nombre        = 'Pablo',
-    @apellido      = 'Martínez',
+    @apellido      = 'Martï¿½nez',
     @email         = 'pablo.martinez@example.com',
     @fecha_nac     = '1982-03-22',
     @telefono      = '1155558888',
@@ -89,7 +89,7 @@ EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
     @dni           = '445566779',
     @nombre        = 'Julieta',
-    @apellido      = 'Rodríguez',
+    @apellido      = 'Rodrï¿½guez',
     @email         = 'julieta.rod@example.com',
     @fecha_nac     = '1995-10-15',
     @telefono      = '1177889900',
@@ -102,7 +102,7 @@ EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
     @dni           = '556677889',
     @nombre        = 'Ernesto',
-    @apellido      = 'López',
+    @apellido      = 'Lï¿½pez',
     @email         = 'ernesto.lopez@example.com',
     @fecha_nac     = '1979-12-01',
     @telefono      = '1199990000',
@@ -244,9 +244,9 @@ EXEC usuarios.CrearUsuario
 -- Esperado: Error, Ya existe un usuario con ese username.
 
 -------------------------------------------------------------------------------
--- 3) CrearUsuario: username vacío
+-- 3) CrearUsuario: username vacio
 -------------------------------------------------------------------------------
-PRINT 'Username vacío';
+PRINT 'Username vacio';
 EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
     @dni           = '444455559',
@@ -260,9 +260,9 @@ EXEC usuarios.CrearUsuario
 -- Esperado: Error, El username es obligatorio.
 
 -------------------------------------------------------------------------------
--- 4) CrearUsuario: password_hash vacío
+-- 4) CrearUsuario: password_hash vacio
 -------------------------------------------------------------------------------
-PRINT 'Password_hash vacío';
+PRINT 'Password_hash vacio';
 EXEC usuarios.CrearUsuario
     @id_persona    = NULL,
     @dni           = '555566669',
@@ -291,7 +291,7 @@ EXEC usuarios.EliminarUsuario
 -------------------------------------------------------------------------------
 -- ModificarUsuario
 -------------------------------------------------------------------------------
-PRINT 'ModificarUsuario: cambiar username válido';
+PRINT 'ModificarUsuario: cambiar username valido';
 EXEC usuarios.ModificarUsuario
     @id_usuario = @uid1,
     @username   = 'juanperez2';
@@ -300,7 +300,7 @@ EXEC usuarios.ModificarUsuario
 PRINT 'ModificarUsuario: username duplicado';
 EXEC usuarios.ModificarUsuario
     @id_usuario = @uid1,
-    @username   = 'mariagomez';   -- el username de Maria aún está en BD (aunque inactivo)
+    @username   = 'mariagomez';   -- el username de Maria aun esta en BD (aunque inactivo)
 -- Esperado: Error, Ya existe un usuario con ese username.
 
 PRINT 'ModificarUsuario: cambiar password_hash';

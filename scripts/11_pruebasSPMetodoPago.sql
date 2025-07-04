@@ -1,3 +1,13 @@
+/*
+	Entrega 4 - Documento de instalación y configuración
+	
+	Comision 5600 - Viernes Tarde 
+	43990422 | Aguirre, Alex Rubén 
+	45234709 | Gauto, Gastón Santiago 
+	44363498 | Caballero, Facundo 
+	40993965 | Cornara Perez, Tomás Andrés
+*/
+
 USE Com5600G01;
 GO
 
