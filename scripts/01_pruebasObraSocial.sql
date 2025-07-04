@@ -14,6 +14,7 @@
 USE Com5600G01;
 GO
 
+
 -- Pruebas obra social
 
 -- CREACION
@@ -52,29 +53,34 @@ EXEC usuarios.CrearObraSocial
 	@nombre = 'Medifé',
 	@nro_telefono = '444444444';
 --Resultado: Obra Social creada correctamente
-
+GO
 
 EXEC usuarios.CrearObraSocial
 	@nombre = 'OSPROTURA',
 	@nro_telefono = '555555555';
 --Resultado: Obra Social creada correctamente
+GO
 
 EXEC usuarios.CrearObraSocial
 	@nombre = 'Sancor Salud',
 	@nro_telefono = '666666666';
 --Resultado: Obra Social creada correctamente
+GO
 
-EXEC usuarios.CrearnObraSocial
+EXEC usuarios.CrearObraSocial
 	@nombre = 'TEST',
 	@nro_telefono = '777777777';
 --Resultado: Obra Social creada correctamente
+GO
 
+DECLARE @aux INT;
 EXEC usuarios.ModificarObraSocial
 	@id = 8,
-	@nombre_nuevo = 'TEST 1';
+	@nombre_nuevo = 'TEST 1',
+	@id_obra_social = @aux OUTPUT;
 -- Resultado: Obra Social Modificada
 
-EXEC usuarios.EliminacionObraSocial
+EXEC usuarios.EliminarObraSocial
 	@id = 8;
 -- Resultado: Obra social eliminada
 
@@ -93,12 +99,14 @@ EXEC usuarios.CrearObraSocial
 
 EXEC usuarios.ModificarObraSocial
 	@id = 99999,
-	@nombre_nuevo = 'ESTO FALLA';
+	@nombre_nuevo = 'ESTO FALLA',
+	@id_obra_social = @aux OUTPUT;
 -- Resultado: id no existe
 
 EXEC usuarios.ModificarObraSocial
 	@id = 1,
-	@nombre_nuevo = '';
+	@nombre_nuevo = '',
+	@id_obra_social = @aux OUTPUT;
 -- Resultado: El nombre no puede ser nulo
 
 EXEC usuarios.EliminarObraSocial
