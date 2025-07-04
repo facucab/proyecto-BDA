@@ -7,14 +7,13 @@
 	45234709 | Gauto, Gastón Santiago 
 	44363498 | Caballero, Facundo 
 	40993965 | Cornara Perez, Tomás Andrés
-
 	Pruebas para Stored Procedures de Obra Social
 */
 
 USE Com5600G01;
 GO
 
-
+-- FUNCIONA
 -- Pruebas obra social
 
 -- CREACION

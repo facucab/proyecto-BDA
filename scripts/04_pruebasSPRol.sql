@@ -10,7 +10,7 @@
 
 	Pruebas para Stored Procedures de Rol
 */
-
+-- [FUNCIONANDO]
 USE Com5600G01;
 GO
 

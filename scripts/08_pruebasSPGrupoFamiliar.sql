@@ -10,7 +10,7 @@
 
 	Pruebas para Crear, Modificar y Eliminar Grupo Familiar
 */
-
+-- Funciona, pero debemos tener socios si o si
 USE Com5600G01;
 GO
 
@@ -19,6 +19,8 @@ GO
 -- Caso normal
 EXEC usuarios.CrearGrupoFamiliar
     @id_socio_rp = 1;
+    
+EXEC usuarios.CrearGrupoFamiliar @id_socio_rp = '000002';
 -- Resultado esperado: OK, Grupo familiar creado correctamente
 select * from usuarios.socio
 

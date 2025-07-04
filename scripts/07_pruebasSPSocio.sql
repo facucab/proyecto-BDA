@@ -10,7 +10,7 @@
 
 	Pruebas para Crear, Modificar y Eliminar Socio
 */
-
+-- DEPENDE DE LOS ANTERIORES TEST [FUNCONANDO]
 USE Com5600G01;
 GO
 

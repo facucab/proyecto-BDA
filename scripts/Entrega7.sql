@@ -71,7 +71,6 @@ GRANT SELECT ON actividades.VistaSociosPorClase TO Secretario;
 GRANT EXECUTE ON facturacion.IngresosMensualesActividades TO Secretario;
 GO
 /* TEST*/
-
 /*
 USE Com5600G01;
 CREATE USER usuario_tesoreria WITHOUT LOGIN;
@@ -93,7 +92,7 @@ EXEC sp_addrolemember 'Secretario', 'usuario_secretario';
 */
 
 /*
- CASO POSITIVO: 
+CASO POSITIVO:  usuario_tesoreria  accede la tabla factura y luego inserta una fila temporal 
 USE Com5600G01;
 GO
 
@@ -107,9 +106,9 @@ BEGIN CATCH
     PRINT 'SELECT: ERROR - ' + ERROR_MESSAGE();
 END CATCH;
 
--- Probar INSERT (debería funcionar)
+-- Probar INSERT 
 BEGIN TRY
-    -- Insertar fila temporal (ejemplo, ajusta columnas si es necesario)
+    -- Insertar fila temporal
     INSERT INTO facturacion.Factura DEFAULT VALUES;
     PRINT 'INSERT: OK';
     
@@ -125,13 +124,13 @@ GO
 */
 
 /*
-
+Caso Negativo: usuario_cobranza con rol Administrativo_Cobranza accede a tabla factura sin permisos
 USE Com5600G01;
 GO
 
-EXECUTE AS USER = 'usuario_cobranza';  -- Usuario con rol Administrativo_Cobranza
+EXECUTE AS USER = 'usuario_cobranza'; 
 
-PRINT 'Iniciando test negativo: usuario_cobranza intentando INSERT (debería fallar)';
+PRINT 'Iniciando test negativo: usuario_cobranza intentando INSERT';
 
 BEGIN TRY
     INSERT INTO facturacion.Factura DEFAULT VALUES;  -- Acción prohibida
