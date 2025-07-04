@@ -363,7 +363,7 @@ BEGIN
 END
 GO
 
--- Importar Grupo Familiar - ?
+-- Importar Grupo Familiar - FUNCIONANDO
 CREATE OR ALTER PROCEDURE usuarios.importarGrupoFamiliar
     @path NVARCHAR(260) 
 AS

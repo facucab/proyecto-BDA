@@ -259,9 +259,11 @@ CREATE TABLE facturacion.detalle(
 );
 GO
 CREATE TABLE actividades.actividad_socio(
+	id_asistencia  INT IDENTITY(1,1) PRIMARY KEY,
 	id_socio INT NOT NULL,
 	id_actividad INT NOT NULL,
-	PRIMARY KEY (id_socio, id_actividad),
+	presentismo  CHAR(2) NULL,
+	fecha DATE NULL
 	CONSTRAINT FK_socio FOREIGN KEY (id_socio) REFERENCES usuarios.socio(id_socio),
 	CONSTRAINT FK_actividad FOREIGN KEY (id_actividad) REFERENCES actividades.actividad(id_actividad)
 );
@@ -3736,59 +3738,51 @@ GO
 * Aclaración:
 *   Se usa transacción explícita para evitar duplicaciones y asegurar atomicidad.
 */
-CREATE OR ALTER PROCEDURE actividades.InscribirSocioActividad
+CREATE OR ALTER PROCEDURE actividades.RegistrarAsistencia
     @id_socio     INT,
-    @id_actividad INT
+    @id_actividad INT,
+    @fecha        DATE,
+    @presentismo  CHAR(2) -- 'SI' o 'NO' u otros valores válidos
 AS
 BEGIN
     SET NOCOUNT ON;
-    SET TRANSACTION ISOLATION LEVEL READ COMMITTED;
 
     BEGIN TRY
-        BEGIN TRANSACTION;
-
         -- Validar existencia del socio activo
         IF NOT EXISTS (
-            SELECT 1 FROM usuarios.socio 
-            WHERE id_socio = @id_socio AND activo = 1
+            SELECT 1 FROM usuarios.socio WHERE id_socio = @id_socio AND activo = 1
         )
         BEGIN
-            ROLLBACK TRANSACTION;
             SELECT 'Error' AS Resultado, 'Socio no encontrado o inactivo.' AS Mensaje, '404' AS Estado;
             RETURN;
         END;
 
         -- Validar existencia de la actividad activa
         IF NOT EXISTS (
-            SELECT 1 FROM actividades.actividad 
-            WHERE id_actividad = @id_actividad AND estado = 1
+            SELECT 1 FROM actividades.actividad WHERE id_actividad = @id_actividad AND estado = 1
         )
         BEGIN
-            ROLLBACK TRANSACTION;
             SELECT 'Error' AS Resultado, 'Actividad no encontrada o inactiva.' AS Mensaje, '404' AS Estado;
             RETURN;
         END;
 
-        -- Verificar si ya está inscripto
+        -- Evitar duplicado exacto para misma fecha
         IF EXISTS (
             SELECT 1 FROM actividades.actividad_socio
-            WHERE id_socio = @id_socio AND id_actividad = @id_actividad
+            WHERE id_socio = @id_socio AND id_actividad = @id_actividad AND fecha = @fecha
         )
         BEGIN
-            ROLLBACK TRANSACTION;
-            SELECT 'Error' AS Resultado, 'El socio ya está inscripto en la actividad.' AS Mensaje, '400' AS Estado;
+            SELECT 'Error' AS Resultado, 'Ya existe un registro para esa fecha.' AS Mensaje, '400' AS Estado;
             RETURN;
         END;
 
-        -- Insertar inscripción
-        INSERT INTO actividades.actividad_socio (id_socio, id_actividad)
-        VALUES (@id_socio, @id_actividad);
+        -- Insertar el registro de asistencia
+        INSERT INTO actividades.actividad_socio (id_socio, id_actividad, fecha, presentismo)
+        VALUES (@id_socio, @id_actividad, @fecha, @presentismo);
 
-        COMMIT TRANSACTION;
-        SELECT 'OK' AS Resultado, 'Socio inscripto correctamente en la actividad.' AS Mensaje, '200' AS Estado;
+        SELECT 'OK' AS Resultado, 'Asistencia registrada correctamente.' AS Mensaje, '200' AS Estado;
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
     END CATCH;
 END;
@@ -3802,34 +3796,35 @@ GO
 * Aclaración:
 *   No requiere transacción explícita ya que sólo afecta una fila.
 */
-CREATE OR ALTER PROCEDURE actividades.QuitarSocioActividad
+CREATE OR ALTER PROCEDURE actividades.EliminarAsistencia
     @id_socio     INT,
-    @id_actividad INT
+    @id_actividad INT,
+    @fecha        DATE
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    -- Verificar si existe la inscripción
+    -- Verificar existencia del registro
     IF NOT EXISTS (
         SELECT 1 FROM actividades.actividad_socio
-        WHERE id_socio = @id_socio AND id_actividad = @id_actividad
+        WHERE id_socio = @id_socio AND id_actividad = @id_actividad AND fecha = @fecha
     )
     BEGIN
-        SELECT 'Error' AS Resultado, 'El socio no está inscripto en la actividad.' AS Mensaje, '404' AS Estado;
+        SELECT 'Error' AS Resultado, 'No existe registro de asistencia para esa fecha.' AS Mensaje, '404' AS Estado;
         RETURN;
     END;
 
     BEGIN TRY
         DELETE FROM actividades.actividad_socio
-        WHERE id_socio = @id_socio AND id_actividad = @id_actividad;
+        WHERE id_socio = @id_socio AND id_actividad = @id_actividad AND fecha = @fecha;
 
-        SELECT 'OK' AS Resultado, 'Socio eliminado correctamente de la actividad.' AS Mensaje, '200' AS Estado;
+        SELECT 'OK' AS Resultado, 'Asistencia eliminada correctamente.' AS Mensaje, '200' AS Estado;
     END TRY
     BEGIN CATCH
         SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje, '500' AS Estado;
     END CATCH;
 END;
-GO
+GOGO
 -- ############################################################
 -- ################# SP NOTA DE CRÉDITO #################
 -- ############################################################
