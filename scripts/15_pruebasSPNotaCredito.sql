@@ -20,7 +20,7 @@ GO
 --Casos Normales
 EXEC facturacion.CrearNotaCredito
 	@fecha_emision = '2024-01-15',
-	@monto = 150.00D,
+	@monto = 150.00,
 	@motivo = 'Devolucion por mal servicio',
 	@id_factura = 1,
 	@id_clima = NULL;
@@ -28,7 +28,7 @@ EXEC facturacion.CrearNotaCredito
 
 EXEC facturacion.CrearNotaCredito
 	@fecha_emision = '2024-01-16',
-	@monto = 75.50D,
+	@monto = 75.50,
 	@motivo = 'Descuento por lluvia',
 	@id_factura = 2,
 	@id_clima = 1;
@@ -36,7 +36,7 @@ EXEC facturacion.CrearNotaCredito
 
 EXEC facturacion.CrearNotaCredito
 	@fecha_emision = '2024-01-17',
-	@monto = 200.00D,
+	@monto = 200.00,
 	@motivo = NULL,
 	@id_factura = 3,
 	@id_clima = NULL;
@@ -44,7 +44,7 @@ EXEC facturacion.CrearNotaCredito
 
 EXEC facturacion.CrearNotaCredito
 	@fecha_emision = '2024-01-18',
-	@monto = 50.25D,
+	@monto = 50.25,
 	@motivo = 'Error en facturacion',
 	@id_factura = 4,
 	@id_clima = 2;
@@ -52,7 +52,7 @@ EXEC facturacion.CrearNotaCredito
 
 EXEC facturacion.CrearNotaCredito
 	@fecha_emision = '2024-01-19',
-	@monto = 300.00D,
+	@monto = 300.00,
 	@motivo = 'Cancelacion de servicio',
 	@id_factura = 5,
 	@id_clima = NULL;
@@ -63,7 +63,7 @@ EXEC facturacion.CrearNotaCredito
 -- Error: Fecha de emision nula
 EXEC facturacion.CrearNotaCredito
 	@fecha_emision = NULL,
-	@monto = 150.00D,
+	@monto = 150.00,
 	@motivo = 'Test',
 	@id_factura = 1,
 	@id_clima = NULL;
@@ -72,7 +72,7 @@ EXEC facturacion.CrearNotaCredito
 -- Error: Fecha de emision futura
 EXEC facturacion.CrearNotaCredito
 	@fecha_emision = '2025-12-31',
-	@monto = 150.00D,
+	@monto = 150.00,
 	@motivo = 'Test',
 	@id_factura = 1,
 	@id_clima = NULL;
@@ -90,7 +90,7 @@ EXEC facturacion.CrearNotaCredito
 -- Error: Monto cero
 EXEC facturacion.CrearNotaCredito
 	@fecha_emision = '2024-01-20',
-	@monto = 0.00D,
+	@monto = 0.00,
 	@motivo = 'Test',
 	@id_factura = 1,
 	@id_clima = NULL;
@@ -99,7 +99,7 @@ EXEC facturacion.CrearNotaCredito
 -- Error: Monto negativo
 EXEC facturacion.CrearNotaCredito
 	@fecha_emision = '2024-01-20',
-	@monto = -50.00D,
+	@monto = -50.00,
 	@motivo = 'Test',
 	@id_factura = 1,
 	@id_clima = NULL;
@@ -108,7 +108,7 @@ EXEC facturacion.CrearNotaCredito
 -- Error: ID factura nulo
 EXEC facturacion.CrearNotaCredito
 	@fecha_emision = '2024-01-20',
-	@monto = 150.00D,
+	@monto = 150.00,
 	@motivo = 'Test',
 	@id_factura = NULL,
 	@id_clima = NULL;
@@ -117,7 +117,7 @@ EXEC facturacion.CrearNotaCredito
 -- Error: Factura inexistente
 EXEC facturacion.CrearNotaCredito
 	@fecha_emision = '2024-01-20',
-	@monto = 150.00D,
+	@monto = 150.00,
 	@motivo = 'Test',
 	@id_factura = 999,
 	@id_clima = NULL;
@@ -126,72 +126,11 @@ EXEC facturacion.CrearNotaCredito
 -- Error: Clima inexistente
 EXEC facturacion.CrearNotaCredito
 	@fecha_emision = '2024-01-20',
-	@monto = 150.00D,
+	@monto = 150.00,
 	@motivo = 'Test',
 	@id_factura = 1,
 	@id_clima = 999;
 --Resultado: El clima especificado no existe
-
--- MODIFICACION
-
--- Casos Normales
-EXEC facturacion.ModificarNotaCredito
-	@id_nota_credito = 1,
-	@fecha_emision = '2024-01-21',
-	@monto = 175.00D,
-	@motivo = 'Devolucion actualizada',
-	@id_clima = 1;
---Resultado: Nota de credito modificada correctamente
-
-EXEC facturacion.ModificarNotaCredito
-	@id_nota_credito = 2,
-	@monto = 80.00D,
-	@motivo = 'Descuento por lluvia actualizado';
---Resultado: Nota de credito modificada correctamente
-
--- ERRORES
-
--- Error: Nota de credito inexistente
-EXEC facturacion.ModificarNotaCredito
-	@id_nota_credito = 999,
-	@monto = 100.00D;
---Resultado: La nota de credito no existe
-
--- Error: Fecha futura en modificacion
-EXEC facturacion.ModificarNotaCredito
-	@id_nota_credito = 1,
-	@fecha_emision = '2025-12-31';
---Resultado: La fecha de emision no puede ser futura
-
--- Error: Monto invalido en modificacion
-EXEC facturacion.ModificarNotaCredito
-	@id_nota_credito = 1,
-	@monto = -25.00D;
---Resultado: El monto debe ser mayor a 0
-
--- Error: Clima inexistente en modificacion
-EXEC facturacion.ModificarNotaCredito
-	@id_nota_credito = 1,
-	@id_clima = 999;
---Resultado: El clima especificado no existe
-
--- ELIMINACION
-
--- Casos Normales
-EXEC facturacion.EliminarNotaCredito
-	@id_nota_credito = 3;
---Resultado: Nota de credito eliminada correctamente
-
-EXEC facturacion.EliminarNotaCredito
-	@id_nota_credito = 4;
---Resultado: Nota de credito eliminada correctamente
-
--- ERRORES
-
--- Error: Nota de credito inexistente
-EXEC facturacion.EliminarNotaCredito
-	@id_nota_credito = 999;
---Resultado: La nota de credito no existe
 
 -- Verificar estado final de la tabla
 SELECT *

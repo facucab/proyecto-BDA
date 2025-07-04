@@ -25,13 +25,16 @@ EXEC facturacion.CrearFactura
 	@id_metodo_pago = 5,
 	@estado_pago    = 'Pendiente',
 	@monto_a_pagar  = 150.75,
+	@fecha_emision  = '1/10/1991',
 	@detalle        = 'Factura test 1';
+
 -- Resultado esperado: OK, Factura creada correctamente.
 
 EXEC facturacion.CrearFactura
 	@id_persona     = 3,
 	@id_metodo_pago = NULL,
 	@estado_pago    = 'Pagado',
+	@fecha_emision  = '1/10/1991',
 	@monto_a_pagar  = 200.00,
 	@detalle        = NULL;
 -- Resultado esperado: OK, Factura creada correctamente.
@@ -41,6 +44,7 @@ EXEC facturacion.CrearFactura
 	@id_persona     = 99999,
 	@id_metodo_pago = 1,
 	@estado_pago    = 'Pendiente',
+	@fecha_emision  = '1/10/1991',
 	@monto_a_pagar  = 50.00,
 	@detalle        = NULL;
 -- Resultado esperado: Error, Persona no encontrada.
@@ -50,24 +54,27 @@ EXEC facturacion.CrearFactura
 	@id_persona     = 3,
 	@id_metodo_pago = 999,
 	@estado_pago    = 'Pendiente',
+	@fecha_emision  = '1/10/1991',
 	@monto_a_pagar  = 75.00,
 	@detalle        = NULL;
 -- Resultado esperado: Error, Metodo de pago no existe.
 
--- Estado de pago vac�o
+-- Estado de pago vacio
 EXEC facturacion.CrearFactura
 	@id_persona     = 3,
 	@id_metodo_pago = 1,
 	@estado_pago    = '',
+	@fecha_emision  = '1/10/1991',
 	@monto_a_pagar  = 60.00,
 	@detalle        = NULL;
 -- Resultado esperado: Error, El estado de pago es obligatorio.
 
--- Monto a pagar inv�lido (<= 0)
+-- Monto a pagar invalido (<= 0)
 EXEC facturacion.CrearFactura
 	@id_persona     = 3,
 	@id_metodo_pago = 1,
 	@estado_pago    = 'Pendiente',
+	@fecha_emision  = '1/10/1991',
 	@monto_a_pagar  = 0,
 	@detalle        = NULL;
 -- Resultado esperado: Error, El monto a pagar debe ser mayor a 0.

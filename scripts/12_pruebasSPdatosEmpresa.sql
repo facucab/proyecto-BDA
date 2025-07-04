@@ -65,7 +65,7 @@ EXEC facturacion.CrearDatosEmpresa
 
 -- Error: CUIT duplicado
 EXEC facturacion.CrearDatosEmpresa
-	@cuit = '20-12345678-9',
+	@cuit = '20-12345678-40',
 	@domicilio_comercial = 'Otra dirección',
 	@condicion_iva = 'Responsable Inscripto',
 	@nombre = 'Empresa Duplicada';

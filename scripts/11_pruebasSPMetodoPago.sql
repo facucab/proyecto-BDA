@@ -11,8 +11,6 @@
 USE Com5600G01;
 GO
 
-BEGIN TRAN TestMetodoPago;
-GO
 
 -- CrearMetodoPago
 
@@ -120,9 +118,7 @@ EXEC facturacion.EliminarMetodoPago
 -- Resultado esperado: Error, Método de pago no encontrado.
 GO
 
-ROLLBACK TRAN TestMetodoPago;
-GO
-
 SELECT *
 FROM facturacion.metodo_pago
 GO
+

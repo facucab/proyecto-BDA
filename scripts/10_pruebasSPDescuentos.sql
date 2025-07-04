@@ -153,8 +153,9 @@ EXEC facturacion.EliminarDescuento
 -- Resultado esperado: Error, Descuento no encontrado.
 GO
 
+SELECT * 
+FROM facturacion.descuento
+
 ROLLBACK TRAN TestDescuento;
 GO
 
-SELECT * 
-FROM facturacion.descuento

@@ -4458,3 +4458,101 @@ BEGIN
     WHERE s.numero_socio = @numero_socio;
 END;
 GO
+
+/*
+* Nombre: CrearDatosEmpresa
+* Descripción: Inserta una nueva empresa en la tabla facturacion.datos_empresa, validando unicidad de CUIT y parámetros obligatorios.
+* Parámetros:
+*   @cuit                VARCHAR(20)  CUIT del emisor (obligatorio, único).
+*   @domicilio_comercial VARCHAR(25)  Domicilio comercial (obligatorio).
+*   @condicion_iva       VARCHAR(25)  Condición frente al IVA (obligatorio, valores válidos: Responsable Inscripto, Monotributista, Exento).
+*   @nombre              VARCHAR(35)  Nombre de la empresa (obligatorio).
+*/
+CREATE OR ALTER PROCEDURE facturacion.CrearDatosEmpresa
+    @cuit                VARCHAR(20),
+    @domicilio_comercial VARCHAR(25),
+    @condicion_iva       VARCHAR(25),
+    @nombre              VARCHAR(35)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    -- Validaciones de nulos y vacíos
+    IF @cuit IS NULL OR LTRIM(RTRIM(@cuit)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El CUIT no puede estar vacío' AS Mensaje;
+        RETURN;
+    END;
+    IF @domicilio_comercial IS NULL OR LTRIM(RTRIM(@domicilio_comercial)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El domicilio no puede estar vacío' AS Mensaje;
+        RETURN;
+    END;
+    IF @condicion_iva IS NULL OR LTRIM(RTRIM(@condicion_iva)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Los parámetros no pueden ser nulos' AS Mensaje;
+        RETURN;
+    END;
+    IF @nombre IS NULL OR LTRIM(RTRIM(@nombre)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El nombre de la empresa no puede estar vacío' AS Mensaje;
+        RETURN;
+    END;
+    -- Validar condición IVA
+    IF UPPER(LTRIM(RTRIM(@condicion_iva))) NOT IN ('RESPONSABLE INSCRIPTO', 'MONOTRIBUTISTA', 'EXENTO')
+    BEGIN
+        SELECT 'Error' AS Resultado, 'Las condiciones válidas frente al IVA son "Responsable Inscripto", "Monotributista" y "Exento"' AS Mensaje;
+        RETURN;
+    END;
+    -- Validar CUIT único
+    IF EXISTS (SELECT 1 FROM facturacion.datos_empresa WHERE cuit_emisor = @cuit)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'CUIT Repetido' AS Mensaje;
+        RETURN;
+    END;
+    -- Insertar
+    BEGIN TRY
+        INSERT INTO facturacion.datos_empresa (cuit_emisor, domicilio_comercial, condicion_IVA, nombre)
+        VALUES (LTRIM(RTRIM(@cuit)), LTRIM(RTRIM(@domicilio_comercial)), LTRIM(RTRIM(@condicion_iva)), LTRIM(RTRIM(@nombre)));
+        SELECT 'OK' AS Resultado, 'Datos ingresados correctamente' AS Mensaje;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+    END CATCH;
+END;
+GO
+/*
+* Nombre: EliminarDatosEmpresa
+* Descripción: Elimina una empresa de la tabla facturacion.datos_empresa por CUIT.
+* Parámetros:
+*   @cuit VARCHAR(20) - CUIT de la empresa a eliminar (obligatorio).
+*/
+CREATE OR ALTER PROCEDURE facturacion.EliminarDatosEmpresa
+    @cuit VARCHAR(20)
+AS
+BEGIN
+    SET NOCOUNT ON;
+    IF @cuit IS NULL
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El CUIT es obligatorio para identificar la empresa a eliminar' AS Mensaje;
+        RETURN;
+    END;
+    IF LTRIM(RTRIM(@cuit)) = ''
+    BEGIN
+        SELECT 'Error' AS Resultado, 'El CUIT no puede estar vacío' AS Mensaje;
+        RETURN;
+    END;
+    IF NOT EXISTS (SELECT 1 FROM facturacion.datos_empresa WHERE cuit_emisor = @cuit)
+    BEGIN
+        SELECT 'Error' AS Resultado, 'No existe una empresa con el CUIT proporcionado' AS Mensaje;
+        RETURN;
+    END;
+    BEGIN TRY
+        DELETE FROM facturacion.datos_empresa WHERE cuit_emisor = @cuit;
+        SELECT 'OK' AS Resultado, 'Empresa eliminada correctamente' AS Mensaje;
+    END TRY
+    BEGIN CATCH
+        SELECT 'Error' AS Resultado, ERROR_MESSAGE() AS Mensaje;
+    END CATCH;
+END;
+GO
+

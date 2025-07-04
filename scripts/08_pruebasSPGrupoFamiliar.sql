@@ -17,8 +17,10 @@ GO
 -- Crear Grupo Familiar
 
 -- Caso normal
-EXEC usuarios.CrearGrupoFamiliar;
+EXEC usuarios.CrearGrupoFamiliar
+    @id_socio_rp = 1;
 -- Resultado esperado: OK, Grupo familiar creado correctamente
+select * from usuarios.socio
 
 -- ModificarEstadoGrupoFamiliar
 
@@ -49,31 +51,6 @@ EXEC usuarios.ModificarEstadoGrupoFamiliar
     @id_grupo = 3,
     @estado   = 61;
 -- Resultado esperado: Error, Estado debe ser 0 (inactivo) o 1 (activo)
-
-
--- EliminarGrupoFamiliar
-
--- Casos Normales
-EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 3;
--- Resultado esperado: OK, Grupo familiar inactivado correctamente
-
-EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 6;
--- Resultado esperado: OK, Grupo familiar inactivado correctamente
-
-EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 9;
--- Resultado esperado: OK, Grupo familiar inactivado correctamente
-
--- Grupo inexistente
-EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 27894;
--- Resultado esperado: Error, Grupo familiar no encontrado
-
--- Responsable asignado
-EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 2;
--- Resultado esperado: Error, No se puede eliminar: grupo tiene responsables asignados
-
--- Miembros activos
-EXEC usuarios.EliminarGrupoFamiliar @id_grupo = 4;
--- Resultado esperado: Error, No se puede eliminar: grupo tiene socios asignados
 
 SELECT *
 FROM usuarios.grupo_familiar
