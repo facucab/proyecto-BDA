@@ -81,6 +81,7 @@ En caso de poder acceder a una nube, haríamos un respaldo adicional en ella par
 
 -- Reporte 2: Reporte acumulado mensual de ingresos por actividad deportiva
 -- desde enero hasta el momento actual
+GO
 CREATE OR ALTER PROCEDURE reportes.IngresosAcumuladosPorActividad
 AS
 BEGIN

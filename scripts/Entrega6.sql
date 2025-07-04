@@ -169,5 +169,5 @@ GO
 -- EXEC actividades.SociosConInasistencias
 GO
 -- Reporte 4: 
-EXEC actividades.SociosConInasistenciasEnClases; 
+-- EXEC actividades.SociosConInasistenciasEnClases; 
 GO
