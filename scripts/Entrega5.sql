@@ -63,22 +63,42 @@ BEGIN
         
         EXEC sp_executesql @SQL; -- Importa los registros
         
-        DECLARE cur CURSOR FOR
+        -- Variables para controlar el loop
+        DECLARE @RowNum INT = 1;
+        DECLARE @MaxRow INT;
+        
+        -- CTE con numeración de filas
+        WITH CTE_Numerado AS (
             SELECT [Categoria socio], 
                    [Valor cuota], 
-                   [Vigente hasta] 
+                   [Vigente hasta],
+                   ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
             FROM #TempDatos
-            WHERE [Categoria socio] IS NOT NULL;
-            
-        OPEN cur;
-        FETCH NEXT FROM cur INTO @nombre_categoria, @costo_membrecia, @vigencia;
+            WHERE [Categoria socio] IS NOT NULL
+        )
+        SELECT @MaxRow = MAX(RowNum) FROM CTE_Numerado;
         
         -- Va revisando registro por registro
-        WHILE @@FETCH_STATUS = 0
+        WHILE @RowNum <= @MaxRow
         BEGIN
             BEGIN TRY
                 DECLARE @return_procedimiento INT;
                 DECLARE @id_aux INT;
+                
+                -- Obtener datos del registro actual usando CTE
+                WITH CTE_Numerado AS (
+                    SELECT [Categoria socio], 
+                           [Valor cuota], 
+                           [Vigente hasta],
+                           ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
+                    FROM #TempDatos
+                    WHERE [Categoria socio] IS NOT NULL
+                )
+                SELECT @nombre_categoria = [Categoria socio],
+                       @costo_membrecia = [Valor cuota],
+                       @vigencia = [Vigente hasta]
+                FROM CTE_Numerado
+                WHERE RowNum = @RowNum;
                 
                 -- Llamo al procedimiento y capturo el resultado
                 EXEC @return_procedimiento = actividades.CrearCategoria
@@ -107,12 +127,10 @@ BEGIN
                        'Error al importar registro: ' + ISNULL(ERROR_MESSAGE(), 'Error desconocido') AS Mensaje;
             END CATCH
             
-            FETCH NEXT FROM cur INTO @nombre_categoria, @costo_membrecia, @vigencia;
+            SET @RowNum = @RowNum + 1;
         END
         
         -- Cierra objetos
-        CLOSE cur;
-        DEALLOCATE cur;
         DROP TABLE #TempDatos;
         
         SELECT 'Éxito' AS Resultado, 'Importación completada' AS Mensaje;
@@ -120,12 +138,6 @@ BEGIN
     END TRY
     BEGIN CATCH
         -- Cleanup en caso de error
-        IF CURSOR_STATUS('local', 'cur') >= 0
-        BEGIN
-            CLOSE cur;
-            DEALLOCATE cur;
-        END
-        
         IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
             DROP TABLE #TempDatos;
             
@@ -222,37 +234,61 @@ BEGIN
         
         EXEC sp_executesql @SQL;  -- Importa los registros
 
-        -- Declara el cursor para la tabla
-        DECLARE cur CURSOR FOR 
-        SELECT [Nro de Socio], 
-               [ DNI], 
-               [Nombre], 
-               [ apellido], 
-               [ email personal],
-               [ fecha de nacimiento], 
-               [ teléfono de contacto], 
-               [ teléfono de contacto emergencia],
-               [ Nombre de la obra social o prepaga], 
-               [nro# de socio obra social/prepaga ],
-               [teléfono de contacto de emergencia ]
-        FROM #TempDatos;
+        -- Variables para controlar el loop
+        DECLARE @RowNum INT = 1;
+        DECLARE @MaxRow INT;
+        
+        -- CTE con numeración de filas
+        WITH CTE_Numerado AS (
+            SELECT [Nro de Socio], 
+                   [ DNI], 
+                   [Nombre], 
+                   [ apellido], 
+                   [ email personal],
+                   [ fecha de nacimiento], 
+                   [ teléfono de contacto], 
+                   [ teléfono de contacto emergencia],
+                   [ Nombre de la obra social o prepaga], 
+                   [nro# de socio obra social/prepaga ],
+                   [teléfono de contacto de emergencia ],
+                   ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
+            FROM #TempDatos
+        )
+        SELECT @MaxRow = MAX(RowNum) FROM CTE_Numerado;
 
-        OPEN cur;
-        FETCH NEXT FROM cur INTO @nroSocio, 
-                                 @dni, 
-                                 @nombre, 
-                                 @apellido, 
-                                 @email, 
-                                 @fechaNac,
-                                 @telefono, 
-                                 @telefonoEmergencia, 
-                                 @obraSocial, 
-                                 @nroSocioObra,
-                                 @telefonoObraSocial;
-
-        WHILE @@FETCH_STATUS = 0
+        WHILE @RowNum <= @MaxRow
         BEGIN
             BEGIN TRY
+                -- Obtener datos del registro actual usando CTE
+                WITH CTE_Numerado AS (
+                    SELECT [Nro de Socio], 
+                           [ DNI], 
+                           [Nombre], 
+                           [ apellido], 
+                           [ email personal],
+                           [ fecha de nacimiento], 
+                           [ teléfono de contacto], 
+                           [ teléfono de contacto emergencia],
+                           [ Nombre de la obra social o prepaga], 
+                           [nro# de socio obra social/prepaga ],
+                           [teléfono de contacto de emergencia ],
+                           ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
+                    FROM #TempDatos
+                )
+                SELECT @nroSocio = [Nro de Socio], 
+                       @dni = [ DNI], 
+                       @nombre = [Nombre], 
+                       @apellido = [ apellido], 
+                       @email = [ email personal], 
+                       @fechaNac = [ fecha de nacimiento],
+                       @telefono = [ teléfono de contacto], 
+                       @telefonoEmergencia = [ teléfono de contacto emergencia], 
+                       @obraSocial = [ Nombre de la obra social o prepaga], 
+                       @nroSocioObra = [nro# de socio obra social/prepaga ],
+                       @telefonoObraSocial = [teléfono de contacto de emergencia ]
+                FROM CTE_Numerado
+                WHERE RowNum = @RowNum;
+
                 -- Reinicializar variables para cada iteración (si no queda usando la misma)
                 SET @id_ObSo = NULL;
 
@@ -316,38 +352,14 @@ BEGIN
                      @id_obra_social = @id_ObSo,
                      @id_categoria = @id_categoria;
 
-                FETCH NEXT FROM cur INTO @nroSocio, 
-                                         @dni, 
-                                         @nombre, 
-                                         @apellido, 
-                                         @email, 
-                                         @fechaNac,
-                                         @telefono, 
-                                         @telefonoEmergencia, 
-                                         @obraSocial, 
-                                         @nroSocioObra,
-                                         @telefonoObraSocial;
+                SET @RowNum = @RowNum + 1;
 
             END TRY
             BEGIN CATCH
                 -- Continuar con el siguiente registro
-                FETCH NEXT FROM cur INTO @nroSocio, 
-                                         @dni, 
-                                         @nombre, 
-                                         @apellido, 
-                                         @email, 
-                                         @fechaNac,
-                                         @telefono, 
-                                         @telefonoEmergencia, 
-                                         @obraSocial, 
-                                         @nroSocioObra,
-                                         @telefonoObraSocial;
+                SET @RowNum = @RowNum + 1;
             END CATCH
         END
-
-        -- Cleanup del cursor
-        CLOSE cur;
-        DEALLOCATE cur;
 
         -- Cleanup de tabla temporal
         IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
@@ -358,12 +370,6 @@ BEGIN
     END TRY
     BEGIN CATCH
         -- Cleanup en caso de error general
-        IF CURSOR_STATUS('local', 'cur') >= 0
-        BEGIN
-            CLOSE cur;
-            DEALLOCATE cur;
-        END
-
         IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
             DROP TABLE #TempDatos;
 
@@ -456,17 +462,42 @@ BEGIN
             @tel_cont_emerg VARCHAR(80);
 		-- 
 		DECLARE @i INT = 0; 
-		-- cursor para recorrer fila por fila
-        DECLARE cur CURSOR FOR
-            SELECT nro_de_socio, nro_de_socio_RP, nombre, apellido, dni, email_personal, fec_nac, tel_contacto, tel_emerg, nom_obra_social, nro_socio_obra_social, tel_cont_emerg
-            FROM #tempGrupoFamiliar;
+		
+		-- Variables para controlar el loop
+		DECLARE @RowNum INT = 1;
+		DECLARE @MaxRow INT;
+		
+		-- CTE con numeración de filas
+		WITH CTE_Numerado AS (
+			SELECT nro_de_socio, nro_de_socio_RP, nombre, apellido, dni, email_personal, fec_nac, tel_contacto, tel_emerg, nom_obra_social, nro_socio_obra_social, tel_cont_emerg,
+				   ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
+			FROM #tempGrupoFamiliar
+		)
+		SELECT @MaxRow = MAX(RowNum) FROM CTE_Numerado;
 
-        OPEN cur;
-
-        FETCH NEXT FROM cur INTO 
-            @nro_de_socio, @nro_de_socio_RP, @nombre, @apellido, @dni, @email_personal, @fec_nac, @tel_contacto, @tel_emerg, @nom_obra_social, @nro_socio_obra_social, @tel_cont_emerg;
-        WHILE @@FETCH_STATUS = 0
+        WHILE @RowNum <= @MaxRow
         BEGIN
+			-- Obtener datos del registro actual usando CTE
+			WITH CTE_Numerado AS (
+				SELECT nro_de_socio, nro_de_socio_RP, nombre, apellido, dni, email_personal, fec_nac, tel_contacto, tel_emerg, nom_obra_social, nro_socio_obra_social, tel_cont_emerg,
+					   ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
+				FROM #tempGrupoFamiliar
+			)
+			SELECT @nro_de_socio = nro_de_socio, 
+				   @nro_de_socio_RP = nro_de_socio_RP, 
+				   @nombre = nombre, 
+				   @apellido = apellido, 
+				   @dni = dni, 
+				   @email_personal = email_personal, 
+				   @fec_nac = fec_nac, 
+				   @tel_contacto = tel_contacto, 
+				   @tel_emerg = tel_emerg, 
+				   @nom_obra_social = nom_obra_social, 
+				   @nro_socio_obra_social = nro_socio_obra_social, 
+				   @tel_cont_emerg = tel_cont_emerg
+			FROM CTE_Numerado
+			WHERE RowNum = @RowNum;
+
 			-- Limpio el numero de los socios:  
 			SET @nro_de_socio_RP = SUBSTRING(@nro_de_socio_RP, CHARINDEX('-', @nro_de_socio_RP) + 1, LEN(@nro_de_socio_RP));
 			SET @nro_de_socio = SUBSTRING(@nro_de_socio, CHARINDEX('-', @nro_de_socio) + 1, LEN(@nro_de_socio));
@@ -559,11 +590,9 @@ BEGIN
 			END;
 
             -- Obtener siguiente fila
-            FETCH NEXT FROM cur INTO  @nro_de_socio, @nro_de_socio_RP, @nombre, @apellido, @dni, @email_personal, @fec_nac, @tel_contacto, @tel_emerg, @nom_obra_social, @nro_socio_obra_social, @tel_cont_emerg;
+            SET @RowNum = @RowNum + 1;
         END
 
-        CLOSE cur;
-        DEALLOCATE cur;
         -- Mostrar los datos importados
        -- SELECT * FROM #tempGrupoFamiliar;
 			
@@ -605,19 +634,36 @@ BEGIN
 
         EXEC sp_executesql @SQL;
 
-        DECLARE cur CURSOR FOR
-            SELECT [Actividad], [Valor por mes]
+        -- Variables para controlar el loop
+        DECLARE @RowNum INT = 1;
+        DECLARE @MaxRow INT;
+        
+        -- CTE con numeración de filas
+        WITH CTE_Numerado AS (
+            SELECT [Actividad], [Valor por mes],
+                   ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
             FROM #TempDatos
-            WHERE [Actividad] IS NOT NULL;
+            WHERE [Actividad] IS NOT NULL
+        )
+        SELECT @MaxRow = MAX(RowNum) FROM CTE_Numerado;
 
-        OPEN cur;
-        FETCH NEXT FROM cur INTO @nombre_actividad, @costo_mensual;
-
-        WHILE @@FETCH_STATUS = 0
+        WHILE @RowNum <= @MaxRow
         BEGIN
             BEGIN TRY
                 DECLARE @return_procedimiento INT;
                 DECLARE @id_aux INT;
+
+                -- Obtener datos del registro actual usando CTE
+                WITH CTE_Numerado AS (
+                    SELECT [Actividad], [Valor por mes],
+                           ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
+                    FROM #TempDatos
+                    WHERE [Actividad] IS NOT NULL
+                )
+                SELECT @nombre_actividad = [Actividad], 
+                       @costo_mensual = [Valor por mes]
+                FROM CTE_Numerado
+                WHERE RowNum = @RowNum;
 
                 EXEC @return_procedimiento = actividades.CrearActividad
                     @nombre_actividad = @nombre_actividad,
@@ -640,23 +686,15 @@ BEGIN
                        'Error al importar registro: ' + ISNULL(ERROR_MESSAGE(), 'Error desconocido') AS Mensaje;
             END CATCH
 
-            FETCH NEXT FROM cur INTO @nombre_actividad, @costo_mensual;
+            SET @RowNum = @RowNum + 1;
         END
 
-        CLOSE cur;
-        DEALLOCATE cur;
         DROP TABLE #TempDatos;
 
         SELECT 'Éxito' AS Resultado, 'Importación de actividades completada' AS Mensaje;
 
     END TRY
     BEGIN CATCH
-        IF CURSOR_STATUS('local', 'cur') >= 0
-        BEGIN
-            CLOSE cur;
-            DEALLOCATE cur;
-        END
-
         IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
             DROP TABLE #TempDatos;
 
@@ -711,16 +749,36 @@ BEGIN
               )';
         EXEC sp_executesql @SQL;
 
-        DECLARE cur CURSOR FOR
-            SELECT Concepto,Grupo,Socios,Invitados
+        -- Variables para controlar el loop
+        DECLARE @RowNum INT = 1;
+        DECLARE @MaxRow INT;
+        
+        -- CTE con numeración de filas
+        WITH CTE_Numerado AS (
+            SELECT Concepto,Grupo,Socios,Invitados,
+                   ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
               FROM #TempDatos
-             WHERE Grupo IS NOT NULL;  -- descartar fila de título
+             WHERE Grupo IS NOT NULL  -- descartar fila de título
+        )
+        SELECT @MaxRow = MAX(RowNum) FROM CTE_Numerado;
 
-        OPEN cur;
-        FETCH NEXT FROM cur INTO @conceptoBruto,@grupoBruto,@sociosBruto,@invitadosBruto;
-        WHILE @@FETCH_STATUS = 0
+        WHILE @RowNum <= @MaxRow
         BEGIN
             BEGIN TRY
+                -- Obtener datos del registro actual usando CTE
+                WITH CTE_Numerado AS (
+                    SELECT Concepto,Grupo,Socios,Invitados,
+                           ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
+                      FROM #TempDatos
+                     WHERE Grupo IS NOT NULL  -- descartar fila de título
+                )
+                SELECT @conceptoBruto = Concepto,
+                       @grupoBruto = Grupo,
+                       @sociosBruto = Socios,
+                       @invitadosBruto = Invitados
+                  FROM CTE_Numerado
+                 WHERE RowNum = @RowNum;
+
                 -- relleanr Concepto
                 IF @conceptoBruto IS NOT NULL AND LTRIM(RTRIM(@conceptoBruto)) <> ''
                     SET @lastConcepto = @conceptoBruto;
@@ -792,12 +850,10 @@ BEGIN
                        + ISNULL(ERROR_MESSAGE(),'Error desconocido') AS Mensaje;
             END CATCH
 
-            FETCH NEXT FROM cur INTO @conceptoBruto,@grupoBruto,@sociosBruto,@invitadosBruto;
+            SET @RowNum = @RowNum + 1;
         END
 
         -- Cierra objetos
-        CLOSE cur;
-        DEALLOCATE cur;
         DROP TABLE #TempDatos;
 
         -- Resultado final
@@ -806,11 +862,6 @@ BEGIN
     END TRY
     BEGIN CATCH
         -- Cleanup en caso de error
-        IF CURSOR_STATUS('local','cur') >= 0
-        BEGIN
-            CLOSE cur;
-            DEALLOCATE cur;
-        END
         IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
             DROP TABLE #TempDatos;
 
@@ -859,21 +910,39 @@ BEGIN
         
         EXEC sp_executesql @SQL;
         
-        -- Variables para el cursor
+        -- Variables para el procesamiento
         DECLARE @fechaHora SMALLDATETIME, @lluvia DECIMAL(5,2), @hora VARCHAR(20), @rain VARCHAR(20);
         
-        DECLARE cur CURSOR FOR
+        -- Variables para controlar el loop
+        DECLARE @RowNum INT = 1;
+        DECLARE @MaxRow INT;
+        
+        -- CTE con numeración de filas
+        WITH CTE_Numerado AS (
             SELECT [time], 
-                   [rain_mm]
+                   [rain_mm],
+                   ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
             FROM #TempClima
-            WHERE [time] IS NOT NULL AND [rain_mm] IS NOT NULL AND LTRIM(RTRIM([time])) <> '';
+            WHERE [time] IS NOT NULL AND [rain_mm] IS NOT NULL AND LTRIM(RTRIM([time])) <> ''
+        )
+        SELECT @MaxRow = MAX(RowNum) FROM CTE_Numerado;
         
-        OPEN cur;
-        FETCH NEXT FROM cur INTO @hora, @rain;
-        
-        WHILE @@FETCH_STATUS = 0
+        WHILE @RowNum <= @MaxRow
         BEGIN
             BEGIN TRY
+                -- Obtener datos del registro actual usando CTE
+                WITH CTE_Numerado AS (
+                    SELECT [time], 
+                           [rain_mm],
+                           ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
+                    FROM #TempClima
+                    WHERE [time] IS NOT NULL AND [rain_mm] IS NOT NULL AND LTRIM(RTRIM([time])) <> ''
+                )
+                SELECT @hora = [time], 
+                       @rain = [rain_mm]
+                FROM CTE_Numerado
+                WHERE RowNum = @RowNum;
+                
                 -- Limpiar espacios y caracteres extraños
                 SET @hora = LTRIM(RTRIM(@hora));
                 
@@ -900,23 +969,15 @@ BEGIN
                 -- Continuar con el siguiente registro
             END CATCH
             
-            FETCH NEXT FROM cur INTO @hora, @rain;
+            SET @RowNum = @RowNum + 1;
         END
         
-        CLOSE cur;
-        DEALLOCATE cur;
         DROP TABLE #TempClima;
         
         SELECT 'Éxito' AS Resultado, 'Importación completada' AS Mensaje;
                
     END TRY
     BEGIN CATCH
-        IF CURSOR_STATUS('local', 'cur') >= 0
-        BEGIN
-            CLOSE cur;
-            DEALLOCATE cur;
-        END
-        
         IF OBJECT_ID('tempdb..#TempClima') IS NOT NULL
             DROP TABLE #TempClima;
             
@@ -964,23 +1025,43 @@ BEGIN
                 ''SELECT * FROM [pago cuotas$A1:E10000]'')';
         EXEC sp_executesql @SQL; -- La ejecuta
     
-        --  Variables auxiliares y cursor para recorrer la tabla
+        --  Variables auxiliares para recorrer la tabla
         DECLARE @id_pago BIGINT, @fecha DATE, @numero_socio VARCHAR(20), @valor DECIMAL(10,2), @medio_pago VARCHAR(50);
         DECLARE @id_persona INT, @id_metodo_pago INT;
         DECLARE @ContadorExitosos INT = 0;
         DECLARE @ContadorErrores INT = 0;
 
-        DECLARE cur CURSOR FOR
-            SELECT [Id de pago], [fecha], [Responsable de pago], [Valor], [Medio de pago]
+        -- Variables para controlar el loop
+        DECLARE @RowNum INT = 1;
+        DECLARE @MaxRow INT;
+        
+        -- CTE con numeración de filas
+        WITH CTE_Numerado AS (
+            SELECT [Id de pago], [fecha], [Responsable de pago], [Valor], [Medio de pago],
+                   ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
             FROM #TempDatos
-            WHERE [Responsable de pago] IS NOT NULL;
+            WHERE [Responsable de pago] IS NOT NULL
+        )
+        SELECT @MaxRow = MAX(RowNum) FROM CTE_Numerado;
 
-        OPEN cur;
-        FETCH NEXT FROM cur INTO @id_pago, @fecha, @numero_socio, @valor, @medio_pago;
-
-        WHILE @@FETCH_STATUS = 0
+        WHILE @RowNum <= @MaxRow
         BEGIN
             BEGIN TRY
+                -- Obtener datos del registro actual usando CTE
+                WITH CTE_Numerado AS (
+                    SELECT [Id de pago], [fecha], [Responsable de pago], [Valor], [Medio de pago],
+                           ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
+                    FROM #TempDatos
+                    WHERE [Responsable de pago] IS NOT NULL
+                )
+                SELECT @id_pago = [Id de pago], 
+                       @fecha = [fecha], 
+                       @numero_socio = [Responsable de pago], 
+                       @valor = [Valor], 
+                       @medio_pago = [Medio de pago]
+                FROM CTE_Numerado
+                WHERE RowNum = @RowNum;
+
                 -- Quita el SN a los registros 'SN-'
                 SET @numero_socio = REPLACE(@numero_socio, 'SN-', '');
                 SET @numero_socio = LTRIM(RTRIM(@numero_socio));
@@ -1037,11 +1118,9 @@ BEGIN
             END CATCH
 
             SIGUIENTE:
-            FETCH NEXT FROM cur INTO @id_pago, @fecha, @numero_socio, @valor, @medio_pago;
+            SET @RowNum = @RowNum + 1;
         END
 
-        CLOSE cur;
-        DEALLOCATE cur;
         DROP TABLE #TempDatos;
 
         -- Generar reporte final
@@ -1052,12 +1131,6 @@ BEGIN
         END
     END TRY
     BEGIN CATCH
-        IF CURSOR_STATUS('local', 'cur') >= 0
-        BEGIN
-            CLOSE cur;
-            DEALLOCATE cur;
-        END
-
         IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
             DROP TABLE #TempDatos;
 
@@ -1127,21 +1200,43 @@ BEGIN
 
                     @horario_clase TIME;
 
-            -- Cursor para recorrer los datos
-            DECLARE cur CURSOR FOR
-            SELECT [Nro de Socio], 
-                   [Actividad], 
-                   [fecha de asistencia], 
-                   [Asistencia], 
-                   [Profesor]
-            FROM #TempDatos
-
-            OPEN cur; -- Abre el cursor
-            FETCH NEXT FROM cur INTO @nroSocio, @actividad, @fecha, @asistencia, @profesor; -- Carga los datos dentro de las variables
+            -- Variables para controlar el loop
+            DECLARE @RowNum INT = 1;
+            DECLARE @MaxRow INT;
+            
+            -- CTE con numeración de filas
+            WITH CTE_Numerado AS (
+                SELECT [Nro de Socio], 
+                       [Actividad], 
+                       [fecha de asistencia], 
+                       [Asistencia], 
+                       [Profesor],
+                       ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
+                FROM #TempDatos
+            )
+            SELECT @MaxRow = MAX(RowNum) FROM CTE_Numerado;
             
             -- Hasta que no termine, carga los datos.
-            WHILE @@FETCH_STATUS = 0
+            WHILE @RowNum <= @MaxRow
             BEGIN
+                -- Obtener datos del registro actual usando CTE
+                WITH CTE_Numerado AS (
+                    SELECT [Nro de Socio], 
+                           [Actividad], 
+                           [fecha de asistencia], 
+                           [Asistencia], 
+                           [Profesor],
+                           ROW_NUMBER() OVER (ORDER BY (SELECT NULL)) AS RowNum
+                    FROM #TempDatos
+                )
+                SELECT @nroSocio = [Nro de Socio], 
+                       @actividad = [Actividad], 
+                       @fecha = [fecha de asistencia], 
+                       @asistencia = [Asistencia], 
+                       @profesor = [Profesor]
+                FROM CTE_Numerado
+                WHERE RowNum = @RowNum;
+
                 -- Normaliza numero de socio
                 SET @nroSocio = REPLACE(LTRIM(RTRIM(@nroSocio)), 'SN-', '');
                 
@@ -1272,7 +1367,7 @@ BEGIN
                 END
 
                 SIGUIENTE_REGISTRO:
-                FETCH NEXT FROM cur INTO @nroSocio, @actividad, @fecha, @asistencia, @profesor;
+                SET @RowNum = @RowNum + 1;
             END
             
     END TRY
