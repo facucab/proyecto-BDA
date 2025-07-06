@@ -28,7 +28,7 @@ GO
 USE Com5600G01;
 GO
 
-
+-- Importar Categorias - FUNCIONANDO - Sin Cursor
 CREATE OR ALTER PROCEDURE actividades.ImportarCategorias
     @RutaArchivo NVARCHAR(260)
 AS
@@ -36,318 +36,296 @@ BEGIN
     SET NOCOUNT ON;
     BEGIN TRY
         DECLARE @SQL NVARCHAR(MAX);
-
+        
         -- Tabla temporal donde importar los archivos
         CREATE TABLE #TempDatos (
             [Categoria socio] VARCHAR(50),
-            [Valor cuota]    DECIMAL(10, 2),
-            [Vigente hasta]  DATE
+            [Valor cuota] DECIMAL(10, 2),
+            [Vigente hasta] DATE
         );
-
+        
         -- Arma el SQL dinámico
         SET @SQL = N'
-            INSERT INTO #TempDatos ([Categoria socio], [Valor cuota], [Vigente hasta])
-            SELECT [Categoria socio], [Valor cuota], [Vigente hasta]
+            INSERT INTO #TempDatos ([Categoria socio], 
+                                    [Valor cuota], 
+                                    [Vigente hasta])
+            SELECT [Categoria socio], 
+                   [Valor cuota], 
+                   [Vigente hasta]
             FROM OPENROWSET(
                 ''Microsoft.ACE.OLEDB.12.0'',
                 ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
                 ''SELECT * FROM [Tarifas$B10:D13]'')';
-        EXEC sp_executesql @SQL; -- Importa los registros
-
-        BEGIN TRANSACTION;
-
-        -- INSERTAR CATEGORÍAS NUEVAS (que NO existían), ignorando filas inválidas
+        
+        EXEC sp_executesql @SQL; -- Importa los registros a la temporal
+        
+        -- Procesa los datos con CTE
+        WITH DatosProcesados AS (
+            SELECT 
+                LTRIM(RTRIM([Categoria socio])) AS nombre_categoria,
+                [Valor cuota] AS costo_membrecia,
+                [Vigente hasta] AS vigencia
+            FROM #TempDatos
+            WHERE [Categoria socio] IS NOT NULL
+              AND LTRIM(RTRIM([Categoria socio])) <> ''
+              AND [Valor cuota] IS NOT NULL
+        )
+        -- Inserta registros nuevos
         INSERT INTO actividades.categoria (nombre_categoria, costo_membrecia, vigencia)
-        SELECT
-            LOWER(LTRIM(RTRIM(t.[Categoria socio]))),
-            t.[Valor cuota],
-            t.[Vigente hasta]
-        FROM #TempDatos AS t
-        LEFT JOIN actividades.categoria AS c
-            ON LOWER(c.nombre_categoria) = LOWER(LTRIM(RTRIM(t.[Categoria socio])))
-        WHERE t.[Categoria socio]   IS NOT NULL
-          AND LTRIM(RTRIM(t.[Categoria socio])) <> ''
-          AND t.[Valor cuota]      > 0
-          AND t.[Vigente hasta]    IS NOT NULL
-          AND c.id_categoria       IS NULL;
-
-        -- ACTUALIZAR CATEGORÍAS EXISTENTES, ignorando filas inválidas
-        UPDATE c
-        SET
-            c.costo_membrecia = t.[Valor cuota],
-            c.vigencia        = t.[Vigente hasta]
-        FROM actividades.categoria AS c
-        INNER JOIN #TempDatos AS t
-            ON LOWER(c.nombre_categoria) = LOWER(LTRIM(RTRIM(t.[Categoria socio])))
-        WHERE t.[Categoria socio]   IS NOT NULL
-          AND LTRIM(RTRIM(t.[Categoria socio])) <> ''
-          AND t.[Valor cuota]      > 0
-          AND t.[Vigente hasta]    IS NOT NULL;
-
-        COMMIT TRANSACTION;
-
-        -- Contar resultados
-        DECLARE @insertados   INT = (
-            SELECT COUNT(*)
-            FROM #TempDatos AS t
-            LEFT JOIN actividades.categoria AS c
-              ON LOWER(c.nombre_categoria) = LOWER(LTRIM(RTRIM(t.[Categoria socio])))
-            WHERE t.[Categoria socio]   IS NOT NULL
-              AND LTRIM(RTRIM(t.[Categoria socio])) <> ''
-              AND t.[Valor cuota]      > 0
-              AND t.[Vigente hasta]    IS NOT NULL
-              AND c.id_categoria       IS NULL
-        ), 
-        @actualizados INT = (
-            SELECT COUNT(*)
-            FROM #TempDatos AS t
-            INNER JOIN actividades.categoria AS c
-              ON LOWER(c.nombre_categoria) = LOWER(LTRIM(RTRIM(t.[Categoria socio])))
-            WHERE t.[Categoria socio] IS NOT NULL
+        SELECT 
+            dp.nombre_categoria,
+            dp.costo_membrecia,
+            dp.vigencia
+        FROM DatosProcesados dp
+        WHERE NOT EXISTS (
+            SELECT 1 FROM actividades.categoria c 
+            WHERE LOWER(LTRIM(RTRIM(c.nombre_categoria))) = LOWER(LTRIM(RTRIM(dp.nombre_categoria)))
         );
-
-        -- Limpieza de temp table
+        
+        -- Actualiza registros existentes
+        UPDATE actividades.categoria
+        SET 
+            costo_membrecia = dp.costo_membrecia,
+            vigencia = dp.vigencia
+        FROM (
+            SELECT 
+                LTRIM(RTRIM([Categoria socio])) AS nombre_categoria,
+                [Valor cuota] AS costo_membrecia,
+                [Vigente hasta] AS vigencia
+            FROM #TempDatos
+            WHERE [Categoria socio] IS NOT NULL
+              AND LTRIM(RTRIM([Categoria socio])) <> ''
+              AND [Valor cuota] IS NOT NULL
+        ) dp
+        WHERE LOWER(LTRIM(RTRIM(actividades.categoria.nombre_categoria))) = LOWER(LTRIM(RTRIM(dp.nombre_categoria)));
+        
         DROP TABLE #TempDatos;
-
-        SELECT
-            'Éxito' AS Resultado,
-            'Importación completada. Insertados: ' 
-              + CAST(@insertados   AS VARCHAR(10))
-              + ', Actualizados: ' 
-              + CAST(@actualizados AS VARCHAR(10)) AS Mensaje;
-
+        
+        SELECT 'Éxito' AS Resultado, 'Importación completada' AS Mensaje;
+        
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
-
-        -- Cleanup en caso de error
         IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
             DROP TABLE #TempDatos;
-
-        SELECT
-            'Error' AS Resultado,
-            'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
+            
+        SELECT 'Error' AS Resultado, 
+               'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
         RETURN -1;
     END CATCH
-END;
+END
 GO
     
--- Importar Socios - FUNCIONANDO
+-- Importar Socios - FUNCIONANDO - Sin Cursor
 CREATE OR ALTER PROCEDURE usuarios.ImportarSocios
     @RutaArchivo NVARCHAR(260)
 AS
 BEGIN
     SET NOCOUNT ON;
+    BEGIN TRY
     DECLARE @SQL NVARCHAR(MAX);
 
-    BEGIN TRY
-        -- Tabla temporal para poner los datos
+        -- Tabla temporal donde importar los archivos
         CREATE TABLE #TempDatos ( 
-            [Nro de Socio]                    VARCHAR(20),
-            [Nombre]                          NVARCHAR(50),
-            [ apellido]                       NVARCHAR(50),
-            [ DNI]                            VARCHAR(20),
-            [ email personal]                 VARCHAR(320),
-            [ fecha de nacimiento]            DATE,
-            [ teléfono de contacto]           VARCHAR(50),
+            [Nro de Socio] VARCHAR(20),
+            [Nombre] VARCHAR(50),
+            [ apellido] VARCHAR(50),
+            [ DNI] VARCHAR(20),
+            [ email personal] VARCHAR(320),
+            [ fecha de nacimiento] DATE,
+            [ teléfono de contacto] VARCHAR(50),
             [ teléfono de contacto emergencia] VARCHAR(50),
             [ Nombre de la obra social o prepaga] NVARCHAR(100),
             [nro# de socio obra social/prepaga ] VARCHAR(50),
             [teléfono de contacto de emergencia ] VARCHAR(50)
         );
 
-        -- Arma el SQL para la ruta
+        -- Arma el SQL dinámico con validaciones mejoradas
         SET @SQL = N'
             INSERT INTO #TempDatos (
-                [Nro de Socio],[Nombre],[ apellido],[ DNI],
-                [ email personal],[ fecha de nacimiento],
-                [ teléfono de contacto],[ teléfono de contacto emergencia],
-                [ Nombre de la obra social o prepaga],
-                [nro# de socio obra social/prepaga ],
+                [Nro de Socio], [Nombre], 
+                [ apellido], 
+                [ DNI], 
+                [ email personal],
+                [ fecha de nacimiento], 
+                [ teléfono de contacto], 
+                [ teléfono de contacto emergencia],
+                [ Nombre de la obra social o prepaga], 
+                [nro# de socio obra social/prepaga ], 
                 [teléfono de contacto de emergencia ]
             )
-            SELECT
-                [Nro de Socio],
-                [Nombre],
-                [ apellido],
-                [ DNI],
-                [ email personal],
-                [ fecha de nacimiento],
-                CASE WHEN ISNUMERIC([ teléfono de contacto]) = 1 AND [ teléfono de contacto] IS NOT NULL
-                     THEN FORMAT(CAST([ teléfono de contacto] AS BIGINT), ''0'')
-                     ELSE CAST([ teléfono de contacto] AS VARCHAR(50))
+            SELECT 
+                LTRIM(RTRIM([Nro de Socio])),
+                LTRIM(RTRIM([Nombre])),
+                LTRIM(RTRIM([ apellido])), 
+                LTRIM(RTRIM([ DNI])),
+                LTRIM(RTRIM([ email personal])),
+                TRY_CAST([ fecha de nacimiento] AS DATE),
+                CASE 
+                    WHEN ISNUMERIC([ teléfono de contacto]) = 1 AND [ teléfono de contacto] IS NOT NULL
+                    THEN FORMAT(CAST([ teléfono de contacto] AS BIGINT), ''0'')
+                    ELSE CAST([ teléfono de contacto] AS VARCHAR(50))
                 END,
-                CASE WHEN ISNUMERIC([ teléfono de contacto emergencia]) = 1 AND [ teléfono de contacto emergencia] IS NOT NULL
-                     THEN FORMAT(CAST([ teléfono de contacto emergencia] AS BIGINT), ''0'')
-                     ELSE CAST([ teléfono de contacto emergencia] AS VARCHAR(50))
+                CASE 
+                    WHEN ISNUMERIC([ teléfono de contacto emergencia]) = 1 AND [ teléfono de contacto emergencia] IS NOT NULL
+                    THEN FORMAT(CAST([ teléfono de contacto emergencia] AS BIGINT), ''0'')
+                    ELSE CAST([ teléfono de contacto emergencia] AS VARCHAR(50))
                 END,
-                [ Nombre de la obra social o prepaga],
-                [nro# de socio obra social/prepaga ],
-                CASE WHEN ISNUMERIC([teléfono de contacto de emergencia ]) = 1 AND [teléfono de contacto de emergencia ] IS NOT NULL
-                     THEN FORMAT(CAST([teléfono de contacto de emergencia ] AS BIGINT), ''0'')
-                     ELSE CAST([teléfono de contacto de emergencia ] AS VARCHAR(50))
+                LTRIM(RTRIM([ Nombre de la obra social o prepaga])),
+                LTRIM(RTRIM([nro# de socio obra social/prepaga ])),
+                CASE 
+                    WHEN ISNUMERIC([teléfono de contacto de emergencia ]) = 1 AND [teléfono de contacto de emergencia ] IS NOT NULL
+                    THEN FORMAT(CAST([teléfono de contacto de emergencia ] AS BIGINT), ''0'')
+                    ELSE CAST([teléfono de contacto de emergencia ] AS VARCHAR(50))
                 END
-            FROM OPENROWSET(
-                ''Microsoft.ACE.OLEDB.12.0'',
-                ''Excel 12.0;HDR=YES;IMEX=1;TypeGuessRows=0;Database=' + @RutaArchivo + ''',
-                ''SELECT * FROM [Responsables de Pago$]'')';
-        EXEC sp_executesql @SQL;  -- Importa los registros
-
-        -- Antes de insertar, normalizar los campos de texto
-        UPDATE #TempDatos
-        SET
-            [Nro de Socio]                    = REPLACE(LTRIM(RTRIM([Nro de Socio])), 'SN-', ''),
-            [ DNI]                            = REPLACE(REPLACE(LTRIM(RTRIM([ DNI])), '.', ''), '-', ''),
-            [ email personal]                 = LOWER(REPLACE(LTRIM(RTRIM([ email personal])), ' ', '')),
-            [ Nombre de la obra social o prepaga] = LTRIM(RTRIM([ Nombre de la obra social o prepaga]));
-
-        BEGIN TRANSACTION;
-
-        -- PASO 1: Procesar obras sociales
-        -- 1.1 Crear obras sociales nuevas
-        INSERT INTO usuarios.obra_social(descripcion, nro_telefono)
-        SELECT DISTINCT
-            UPPER(LTRIM(RTRIM(t.[ Nombre de la obra social o prepaga]))),
-            COALESCE(t.[teléfono de contacto de emergencia ], '11')
-        FROM #TempDatos AS t
-        WHERE t.[ Nombre de la obra social o prepaga] IS NOT NULL
-          AND LTRIM(RTRIM(t.[ Nombre de la obra social o prepaga])) <> ''
+                FROM OPENROWSET(
+                    ''Microsoft.ACE.OLEDB.12.0'',
+                    ''Excel 12.0;HDR=YES;IMEX=1;TypeGuessRows=0;Database=' + @RutaArchivo + ''',
+                ''SELECT * FROM [Responsables de Pago$]'')
+            WHERE [Nro de Socio] IS NOT NULL 
+              AND LTRIM(RTRIM([Nro de Socio])) <> ''''
+              AND [ DNI] IS NOT NULL 
+              AND LTRIM(RTRIM([ DNI])) <> ''''
+              AND TRY_CAST([ fecha de nacimiento] AS DATE) IS NOT NULL';
+        
+        EXEC sp_executesql @SQL; -- Importa los registros a la temporal
+        
+        -- Procesa los datos y crea obras sociales nuevas con validación mejorada
+        INSERT INTO usuarios.obra_social (descripcion, nro_telefono)
+        SELECT DISTINCT 
+            LTRIM(RTRIM([ Nombre de la obra social o prepaga])),
+            LEFT(ISNULL([teléfono de contacto de emergencia ], '11'), 20)
+        FROM #TempDatos
+        WHERE [ Nombre de la obra social o prepaga] IS NOT NULL 
+          AND LTRIM(RTRIM([ Nombre de la obra social o prepaga])) <> ''
           AND NOT EXISTS (
-              SELECT 1 FROM usuarios.obra_social os
-              WHERE os.descripcion = UPPER(LTRIM(RTRIM(t.[ Nombre de la obra social o prepaga])))
-          );
-
-        -- 1.2 Actualizar teléfonos de obras sociales existentes
-        UPDATE os
-        SET nro_telefono = COALESCE(src.[teléfono de contacto de emergencia ], os.nro_telefono)
-        FROM usuarios.obra_social AS os
-        INNER JOIN (
-            SELECT DISTINCT
-                UPPER(LTRIM(RTRIM([ Nombre de la obra social o prepaga]))) AS descripcion,
-                [teléfono de contacto de emergencia ]
-            FROM #TempDatos
-            WHERE [ Nombre de la obra social o prepaga] IS NOT NULL
-              AND LTRIM(RTRIM([ Nombre de la obra social o prepaga])) <> ''
-              AND [teléfono de contacto de emergencia ] IS NOT NULL
-        ) AS src
-          ON os.descripcion = src.descripcion;
-
-        -- PASO 2: Agregar columnas calculadas a la tabla temporal
-        ALTER TABLE #TempDatos ADD 
-            id_persona_existente INT,
-            id_obra_social_calc  INT,
-            id_categoria_calc    INT,
-            edad_calc            INT;
-
-        -- Buscar personas existentes
-        UPDATE t
-        SET t.id_persona_existente = p.id_persona
-        FROM #TempDatos AS t
-        INNER JOIN usuarios.persona AS p
-          ON p.dni = TRY_CAST(t.[ DNI] AS INT)
-         AND p.activo = 1;
-
-        -- Buscar obras sociales
-        UPDATE t
-        SET t.id_obra_social_calc = os.id_obra_social
-        FROM #TempDatos AS t
-        INNER JOIN usuarios.obra_social AS os
-          ON os.descripcion = UPPER(LTRIM(RTRIM(t.[ Nombre de la obra social o prepaga])))
-        WHERE t.[ Nombre de la obra social o prepaga] IS NOT NULL;
-
-        -- Calcular edad y categoría
-        UPDATE #TempDatos
-        SET
-            edad_calc = DATEDIFF(YEAR, [ fecha de nacimiento], GETDATE()),
-            id_categoria_calc = CASE
-                WHEN DATEDIFF(YEAR, [ fecha de nacimiento], GETDATE()) >= 18
-                    THEN (SELECT id_categoria FROM actividades.categoria WHERE nombre_categoria = 'mayor')
-                WHEN DATEDIFF(YEAR, [ fecha de nacimiento], GETDATE()) >= 13
-                    THEN (SELECT id_categoria FROM actividades.categoria WHERE nombre_categoria = 'cadete')
+              SELECT 1 FROM usuarios.obra_social os 
+              WHERE LOWER(LTRIM(RTRIM(os.descripcion))) = LOWER(LTRIM(RTRIM([ Nombre de la obra social o prepaga])))
+        );
+        
+        -- Crear tabla temporal para datos procesados
+        CREATE TABLE #DatosProcesados (
+            numero_socio VARCHAR(20),
+            dni VARCHAR(20),
+            nombre NVARCHAR(50),
+            apellido NVARCHAR(50),
+            email VARCHAR(320),
+            fecha_nac DATE,
+            telefono VARCHAR(50),
+            telefono_emergencia VARCHAR(50),
+            nro_socio_obra VARCHAR(50),
+            id_obra_social INT,
+            categoria_nombre VARCHAR(20)
+        );
+        
+        -- Insertar datos procesados en tabla temporal
+        INSERT INTO #DatosProcesados
+        SELECT 
+            REPLACE(LTRIM(RTRIM([Nro de Socio])), 'SN-', '') AS numero_socio,
+            REPLACE(REPLACE(LTRIM(RTRIM([ DNI])), '.', ''), '-', '') AS dni,
+            UPPER(LEFT(LTRIM(RTRIM([Nombre])), 1)) + LOWER(SUBSTRING(LTRIM(RTRIM([Nombre])), 2, LEN([Nombre]))) AS nombre,
+            UPPER(LEFT(LTRIM(RTRIM([ apellido])), 1)) + LOWER(SUBSTRING(LTRIM(RTRIM([ apellido])), 2, LEN([ apellido]))) AS apellido,
+            CASE 
+                WHEN [ email personal] IS NULL OR LTRIM(RTRIM([ email personal])) = '' THEN
+                    'socio_' + REPLACE(LTRIM(RTRIM([Nro de Socio])), 'SN-', '') + '@example.com'
                 ELSE
-                    (SELECT id_categoria FROM actividades.categoria WHERE nombre_categoria = 'menor')
-            END
-        WHERE [ fecha de nacimiento] IS NOT NULL;
-
-        -- PASO 3: Crear personas nuevas
-        ;WITH CTE_PersonasValidas AS (
-            SELECT DISTINCT
-                dni_int   = TRY_CAST([ DNI] AS INT),
-                nombre    = UPPER(LEFT([Nombre],1)) + LOWER(SUBSTRING([Nombre],2,LEN([Nombre]))),
-                apellido  = UPPER(LEFT([ apellido],1)) + LOWER(SUBSTRING([ apellido],2,LEN([ apellido]))),
-                email     = [ email personal],
-                fecha_nac = [ fecha de nacimiento],
-                telefono  = [ teléfono de contacto]
-            FROM #TempDatos
-            WHERE TRY_CAST([ DNI] AS INT)    IS NOT NULL
-              AND [ fecha de nacimiento]      IS NOT NULL
-        )
-        INSERT INTO usuarios.persona(dni, nombre, apellido, email, fecha_nac, telefono, activo)
-        SELECT
-            vp.dni_int,
-            vp.nombre,
-            vp.apellido,
-            LOWER(vp.email),
-            vp.fecha_nac,
-            vp.telefono,
-            1
-        FROM CTE_PersonasValidas AS vp
-        WHERE NOT EXISTS (
-            SELECT 1 FROM usuarios.persona p WHERE p.dni = vp.dni_int
-        );
-
-        -- Actualizar los IDs de las personas recién creadas
-        UPDATE t
-        SET t.id_persona_existente = p.id_persona
-        FROM #TempDatos AS t
-        INNER JOIN usuarios.persona AS p
-          ON p.dni = TRY_CAST(t.[ DNI] AS INT)
-        WHERE t.id_persona_existente IS NULL;
-
-        -- PASO 4: Crear socios nuevos
-        ;WITH CTE_SociosValidos AS (
-            SELECT
-                numero_socio       = [Nro de Socio],
-                id_persona         = id_persona_existente,
-                telefono_emergencia= [ teléfono de contacto emergencia],
-                obra_nro_socio     = [nro# de socio obra social/prepaga ],
-                id_obra_social     = id_obra_social_calc,
-                id_categoria       = id_categoria_calc
-            FROM #TempDatos
-            WHERE [Nro de Socio] IS NOT NULL
-              AND id_persona_existente IS NOT NULL
-        )
-        INSERT INTO usuarios.socio(
-            numero_socio, id_persona, telefono_emergencia,
-            obra_nro_socio, id_obra_social, id_categoria, id_grupo
-        )
-        SELECT
-            vs.numero_socio,
-            vs.id_persona,
-            vs.telefono_emergencia,
-            vs.obra_nro_socio,
-            vs.id_obra_social,
-            vs.id_categoria,
-            NULL
-        FROM CTE_SociosValidos AS vs
-        WHERE NOT EXISTS (
-            SELECT 1 FROM usuarios.socio s WHERE s.numero_socio = vs.numero_socio
-        );
-
-        COMMIT TRANSACTION;
-
-        -- Cleanup de tabla temporal
-        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
+                    LOWER(REPLACE(LTRIM(RTRIM([ email personal])), ' ', ''))
+            END AS email,
+            [ fecha de nacimiento] AS fecha_nac,
+            CASE 
+                WHEN [ teléfono de contacto] IS NULL OR LTRIM(RTRIM([ teléfono de contacto])) = '' THEN '11'
+                ELSE [ teléfono de contacto]
+            END AS telefono,
+            [ teléfono de contacto emergencia] AS telefono_emergencia,
+            [nro# de socio obra social/prepaga ] AS nro_socio_obra,
+            os.id_obra_social,
+            CASE 
+                WHEN DATEDIFF(YEAR, [ fecha de nacimiento], GETDATE()) >= 18 THEN 'mayor'
+                WHEN DATEDIFF(YEAR, [ fecha de nacimiento], GETDATE()) >= 13 THEN 'cadete'
+                ELSE 'menor'
+            END AS categoria_nombre
+        FROM #TempDatos
+        LEFT JOIN usuarios.obra_social os ON LOWER(LTRIM(RTRIM(os.descripcion))) = LOWER(LTRIM(RTRIM([ Nombre de la obra social o prepaga])))
+        WHERE [Nro de Socio] IS NOT NULL
+          AND LTRIM(RTRIM([Nro de Socio])) <> ''
+          AND [ DNI] IS NOT NULL
+          AND LTRIM(RTRIM([ DNI])) <> ''
+          AND [ fecha de nacimiento] IS NOT NULL;
+        
+        -- Crear personas si no existen (manejo de duplicados)
+        INSERT INTO usuarios.persona (dni, nombre, apellido, email, fecha_nac, telefono)
+        SELECT 
+            dni,
+            nombre,
+            apellido,
+            email,
+            fecha_nac,
+            telefono
+        FROM (
+            SELECT 
+                dp.dni,
+                dp.nombre,
+                dp.apellido,
+                dp.email,
+                dp.fecha_nac,
+                dp.telefono,
+                ROW_NUMBER() OVER (PARTITION BY dp.dni ORDER BY dp.numero_socio) AS rn
+            FROM #DatosProcesados dp
+            WHERE NOT EXISTS (
+                SELECT 1 FROM usuarios.persona p WHERE p.dni = dp.dni
+            )
+            AND dp.dni IS NOT NULL 
+            AND dp.dni <> ''
+        ) ranked
+        WHERE rn = 1;
+        
+        -- Crear o actualizar socios con validación mejorada
+        MERGE usuarios.socio AS target
+        USING (
+            SELECT 
+                dp.numero_socio,
+                dp.dni,
+                dp.nombre,
+                dp.apellido,
+                dp.email,
+                dp.fecha_nac,
+                dp.telefono,
+                dp.telefono_emergencia,
+                dp.nro_socio_obra,
+                dp.id_obra_social,
+                c.id_categoria
+            FROM #DatosProcesados dp
+            LEFT JOIN actividades.categoria c ON LOWER(c.nombre_categoria) = LOWER(dp.categoria_nombre)
+            WHERE dp.numero_socio IS NOT NULL 
+              AND dp.numero_socio <> ''
+              AND dp.dni IS NOT NULL 
+              AND dp.dni <> ''
+        ) AS source
+        ON target.numero_socio = source.numero_socio
+        WHEN NOT MATCHED THEN
+            INSERT (numero_socio, id_persona, telefono_emergencia, obra_nro_socio, id_obra_social, id_categoria)
+            VALUES (
+                source.numero_socio,
+                (SELECT id_persona FROM usuarios.persona WHERE dni = source.dni),
+                source.telefono_emergencia,
+                source.nro_socio_obra,
+                source.id_obra_social,
+                source.id_categoria
+            )
+        WHEN MATCHED THEN
+            UPDATE SET
+                telefono_emergencia = source.telefono_emergencia,
+                obra_nro_socio = source.nro_socio_obra,
+                id_obra_social = source.id_obra_social,
+                id_categoria = source.id_categoria;
+        
+        DROP TABLE #DatosProcesados;
+        
             DROP TABLE #TempDatos;
 
-        SELECT 'Éxito' AS Resultado, 'Proceso completado correctamente' AS Mensaje;
+        SELECT 'Éxito' AS Resultado, 'Importación completada' AS Mensaje;
 
     END TRY
     BEGIN CATCH
-        -- Cleanup en caso de error general
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
         IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
             DROP TABLE #TempDatos;
 
@@ -355,205 +333,279 @@ BEGIN
                'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
         RETURN -1;
     END CATCH
-END;
+END
 GO
 
--- Importar Grupo Familiar - FUNCIONANDO
+-- Importar Grupo Familiar - FUNCIONANDO - Sin Cursor
 CREATE OR ALTER PROCEDURE usuarios.importarGrupoFamiliar
-    @path NVARCHAR(260)
+    @path NVARCHAR(260) 
 AS
 BEGIN
     SET NOCOUNT ON;
     BEGIN TRY
-        -- Tabla temporal para almacenar los datos importados
-        CREATE TABLE #tempGrupoFamiliar (
-            nro_de_socio             VARCHAR(7),
-            nro_de_socio_RP          VARCHAR(7),
-            nombre                   VARCHAR(35),
-            apellido                 VARCHAR(35),
-            dni                      INT,
-            email_personal           VARCHAR(255),
-            fec_nac                  DATE,
-            tel_contacto             VARCHAR(20),
-            tel_emerg                VARCHAR(20),
-            nom_obra_social          VARCHAR(35),
-            nro_socio_obra_social    VARCHAR(35),
-            tel_cont_emerg           VARCHAR(80)
+        DECLARE @SQL NVARCHAR(MAX);
+        
+        -- Tabla temporal donde importar los archivos
+        CREATE TABLE #TempDatos (
+            [Nro de Socio] VARCHAR(20),
+            [Nro de socio RP] VARCHAR(20),
+            [Nombre] VARCHAR(50),
+            [ apellido] VARCHAR(50),
+            [ DNI] VARCHAR(20),
+            [ email personal] VARCHAR(320),
+            [ fecha de nacimiento] DATE,
+            [ teléfono de contacto] VARCHAR(50),
+            [ teléfono de contacto emergencia] VARCHAR(50),
+            [ Nombre de la obra social o prepaga] VARCHAR(100),
+            [nro# de socio obra social/prepaga ] VARCHAR(50),
+            [teléfono de contacto de emergencia ] VARCHAR(50)
         );
-
-        DECLARE @sql NVARCHAR(MAX);
-
-        -- Consulta con los encabezados EXACTOS como aparecen en el excel
-        SET @sql = N'
-            INSERT INTO #tempGrupoFamiliar (
-                nro_de_socio,
-                nro_de_socio_RP,
-                nombre,
-                apellido,
-                dni,
-                email_personal,
-                fec_nac,
-                tel_contacto,
-                tel_emerg,
-                nom_obra_social,
-                nro_socio_obra_social,
-                tel_cont_emerg
-            )
-            SELECT
-                [Nro de Socio],
-                [Nro de socio RP],
-                RTRIM(LTRIM(LOWER([Nombre]))),
-                RTRIM(LTRIM(LOWER([ apellido]))),
-                [ DNI],
-                [ email personal],
-                CONVERT(DATE, [ fecha de nacimiento], 103),
-                [ teléfono de contacto],
-                CAST([ teléfono de contacto emergencia] AS VARCHAR(20)),
-                RTRIM(LTRIM(LOWER([ Nombre de la obra social o prepaga]))),
-                [nro# de socio obra social/prepaga ],
+        
+        -- Arma el SQL dinámico
+        SET @SQL = N'
+            INSERT INTO #TempDatos (
+                [Nro de Socio], [Nro de socio RP], [Nombre], 
+                [ apellido], [ DNI], [ email personal],
+                [ fecha de nacimiento], [ teléfono de contacto], 
+                [ teléfono de contacto emergencia],
+                [ Nombre de la obra social o prepaga], 
+                [nro# de socio obra social/prepaga ], 
                 [teléfono de contacto de emergencia ]
+            )
+            SELECT 
+                LTRIM(RTRIM([Nro de Socio])),
+                LTRIM(RTRIM([Nro de socio RP])),
+                LTRIM(RTRIM([Nombre])),
+                LTRIM(RTRIM([ apellido])), 
+                LTRIM(RTRIM([ DNI])),
+                LTRIM(RTRIM([ email personal])),
+                TRY_CAST([ fecha de nacimiento] AS DATE),
+                CASE 
+                    WHEN ISNUMERIC([ teléfono de contacto]) = 1 AND [ teléfono de contacto] IS NOT NULL
+                    THEN FORMAT(CAST([ teléfono de contacto] AS BIGINT), ''0'')
+                    ELSE CAST([ teléfono de contacto] AS VARCHAR(50))
+                END,
+                CASE 
+                    WHEN ISNUMERIC([ teléfono de contacto emergencia]) = 1 AND [ teléfono de contacto emergencia] IS NOT NULL
+                    THEN FORMAT(CAST([ teléfono de contacto emergencia] AS BIGINT), ''0'')
+                    ELSE CAST([ teléfono de contacto emergencia] AS VARCHAR(50))
+                END,
+                LTRIM(RTRIM([ Nombre de la obra social o prepaga])),
+                LTRIM(RTRIM([nro# de socio obra social/prepaga ])),
+                CASE 
+                    WHEN ISNUMERIC([teléfono de contacto de emergencia ]) = 1 AND [teléfono de contacto de emergencia ] IS NOT NULL
+                    THEN FORMAT(CAST([teléfono de contacto de emergencia ] AS BIGINT), ''0'')
+                    ELSE CAST([teléfono de contacto de emergencia ] AS VARCHAR(50))
+                END
             FROM OPENROWSET(
                 ''Microsoft.ACE.OLEDB.12.0'',
-                ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @path + ''',
-                ''SELECT * FROM [Grupo Familiar$]''
-            ) AS ExcelData;';
-        EXEC sp_executesql @sql; -- Importa los registros
-
-        BEGIN TRANSACTION;
-
-        -- Normalizar campos y filtrar filas con responsable válido
-        ;WITH CTE_Normalizado AS (
-            SELECT
-                ROW_NUMBER() OVER(ORDER BY (SELECT 1))                   AS rn,
-                SUBSTRING(nro_de_socio, CHARINDEX('-', nro_de_socio)+1, 7)      AS nro_socio,
-                SUBSTRING(nro_de_socio_RP, CHARINDEX('-', nro_de_socio_RP)+1,7) AS nro_socio_rp,
-                nombre,
-                apellido,
-                dni,
-                email_personal,
-                fec_nac,
-                ISNULL(tel_contacto, '11')                                AS tel_contacto,
-                tel_emerg,
-                nom_obra_social,
-                nro_socio_obra_social,
-                tel_cont_emerg
-            FROM #tempGrupoFamiliar
-            WHERE nro_de_socio IS NOT NULL
-              AND nro_de_socio_RP IS NOT NULL
-        ), CTE_Validos AS (
-            SELECT n.*
-            FROM CTE_Normalizado n
-            INNER JOIN usuarios.socio srp
-              ON srp.numero_socio = n.nro_socio_rp
-        )
-
-        -- Crear grupos familiares faltantes
-        MERGE usuarios.grupo_familiar AS target
-        USING (
-            SELECT DISTINCT nro_socio_rp AS id_socio_rp
-            FROM CTE_Validos
-        ) AS src
-          ON target.id_socio_rp = src.id_socio_rp
-        WHEN NOT MATCHED THEN
-          INSERT (id_socio_rp) VALUES (src.id_socio_rp);
-
-        -- Crear obras sociales faltantes
-        MERGE usuarios.obra_social AS target
-        USING (
-            SELECT DISTINCT UPPER(nom_obra_social) AS descripcion
-            FROM CTE_Validos
-            WHERE nom_obra_social IS NOT NULL AND nom_obra_social <> ''
-        ) AS src_os
-          ON target.descripcion = src_os.descripcion
-        WHEN NOT MATCHED THEN
-          INSERT (descripcion, nro_telefono) VALUES (src_os.descripcion, '11');
-
-        -- Preparar datos finales con ID de grupo, obra y categoría
-        ;WITH CTE_Datos AS (
-            SELECT
-                v.*,
-                gf.id_grupo_familiar,
-                os.id_obra_social,
-                CASE 
-                    WHEN DATEDIFF(YEAR, v.fec_nac, GETDATE()) > 17 THEN 
-                        (SELECT id_categoria FROM actividades.categoria WHERE LOWER(nombre_categoria) = 'mayor')
-                    WHEN DATEDIFF(YEAR, v.fec_nac, GETDATE()) > 12 THEN 
-                        (SELECT id_categoria FROM actividades.categoria WHERE LOWER(nombre_categoria) = 'cadete')
-                    ELSE 
-                        (SELECT id_categoria FROM actividades.categoria WHERE LOWER(nombre_categoria) = 'menor')
-                END AS id_categoria
-            FROM CTE_Validos v
-            INNER JOIN usuarios.grupo_familiar gf 
-                ON gf.id_socio_rp = v.nro_socio_rp
-            LEFT JOIN usuarios.obra_social os 
-                ON UPPER(os.descripcion) = UPPER(v.nom_obra_social)
-        )
-
-        -- Insertar socios nuevos (ignorando los ya existentes)
-        INSERT INTO usuarios.socio (
-            id_persona,
+                ''Excel 12.0;HDR=YES;IMEX=1;TypeGuessRows=0;Database=' + @path + ''',
+                ''SELECT * FROM [Grupo Familiar$]'')
+            WHERE [Nro de Socio] IS NOT NULL 
+              AND LTRIM(RTRIM([Nro de Socio])) <> ''''
+              AND [ DNI] IS NOT NULL 
+              AND LTRIM(RTRIM([ DNI])) <> ''''
+              AND TRY_CAST([ fecha de nacimiento] AS DATE) IS NOT NULL';
+        
+        EXEC sp_executesql @SQL; -- Importa los registros a la temporal
+        
+        -- Procesa los datos y crea obras sociales
+        INSERT INTO usuarios.obra_social (descripcion, nro_telefono)
+        SELECT DISTINCT 
+            LTRIM(RTRIM([ Nombre de la obra social o prepaga])),
+            LEFT(ISNULL([teléfono de contacto de emergencia ], '11'), 20)
+        FROM #TempDatos
+        WHERE [ Nombre de la obra social o prepaga] IS NOT NULL 
+          AND LTRIM(RTRIM([ Nombre de la obra social o prepaga])) <> ''
+          AND NOT EXISTS (
+              SELECT 1 FROM usuarios.obra_social os 
+              WHERE LOWER(LTRIM(RTRIM(os.descripcion))) = LOWER(LTRIM(RTRIM([ Nombre de la obra social o prepaga])))
+        );
+        
+        -- Crear tabla temporal para datos procesados
+        CREATE TABLE #DatosProcesados (
+            numero_socio VARCHAR(20),
+            numero_socio_rp VARCHAR(20),
+            dni VARCHAR(20),
+            nombre NVARCHAR(50),
+            apellido NVARCHAR(50),
+            email VARCHAR(320),
+            fecha_nac DATE,
+            telefono VARCHAR(50),
+            telefono_emergencia VARCHAR(50),
+            nro_socio_obra VARCHAR(50),
+            id_obra_social INT,
+            categoria_nombre VARCHAR(20),
+            id_socio_rp INT
+        );
+        
+        -- Insertar datos procesados en tabla temporal
+        INSERT INTO #DatosProcesados
+        SELECT 
+            REPLACE(LTRIM(RTRIM([Nro de Socio])), 'SN-', '') AS numero_socio,
+            REPLACE(LTRIM(RTRIM([Nro de socio RP])), 'SN-', '') AS numero_socio_rp,
+            CASE 
+                WHEN ISNUMERIC([ DNI]) = 1 THEN 
+                    CAST(CAST(CAST([ DNI] AS FLOAT) AS INT) AS VARCHAR(9))
+                ELSE 
+                    LEFT(REPLACE(REPLACE(REPLACE(LTRIM(RTRIM([ DNI])), '.', ''), '-', ''), '+', ''), 9)
+            END AS dni,
+            UPPER(LEFT(LTRIM(RTRIM([Nombre])), 1)) + LOWER(SUBSTRING(LTRIM(RTRIM([Nombre])), 2, LEN([Nombre]))) AS nombre,
+            UPPER(LEFT(LTRIM(RTRIM([ apellido])), 1)) + LOWER(SUBSTRING(LTRIM(RTRIM([ apellido])), 2, LEN([ apellido]))) AS apellido,
+            CASE 
+                WHEN [ email personal] IS NULL OR LTRIM(RTRIM([ email personal])) = '' THEN
+                    'socio_' + REPLACE(LTRIM(RTRIM([Nro de Socio])), 'SN-', '') + '@example.com'
+                ELSE
+                    LOWER(REPLACE(LTRIM(RTRIM([ email personal])), ' ', ''))
+            END AS email,
+            [ fecha de nacimiento] AS fecha_nac,
+            CASE 
+                WHEN [ teléfono de contacto] IS NULL OR LTRIM(RTRIM([ teléfono de contacto])) = '' THEN '11'
+                ELSE [ teléfono de contacto]
+            END AS telefono,
+            [ teléfono de contacto emergencia] AS telefono_emergencia,
+            [nro# de socio obra social/prepaga ] AS nro_socio_obra,
+            os.id_obra_social,
+            CASE 
+                WHEN DATEDIFF(YEAR, [ fecha de nacimiento], GETDATE()) >= 18 THEN 'mayor'
+                WHEN DATEDIFF(YEAR, [ fecha de nacimiento], GETDATE()) >= 13 THEN 'cadete'
+                ELSE 'menor'
+            END AS categoria_nombre,
+            s_rp.id_socio AS id_socio_rp
+        FROM #TempDatos
+        LEFT JOIN usuarios.obra_social os ON LOWER(LTRIM(RTRIM(os.descripcion))) = LOWER(LTRIM(RTRIM([ Nombre de la obra social o prepaga])))
+        LEFT JOIN usuarios.socio s_rp ON s_rp.numero_socio = REPLACE(LTRIM(RTRIM([Nro de socio RP])), 'SN-', '')
+        WHERE [Nro de Socio] IS NOT NULL
+          AND LTRIM(RTRIM([Nro de Socio])) <> ''
+          AND [ DNI] IS NOT NULL
+          AND LTRIM(RTRIM([ DNI])) <> ''
+          AND [ fecha de nacimiento] IS NOT NULL
+          AND s_rp.id_socio IS NOT NULL; -- Solo procesar si existe el socio responsable
+        
+        -- Crear personas si no existen (manejo de duplicados)
+        INSERT INTO usuarios.persona (dni, nombre, apellido, email, fecha_nac, telefono)
+        SELECT 
             dni,
             nombre,
             apellido,
             email,
             fecha_nac,
-            telefono,
-            numero_socio,
-            telefono_emergencia,
-            obra_nro_socio,
-            id_obra_social,
-            id_categoria,
-            id_grupo
-        )
-        SELECT
-            NULL,
-            d.dni,
-            d.nombre,
-            d.apellido,
-            d.email_personal,
-            d.fec_nac,
-            d.tel_contacto,
-            d.nro_socio,
-            d.tel_cont_emerg,
-            d.nro_socio_obra_social,
-            d.id_obra_social,
-            d.id_categoria,
-            d.id_grupo_familiar
-        FROM CTE_Datos d
-        LEFT JOIN usuarios.socio s 
-          ON s.numero_socio = d.nro_socio
-        WHERE s.numero_socio IS NULL;
-
-        -- Actualizar sólo id_grupo en los socios que ya existen
+            telefono
+        FROM (
+            SELECT 
+                dp.dni,
+                dp.nombre,
+                dp.apellido,
+                dp.email,
+                dp.fecha_nac,
+                dp.telefono,
+                ROW_NUMBER() OVER (PARTITION BY dp.dni ORDER BY dp.numero_socio) AS rn
+            FROM #DatosProcesados dp
+            WHERE NOT EXISTS (
+                SELECT 1 FROM usuarios.persona p WHERE p.dni = dp.dni
+            )
+            AND dp.dni IS NOT NULL 
+            AND dp.dni <> ''
+        ) ranked
+        WHERE rn = 1;
+        
+        -- Crear grupos familiares si no existen
+        INSERT INTO usuarios.grupo_familiar (id_socio_rp)
+        SELECT DISTINCT 
+            dp.id_socio_rp
+        FROM #DatosProcesados dp
+        WHERE NOT EXISTS (
+            SELECT 1 FROM usuarios.grupo_familiar gf WHERE gf.id_socio_rp = dp.id_socio_rp
+        );
+        
+        -- Actualizar socios existentes
         UPDATE s
-        SET s.id_grupo = d.id_grupo_familiar
+        SET telefono_emergencia = dp.telefono_emergencia,
+            obra_nro_socio = dp.nro_socio_obra,
+            id_obra_social = dp.id_obra_social,
+            id_categoria = dp.id_categoria,
+            id_grupo = dp.id_grupo_familiar
         FROM usuarios.socio s
-        INNER JOIN CTE_Datos d 
-          ON d.nro_socio = s.numero_socio;
-
-        COMMIT TRANSACTION;
-
-        DROP TABLE #tempGrupoFamiliar;
-
-        SELECT 'Éxito' AS Resultado, 'Importación completada' AS Mensaje;
+        INNER JOIN (
+            SELECT 
+                dp.numero_socio,
+                dp.dni,
+                dp.nombre,
+                dp.apellido,
+                dp.email,
+                dp.fecha_nac,
+                dp.telefono,
+                dp.telefono_emergencia,
+                dp.nro_socio_obra,
+                dp.id_obra_social,
+                c.id_categoria,
+                gf.id_grupo_familiar
+            FROM #DatosProcesados dp
+            LEFT JOIN actividades.categoria c ON LOWER(c.nombre_categoria) = LOWER(dp.categoria_nombre)
+            LEFT JOIN usuarios.grupo_familiar gf ON gf.id_socio_rp = dp.id_socio_rp
+            WHERE dp.numero_socio IS NOT NULL 
+              AND dp.numero_socio <> ''
+              AND dp.dni IS NOT NULL 
+              AND dp.dni <> ''
+        ) dp ON s.numero_socio = dp.numero_socio;
+        
+        -- Insertar nuevos socios que no existen
+        INSERT INTO usuarios.socio (numero_socio, id_persona, telefono_emergencia, obra_nro_socio, id_obra_social, id_categoria, id_grupo)
+        SELECT 
+            dp.numero_socio,
+            (SELECT id_persona FROM usuarios.persona WHERE dni = dp.dni),
+            dp.telefono_emergencia,
+            dp.nro_socio_obra,
+            dp.id_obra_social,
+            dp.id_categoria,
+            dp.id_grupo_familiar
+        FROM (
+            SELECT 
+                dp.numero_socio,
+                dp.dni,
+                dp.nombre,
+                dp.apellido,
+                dp.email,
+                dp.fecha_nac,
+                dp.telefono,
+                dp.telefono_emergencia,
+                dp.nro_socio_obra,
+                dp.id_obra_social,
+                c.id_categoria,
+                gf.id_grupo_familiar
+            FROM #DatosProcesados dp
+            LEFT JOIN actividades.categoria c ON LOWER(c.nombre_categoria) = LOWER(dp.categoria_nombre)
+            LEFT JOIN usuarios.grupo_familiar gf ON gf.id_socio_rp = dp.id_socio_rp
+            WHERE dp.numero_socio IS NOT NULL 
+              AND dp.numero_socio <> ''
+              AND dp.dni IS NOT NULL 
+              AND dp.dni <> ''
+        ) dp
+        WHERE NOT EXISTS (
+            SELECT 1 FROM usuarios.socio s WHERE s.numero_socio = dp.numero_socio
+        );
+        
+        DROP TABLE #DatosProcesados;
+        DROP TABLE #TempDatos;
+        
+        SELECT 'Éxito' AS Resultado, 'Importación de grupo familiar completada' AS Mensaje;
+        
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0 
-            ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#tempGrupoFamiliar') IS NOT NULL
-            DROP TABLE #tempGrupoFamiliar;
-
-        SELECT 
-            'ERROR' AS Resultado,
-            ERROR_MESSAGE() AS Mensaje,
-            ERROR_LINE() AS LineaError,
-            ERROR_NUMBER() AS CodigoError;
-    END CATCH;
-END;
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
+            DROP TABLE #TempDatos;
+        IF OBJECT_ID('tempdb..#DatosProcesados') IS NOT NULL
+            DROP TABLE #DatosProcesados;
+            
+        SELECT 'Error' AS Resultado, 
+               'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
+        RETURN -1;
+    END CATCH
+END
 GO
 
 
--- Importar Actividades - FUNCIONANDO
+-- Importar Actividades - FUNCIONADO - Sin Cursor
 CREATE OR ALTER PROCEDURE actividades.ImportarActividades
     @RutaArchivo NVARCHAR(260)
 AS
@@ -561,14 +613,14 @@ BEGIN
     SET NOCOUNT ON;
     BEGIN TRY
         DECLARE @SQL NVARCHAR(MAX);
-
-        -- Tabla temporal donde importar los datos
+        
+        -- Tabla temporal donde importar los archivos
         CREATE TABLE #TempDatos (
-            [Actividad]       VARCHAR(50),
-            [Valor por mes]   DECIMAL(10,2),
-            [Vigente hasta]   DATE
+            [Actividad] VARCHAR(50),
+            [Valor por mes] DECIMAL(10,2),
+            [Vigente hasta] DATE
         );
-
+        
         -- Arma el SQL dinámico
         SET @SQL = N'
             INSERT INTO #TempDatos ([Actividad], [Valor por mes], [Vigente hasta])
@@ -577,268 +629,269 @@ BEGIN
                 ''Microsoft.ACE.OLEDB.12.0'',
                 ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
                 ''SELECT * FROM [Tarifas$B2:D8]'')';
-        EXEC sp_executesql @SQL; -- Importa los registros
-
-        BEGIN TRANSACTION;
-
-        -- CTE con filas válidas
-        ;WITH CTE_Validas AS (
-            SELECT
-                [Actividad],
-                [Valor por mes]
+        
+        EXEC sp_executesql @SQL; -- Importa los registros a la temporal
+        
+        -- Procesa los datos con CTE
+        WITH DatosProcesados AS (
+            SELECT 
+                LTRIM(RTRIM([Actividad])) AS nombre_actividad,
+                [Valor por mes] AS costo_mensual
             FROM #TempDatos
-            WHERE [Actividad]       IS NOT NULL
+            WHERE [Actividad] IS NOT NULL
               AND LTRIM(RTRIM([Actividad])) <> ''
-              AND [Valor por mes]   >  0
+              AND [Valor por mes] IS NOT NULL
         )
-
-        -- PASO 1: Insertar actividades nuevas (que no existen)
-        INSERT INTO actividades.actividad(nombre, costo_mensual)
-        SELECT
-            v.[Actividad],
-            v.[Valor por mes]
-        FROM CTE_Validas AS v
-        LEFT JOIN actividades.actividad AS a
-            ON a.nombre = v.[Actividad]
-        WHERE a.id_actividad IS NULL;
-
-        -- PASO 2: Actualizar actividades existentes
-        UPDATE a
-        SET a.costo_mensual = v.[Valor por mes]
-        FROM actividades.actividad AS a
-        INNER JOIN CTE_Validas AS v
-            ON a.nombre = v.[Actividad];
-
-        COMMIT TRANSACTION;
-
-        -- Cierra objetos
+        -- Inserta registros nuevos
+        INSERT INTO actividades.actividad (nombre, costo_mensual)
+        SELECT 
+            dp.nombre_actividad,
+            dp.costo_mensual
+        FROM DatosProcesados dp
+        WHERE NOT EXISTS (
+            SELECT 1 FROM actividades.actividad a 
+            WHERE LOWER(LTRIM(RTRIM(a.nombre))) = LOWER(LTRIM(RTRIM(dp.nombre_actividad)))
+        );
+        
+        -- Actualiza registros existentes
+        UPDATE actividades.actividad
+        SET 
+            costo_mensual = dp.costo_mensual
+        FROM (
+            SELECT 
+                LTRIM(RTRIM([Actividad])) AS nombre_actividad,
+                [Valor por mes] AS costo_mensual
+            FROM #TempDatos
+            WHERE [Actividad] IS NOT NULL
+              AND LTRIM(RTRIM([Actividad])) <> ''
+              AND [Valor por mes] IS NOT NULL
+        ) dp
+        WHERE LOWER(LTRIM(RTRIM(actividades.actividad.nombre))) = LOWER(LTRIM(RTRIM(dp.nombre_actividad)));
+        
         DROP TABLE #TempDatos;
-
+        
         SELECT 'Éxito' AS Resultado, 'Importación de actividades completada' AS Mensaje;
-
+        
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
         IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
             DROP TABLE #TempDatos;
-
-        SELECT 'Error' AS Resultado,
+            
+        SELECT 'Error' AS Resultado, 
                'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
         RETURN -1;
     END CATCH
-END;
+END
 GO
 
--- Importar Costos de Pileta - FUNCIONADO
+-- Importar Costos de Pileta - FUNCIONADO - Sin Cursor
 EXEC actividades.CrearPileta 
     @detalle = 'Pileta prueba',
     @metro_cuadrado = 10;
 GO
 CREATE OR ALTER PROCEDURE actividades.ImportarCostosPileta
-    @RutaArchivo    NVARCHAR(260),
-    @id_pileta      INT
+    @RutaArchivo NVARCHAR(260),
+    @id_pileta    INT
 AS
 BEGIN
     SET NOCOUNT ON;
     BEGIN TRY
         DECLARE @SQL NVARCHAR(MAX);
-
-        -- Tabla temporal donde importar crudo
+        
+        -- Tabla temporal donde importar los archivos
         CREATE TABLE #TempDatos (
-            id          INT IDENTITY(1,1) PRIMARY KEY,
-            [Concepto]  NVARCHAR(100), -- nombre de tarifa
-            [Grupo]     NVARCHAR(100), -- adulto o menores
-            [Socios]    NVARCHAR(100),
-            [Invitados] NVARCHAR(100)
+            [Concepto] VARCHAR(100),
+            [Grupo] VARCHAR(100),
+            [Socios] VARCHAR(100),
+            [Invitados] VARCHAR(100)
         );
-
-        -- Arma el SQL dinámico e importa registros
+        
+        -- Arma el SQL dinámico
         SET @SQL = N'
-            INSERT INTO #TempDatos(Concepto, Grupo, Socios, Invitados)
+            INSERT INTO #TempDatos (Concepto, Grupo, Socios, Invitados)
             SELECT F1, F2, F3, F4
-              FROM OPENROWSET(
-                   ''Microsoft.ACE.OLEDB.12.0'',
-                   ''Excel 12.0;HDR=NO;IMEX=1;TypeGuessRows=0;Database=' + @RutaArchivo + ''',
-                   ''SELECT * FROM [Tarifas$B16:F22]''
-              )';
-        EXEC sp_executesql @SQL;
-
-        -- Validar existencia de la pileta
-        IF NOT EXISTS (SELECT 1 FROM actividades.pileta WHERE id_pileta = @id_pileta)
-        BEGIN
-            DROP TABLE #TempDatos;
-            SELECT 'Error' AS Resultado, 'Pileta no encontrada.' AS Mensaje;
-            RETURN;
-        END;
-
-        BEGIN TRANSACTION;
-
-        -- CTEs para limpieza, mapeo y filtrado de filas válidas
-        ;WITH CTE_Limpio AS (
-            SELECT
-                id,
-                [Concepto]   AS conceptoBruto,
-                [Grupo]      AS grupoBruto,
-                [Socios]     AS sociosBruto,
-                [Invitados]  AS invitadosBruto,
-                -- Propagar el último Concepto no nulo
-                (
-                  SELECT TOP 1 Concepto
-                  FROM #TempDatos t2
-                  WHERE t2.id <= t1.id
-                    AND LTRIM(RTRIM(t2.Concepto)) <> ''
-                  ORDER BY t2.id DESC
-                ) AS conceptoProp
-            FROM #TempDatos t1
-        ), CTE_Mapeado AS (
-            SELECT
-                id,
-                conceptoProp                                      AS Concepto,
-                CASE WHEN LOWER(grupoBruto) LIKE '%menor%' THEN 'men' ELSE 'adu' END AS tipo_grupo,
+            FROM OPENROWSET(
+                ''Microsoft.ACE.OLEDB.12.0'',
+                ''Excel 12.0;HDR=NO;IMEX=1;TypeGuessRows=0;Database=' + @RutaArchivo + ''',
+                ''SELECT * FROM [Tarifas$B16:F22]'')';
+        
+        EXEC sp_executesql @SQL; -- Importa los registros a la temporal
+        
+        -- Procesa los datos con CTE
+        WITH DatosProcesados AS (
+            SELECT 
+                LTRIM(RTRIM(Concepto)) AS concepto,
+                LTRIM(RTRIM(Grupo)) AS grupo,
+                Socios,
+                Invitados,
+                -- Mapear tipo (dia/tem/mes)
                 CASE
-                    WHEN LOWER(conceptoProp) LIKE '%dia%'  OR LOWER(conceptoProp) LIKE '%día%' THEN 'dia'
-                    WHEN LOWER(conceptoProp) LIKE '%temporad%'                           THEN 'tem'
-                    WHEN LOWER(conceptoProp) LIKE '%mes%'                                THEN 'mes'
+                    WHEN LTRIM(RTRIM(Concepto)) LIKE '%dia%' OR LTRIM(RTRIM(Concepto)) LIKE '%día%' THEN 'dia'
+                    WHEN LTRIM(RTRIM(Concepto)) LIKE '%temporad%' THEN 'tem'
+                    WHEN LTRIM(RTRIM(Concepto)) LIKE '%mes%' THEN 'mes'
                     ELSE NULL
-                END                                                AS tipo,
+                END AS tipo,
+                -- Mapear grupo (adu/men)
+                CASE
+                    WHEN LTRIM(RTRIM(Grupo)) LIKE '%menor%' THEN 'men'
+                    ELSE 'adu'
+                END AS tipo_grupo,
+                -- Limpiar y convertir Socios a DECIMAL
                 TRY_CAST(
-                  REPLACE(
                     REPLACE(
-                      REPLACE(
-                        REPLACE(REPLACE(sociosBruto, CHAR(160), ''), ' ', ''), '$', ''), '.', ''),
-                    ',', '.'
-                  ) AS DECIMAL(10,2)
-                )                                                AS precio_socios,
+                        REPLACE(
+                            REPLACE(
+                                REPLACE(REPLACE(Socios, CHAR(160), ''), ' ', ''), '$', ''), '.', ''
+                            ), ',', '.')
+                AS DECIMAL(10,2)) AS precio_socios,
+                -- Limpiar y convertir Invitados (0 si vacío)
                 ISNULL(
-                  TRY_CAST(
+                    TRY_CAST(
+                        REPLACE(
+                            REPLACE(
+                                REPLACE(
+                                    REPLACE(REPLACE(Invitados, CHAR(160), ''), ' ', ''), '$', ''), '.', ''
+                                ), ',', '.')
+                    AS DECIMAL(10,2))
+                , 0) AS precio_invitados
+            FROM #TempDatos
+            WHERE Grupo IS NOT NULL -- Descartar fila de título
+              AND LTRIM(RTRIM(Grupo)) <> ''
+              AND Socios IS NOT NULL
+              AND LTRIM(RTRIM(Socios)) <> ''
+        )
+        -- Inserta registros nuevos
+        INSERT INTO actividades.costo (tipo, tipo_grupo, precio_socios, precio_invitados, id_pileta)
+        SELECT 
+            dp.tipo,
+            dp.tipo_grupo,
+            dp.precio_socios,
+            dp.precio_invitados,
+            @id_pileta
+        FROM DatosProcesados dp
+        WHERE dp.tipo IS NOT NULL
+          AND dp.tipo_grupo IS NOT NULL
+          AND dp.precio_socios IS NOT NULL
+          AND dp.precio_invitados > 0
+          AND NOT EXISTS (
+              SELECT 1 FROM actividades.costo c 
+              WHERE c.tipo = dp.tipo 
+                AND c.tipo_grupo = dp.tipo_grupo 
+                AND c.id_pileta = @id_pileta
+          );
+        
+        -- Actualiza registros existentes
+        UPDATE actividades.costo
+        SET 
+            precio_socios = dp.precio_socios,
+            precio_invitados = dp.precio_invitados
+        FROM (
+            SELECT 
+                LTRIM(RTRIM(Concepto)) AS concepto,
+                LTRIM(RTRIM(Grupo)) AS grupo,
+                Socios,
+                Invitados,
+                CASE
+                    WHEN LTRIM(RTRIM(Concepto)) LIKE '%dia%' OR LTRIM(RTRIM(Concepto)) LIKE '%día%' THEN 'dia'
+                    WHEN LTRIM(RTRIM(Concepto)) LIKE '%temporad%' THEN 'tem'
+                    WHEN LTRIM(RTRIM(Concepto)) LIKE '%mes%' THEN 'mes'
+                    ELSE NULL
+                END AS tipo,
+                CASE
+                    WHEN LTRIM(RTRIM(Grupo)) LIKE '%menor%' THEN 'men'
+                    ELSE 'adu'
+                END AS tipo_grupo,
+                TRY_CAST(
                     REPLACE(
                       REPLACE(
                         REPLACE(
-                          REPLACE(REPLACE(invitadosBruto, CHAR(160), ''), ' ', ''), '$', ''), '.', ''),
-                      ',', '.'
-                    ) AS DECIMAL(10,2)
-                  ), 0
-                )                                                AS precio_invitados
-            FROM CTE_Limpio
-        ), CTE_Validos AS (
-            SELECT *
-            FROM CTE_Mapeado
-            WHERE tipo        IS NOT NULL
-              AND tipo_grupo  IN ('adu','men')
-              AND precio_socios    > 0
-              AND precio_invitados >= 0
-        )
-
-        -- INSERTAR nuevos costos (que no existían)
-        INSERT INTO actividades.costo(tipo, tipo_grupo, precio_socios, precio_invitados, id_pileta)
-        SELECT
-            v.tipo,
-            v.tipo_grupo,
-            v.precio_socios,
-            v.precio_invitados,
-            @id_pileta
-        FROM CTE_Validos v
-        LEFT JOIN actividades.costo c
-          ON c.tipo       = v.tipo
-         AND c.tipo_grupo = v.tipo_grupo
-         AND c.id_pileta   = @id_pileta
-        WHERE c.id_costo IS NULL;
-
-        -- ACTUALIZAR costos existentes
-        UPDATE c
-        SET
-            c.precio_socios    = v.precio_socios,
-            c.precio_invitados = v.precio_invitados
-        FROM actividades.costo c
-        INNER JOIN CTE_Validos v
-          ON c.tipo       = v.tipo
-         AND c.tipo_grupo = v.tipo_grupo
-         AND c.id_pileta   = @id_pileta;
-
-        COMMIT TRANSACTION;
-
-        -- Cleanup de temp table
-        DROP TABLE #TempDatos;
-
-        SELECT 'Éxito' AS Resultado, 'Importación completada' AS Mensaje;
+                                REPLACE(REPLACE(Socios, CHAR(160), ''), ' ', ''), '$', ''), '.', ''
+                            ), ',', '.')
+                AS DECIMAL(10,2)) AS precio_socios,
+                ISNULL(
+                    TRY_CAST(
+                        REPLACE(
+                            REPLACE(
+                                REPLACE(
+                                    REPLACE(REPLACE(Invitados, CHAR(160), ''), ' ', ''), '$', ''), '.', ''
+                                ), ',', '.')
+                    AS DECIMAL(10,2))
+                , 0) AS precio_invitados
+            FROM #TempDatos
+            WHERE Grupo IS NOT NULL
+              AND LTRIM(RTRIM(Grupo)) <> ''
+              AND Socios IS NOT NULL
+              AND LTRIM(RTRIM(Socios)) <> ''
+        ) dp
+        WHERE actividades.costo.tipo = dp.tipo 
+          AND actividades.costo.tipo_grupo = dp.tipo_grupo 
+          AND actividades.costo.id_pileta = @id_pileta
+          AND dp.tipo IS NOT NULL
+          AND dp.tipo_grupo IS NOT NULL
+          AND dp.precio_socios IS NOT NULL
+          AND dp.precio_invitados > 0;
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL DROP TABLE #TempDatos;
-        SELECT 'Error' AS Resultado, 'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
+            DROP TABLE #TempDatos;
+            
+        SELECT 'Error' AS Resultado, 
+               'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
         RETURN -1;
     END CATCH
-END;
+END
 GO
 
-
-
--- Importar Clima - FUNCIONANDO
+-- Importar Clima - FUNCIONANDO - Sin Cursor (BULK)
 CREATE OR ALTER PROCEDURE facturacion.ImportarClima
-    @RutaBase NVARCHAR(300) = '.\docs\',  -- Ruta base donde están los archivos
-    @Anio      INT
+    @RutaBase NVARCHAR(300) = '.\docs\',
+    @Anio INT
 AS
 BEGIN
     SET NOCOUNT ON;
     BEGIN TRY
-        -- Construir la ruta del archivo dinámicamente
-        DECLARE @RutaArchivo NVARCHAR(400) 
-            = @RutaBase 
-            + 'open-meteo-buenosaires_' 
-            + CAST(@Anio AS NVARCHAR(4)) 
-            + '.csv';
+        DECLARE @RutaArchivo NVARCHAR(400);
+        SET @RutaArchivo = @RutaBase + 'open-meteo-buenosaires_' + CAST(@Anio AS NVARCHAR(4)) + '.csv';
         
-        -- Tabla temporal para importar los datos del CSV
+        IF OBJECT_ID('tempdb..#TempClima') IS NOT NULL
+            DROP TABLE #TempClima;
+        
         CREATE TABLE #TempClima (
-            [time]                 VARCHAR(20),
-            [temperature_2m]       VARCHAR(20) NULL,
-            [rain_mm]              VARCHAR(20) NULL,
-            [relative_humidity_2m] VARCHAR(20) NULL,
-            [wind_speed_10m]       VARCHAR(20) NULL
+            Fecha NVARCHAR(50),
+            Temperatura NVARCHAR(50),
+            Lluvia NVARCHAR(50),
+            Humedad NVARCHAR(50),
+            Viento NVARCHAR(50)
         );
         
         DECLARE @SQL NVARCHAR(MAX);
-        -- Importar datos desde el CSV, saltando las primeras 2 líneas (encabezados)
-        SET @SQL = N'
-            BULK INSERT #TempClima
-            FROM ''' + @RutaArchivo + '''
-            WITH (
-                FIRSTROW        = 3,
-                FIELDTERMINATOR = '','',
-                ROWTERMINATOR   = ''\n'',
-                CODEPAGE        = ''65001'',
-                TABLOCK
-            );';
+        SET @SQL = '
+        BULK INSERT #TempClima
+        FROM ''' + @RutaArchivo + '''
+        WITH (
+            FIRSTROW = 4,
+            FIELDTERMINATOR = '','',
+            ROWTERMINATOR = ''0x0a'',
+            CODEPAGE = ''65001''
+        );';
+        
         EXEC sp_executesql @SQL;
         
         BEGIN TRANSACTION;
         
-        -- CTE que limpia y parsea las filas, descartando las que queden NULL
-        ;WITH CTE_Raw AS (
-            SELECT
-                LTRIM(RTRIM([time])) AS time_str,
-                TRY_CAST(REPLACE([rain_mm], ',', '.') AS DECIMAL(5,2)) AS lluvia_raw
-            FROM #TempClima
-            WHERE [time] IS NOT NULL
-              AND LTRIM(RTRIM([time])) <> ''
-        ), CTE_Parsed AS (
-            SELECT
-                TRY_CAST(LEFT(time_str,10) + ' ' + RIGHT(time_str,5) AS SMALLDATETIME) AS fecha,
-                lluvia_raw AS lluvia
-            FROM CTE_Raw
-        ), CTE_Validos AS (
-            SELECT fecha, lluvia
-            FROM CTE_Parsed
-            WHERE fecha  IS NOT NULL
-              AND fecha <= GETDATE()
-              AND lluvia IS NOT NULL
-              AND lluvia >= 0
-        )
-        -- Insertar en bloque sólo las filas válidas
         INSERT INTO facturacion.clima (fecha, lluvia)
-        SELECT fecha, lluvia
-        FROM CTE_Validos;
+        SELECT 
+            TRY_CAST(REPLACE(LTRIM(RTRIM(Fecha)), 'T', ' ') AS SMALLDATETIME),
+            TRY_CAST(REPLACE(LTRIM(RTRIM(Lluvia)), ',', '.') AS DECIMAL(5,2))
+        FROM #TempClima
+        WHERE 
+            TRY_CAST(REPLACE(LTRIM(RTRIM(Fecha)), 'T', ' ') AS SMALLDATETIME) IS NOT NULL
+            AND TRY_CAST(REPLACE(LTRIM(RTRIM(Lluvia)), ',', '.') AS DECIMAL(5,2)) IS NOT NULL
+            AND NOT EXISTS (
+                SELECT 1
+                FROM facturacion.clima c
+                WHERE c.fecha = TRY_CAST(REPLACE(LTRIM(RTRIM(Fecha)), 'T', ' ') AS SMALLDATETIME)
+            );
         
         COMMIT TRANSACTION;
         
@@ -850,328 +903,425 @@ BEGIN
     BEGIN CATCH
         IF @@TRANCOUNT > 0
             ROLLBACK TRANSACTION;
+        
         IF OBJECT_ID('tempdb..#TempClima') IS NOT NULL
             DROP TABLE #TempClima;
-        
-        SELECT 'Error' AS Resultado, 
-               'Error en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
+            
+        SELECT 'Error' AS Resultado, 'Error en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
         RETURN -1;
     END CATCH
-END;
+END
 GO
 
-
--- Importar Facturas - FUNCIONANDO
+-- Importar Facturas - FUNCIONANDO - Sin Cursor
 CREATE OR ALTER PROCEDURE facturacion.ImportarFacturas
     @RutaArchivo NVARCHAR(260)
 AS
 BEGIN
     SET NOCOUNT ON;
     BEGIN TRY
-        -- 1) Cargar datos crudos en tabla temporal
+        DECLARE @SQL NVARCHAR(MAX);
+        
+        -- Tabla temporal donde importar los archivos
         CREATE TABLE #TempDatos (
-            [Id de pago]           BIGINT,
-            [fecha]                DATE,
-            [Responsable de pago]  VARCHAR(20),
-            [Valor]                DECIMAL(10,2),
-            [Medio de pago]        VARCHAR(50)
+            [Id de pago] BIGINT,
+            [fecha] DATE,
+            [Responsable de pago] VARCHAR(20),
+            [Valor] DECIMAL(10,2),
+            [Medio de pago] VARCHAR(50)
         );
-
-        DECLARE @SQL NVARCHAR(MAX) = N'
-            INSERT INTO #TempDatos(
-                [Id de pago],[fecha],[Responsable de pago],[Valor],[Medio de pago]
-            )
-            SELECT
-                CAST([Id de pago] AS BIGINT),
-                [fecha],
-                [Responsable de pago],
-                [Valor],
+        
+        -- Arma el SQL dinámico
+        SET @SQL = N'
+            INSERT INTO #TempDatos ([Id de pago], 
+                                    [fecha], 
+                                    [Responsable de pago], 
+                                    [Valor], 
+                                    [Medio de pago])
+            SELECT 
+                CAST([Id de pago] AS BIGINT), 
+                [fecha], 
+                [Responsable de pago], 
+                [Valor], 
                 [Medio de pago]
             FROM OPENROWSET(
                 ''Microsoft.ACE.OLEDB.12.0'',
                 ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
-                ''SELECT * FROM [pago cuotas$A1:E10000]''
-            )';
-        EXEC sp_executesql @SQL;  -- Importa los registros
-
-        BEGIN TRANSACTION;
-
-        -- 2) Normalizar texto
-        UPDATE #TempDatos
-        SET
-            [Responsable de pago] = LTRIM(RTRIM(REPLACE([Responsable de pago], 'SN-', ''))),
-            [Medio de pago]       = LTRIM(RTRIM([Medio de pago]));
-
-        -- 3) Crear nuevos métodos de pago (si no existen)
-        INSERT INTO facturacion.metodo_pago(nombre)
-        SELECT DISTINCT mp.nombre
-        FROM (
-            SELECT LTRIM(RTRIM([Medio de pago])) AS nombre
-            FROM #TempDatos
-            WHERE [Medio de pago] IS NOT NULL
-              AND LTRIM(RTRIM([Medio de pago])) <> ''
-        ) AS mp
-        WHERE NOT EXISTS (
-            SELECT 1
-            FROM facturacion.metodo_pago m
-            WHERE LOWER(m.nombre) = LOWER(mp.nombre)
+                ''SELECT * FROM [pago cuotas$A1:E10000]'')
+            WHERE [Responsable de pago] IS NOT NULL 
+              AND LTRIM(RTRIM([Responsable de pago])) <> ''''
+              AND [Valor] IS NOT NULL 
+              AND [Valor] > 0';
+        
+        EXEC sp_executesql @SQL; -- Importa los registros a la temporal
+        
+        -- Crear métodos de pago si no existen
+        INSERT INTO facturacion.metodo_pago (nombre)
+        SELECT DISTINCT 
+            LTRIM(RTRIM([Medio de pago]))
+        FROM #TempDatos
+        WHERE [Medio de pago] IS NOT NULL 
+          AND LTRIM(RTRIM([Medio de pago])) <> ''
+          AND NOT EXISTS (
+              SELECT 1 FROM facturacion.metodo_pago mp 
+              WHERE LOWER(LTRIM(RTRIM(mp.nombre))) = LOWER(LTRIM(RTRIM([Medio de pago])))
         );
-
-        -- 4) Determinar filas válidas y hacer insert masivo
-        DECLARE @total   INT = (
-            SELECT COUNT(*)
-            FROM #TempDatos
-            WHERE [Responsable de pago] IS NOT NULL
-              AND LTRIM(RTRIM([Responsable de pago])) <> ''
+        
+        -- Crear tabla temporal para datos procesados
+        CREATE TABLE #DatosProcesados (
+            id_pago BIGINT,
+            fecha_emision DATE,
+            numero_socio VARCHAR(20),
+            valor DECIMAL(10,2),
+            medio_pago VARCHAR(50),
+            id_persona INT,
+            id_metodo_pago INT
         );
-
-        DECLARE @validos INT = (
-            SELECT COUNT(*)
-            FROM #TempDatos td
-            INNER JOIN usuarios.socio  s
-                ON s.numero_socio = td.[Responsable de pago]
-               AND s.activo = 1
-            LEFT JOIN facturacion.metodo_pago m
-                ON LOWER(m.nombre) = LOWER(td.[Medio de pago])
-            WHERE td.[fecha]  IS NOT NULL
-              AND td.[Valor]  > 0
-        );
-
-        -- Insertar facturas válidas de una sola vez 
-        INSERT INTO facturacion.factura (
-            id_persona,
-            id_metodo_pago,
-            estado_pago,
-            monto_a_pagar
-        )
-        SELECT
+        
+        -- Insertar datos procesados en tabla temporal
+        INSERT INTO #DatosProcesados
+        SELECT 
+            [Id de pago] AS id_pago,
+            [fecha] AS fecha_emision,
+            REPLACE(LTRIM(RTRIM([Responsable de pago])), 'SN-', '') AS numero_socio,
+            [Valor] AS valor,
+            LTRIM(RTRIM([Medio de pago])) AS medio_pago,
             s.id_persona,
-            m.id_metodo_pago,
-            'Pendiente',
-            td.[Valor]
-        FROM #TempDatos td
-        INNER JOIN usuarios.socio  s
-            ON s.numero_socio = td.[Responsable de pago]
-           AND s.activo = 1
-        LEFT JOIN facturacion.metodo_pago m
-            ON LOWER(m.nombre) = LOWER(td.[Medio de pago])
-        WHERE td.[fecha]  IS NOT NULL
-          AND td.[Valor]  > 0;
-
-        COMMIT TRANSACTION;
-
+            mp.id_metodo_pago
+        FROM #TempDatos
+        INNER JOIN usuarios.socio s ON s.numero_socio = REPLACE(LTRIM(RTRIM([Responsable de pago])), 'SN-', '')
+        INNER JOIN facturacion.metodo_pago mp ON LOWER(LTRIM(RTRIM(mp.nombre))) = LOWER(LTRIM(RTRIM([Medio de pago])))
+        WHERE [Responsable de pago] IS NOT NULL
+          AND LTRIM(RTRIM([Responsable de pago])) <> ''
+          AND [Valor] IS NOT NULL 
+          AND [Valor] > 0
+          AND s.id_persona IS NOT NULL
+          AND mp.id_metodo_pago IS NOT NULL;
+        
+        -- Procesa los datos con CTE
+        WITH DatosProcesados AS (
+            SELECT 
+                dp.id_pago,
+                dp.fecha_emision,
+                dp.numero_socio,
+                dp.valor,
+                dp.medio_pago,
+                dp.id_persona,
+                dp.id_metodo_pago
+            FROM #DatosProcesados dp
+            WHERE dp.id_pago IS NOT NULL
+              AND dp.fecha_emision IS NOT NULL
+              AND dp.valor IS NOT NULL 
+              AND dp.valor > 0
+              AND dp.id_persona IS NOT NULL
+              AND dp.id_metodo_pago IS NOT NULL
+        )
+        -- Inserta registros nuevos
+        INSERT INTO facturacion.factura (id_persona, id_metodo_pago, estado_pago, monto_a_pagar, detalle, fecha_emision, id_pago)
+        SELECT 
+            dp.id_persona,
+            dp.id_metodo_pago,
+            'Pendiente' AS estado_pago,
+            dp.valor AS monto_a_pagar,
+            NULL AS detalle,
+            dp.fecha_emision,
+            dp.id_pago
+        FROM DatosProcesados dp
+        WHERE NOT EXISTS (
+            SELECT 1 FROM facturacion.factura f 
+            WHERE f.id_pago = dp.id_pago
+        );
+        
+        -- Actualiza registros existentes
+        UPDATE facturacion.factura
+        SET 
+            id_persona = dp.id_persona,
+            id_metodo_pago = dp.id_metodo_pago,
+            monto_a_pagar = dp.valor,
+            fecha_emision = dp.fecha_emision
+        FROM (
+            SELECT 
+                dp.id_pago,
+                dp.id_persona,
+                dp.id_metodo_pago,
+                dp.valor,
+                dp.fecha_emision
+            FROM #DatosProcesados dp
+            WHERE dp.id_pago IS NOT NULL
+              AND dp.fecha_emision IS NOT NULL
+              AND dp.valor IS NOT NULL 
+              AND dp.valor > 0
+              AND dp.id_persona IS NOT NULL
+              AND dp.id_metodo_pago IS NOT NULL
+        ) dp
+        WHERE facturacion.factura.id_pago = dp.id_pago;
+        
+        DROP TABLE #DatosProcesados;
         DROP TABLE #TempDatos;
-
-        -- 5) Reporte final
-        SELECT
-            'Exito' AS Resultado,
-            'Facturas importadas: ' + CAST(@validos   AS VARCHAR(10))
-          + '. Filas inválidas ignoradas: ' + CAST(@total - @validos AS VARCHAR(10))
-          AS Mensaje;
-
+        
+        SELECT 'Éxito' AS Resultado, 'Importación de facturas completada' AS Mensaje;
+        
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0 ROLLBACK TRANSACTION;
-        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL DROP TABLE #TempDatos;
-
-        SELECT
-            'Error' AS Resultado,
-            'Error en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
+        IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
+            DROP TABLE #TempDatos;
+        IF OBJECT_ID('tempdb..#DatosProcesados') IS NOT NULL
+            DROP TABLE #DatosProcesados;
+            
+        SELECT 'Error' AS Resultado, 
+               'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
         RETURN -1;
     END CATCH
-END;
+END
 GO
 
-
--- Importar Presentismo a Actividades - FUNCIONANDO
+-- Importar Presentismo a Actividades - FUNCIONANDO - Sin Cursor
 CREATE OR ALTER PROCEDURE actividades.ImportarPresentismoActividades
     @RutaArchivo NVARCHAR(260)
 AS
 BEGIN
     SET NOCOUNT ON;
-    SET LANGUAGE Spanish; -- Por las dudas
-
     BEGIN TRY
-        -- 1) Cargo crudo desde Excel
+        DECLARE @SQL NVARCHAR(MAX);
+        
+        -- Tabla temporal donde importar los archivos
         CREATE TABLE #TempDatos (
-            [Nro de Socio]          VARCHAR(20),
-            [Actividad]             NVARCHAR(100),
-            [fecha de asistencia]   DATE,
-            [Asistencia]            VARCHAR(15),
-            [Profesor]              NVARCHAR(100)
+            [Nro de Socio] VARCHAR(20),
+            [Actividad] NVARCHAR(100),
+            [fecha de asistencia] DATE,
+            [Asistencia] VARCHAR(15),
+            [Profesor] NVARCHAR(100)
         );
-
-        DECLARE @SQL NVARCHAR(MAX) = N'
-            INSERT INTO #TempDatos (
-                [Nro de Socio], [Actividad], [fecha de asistencia], [Asistencia], [Profesor]
-            )
-            SELECT
-                [Nro de Socio],
-                [Actividad],
-                [fecha de asistencia],
-                [Asistencia],
-                [Profesor]
+        
+        -- Arma el SQL dinámico
+        SET @SQL = N'
+            INSERT INTO #TempDatos ([Nro de Socio], 
+                                    [Actividad], 
+                                    [fecha de asistencia], 
+                                    [Asistencia], 
+                                    [Profesor])
+            SELECT 
+                LTRIM(RTRIM(CAST([Nro de Socio] AS VARCHAR(20)))),
+                LTRIM(RTRIM(CAST([Actividad] AS NVARCHAR(100)))),
+                CAST([fecha de asistencia] AS DATE),
+                LTRIM(RTRIM(CAST([Asistencia] AS VARCHAR(15)))),
+                LTRIM(RTRIM(CAST([Profesor] AS NVARCHAR(100))))
             FROM OPENROWSET(
                 ''Microsoft.ACE.OLEDB.12.0'',
                 ''Excel 12.0;HDR=YES;IMEX=1;Database=' + @RutaArchivo + ''',
-                ''SELECT * FROM [presentismo_actividades$]''
-            )';
-        EXEC sp_executesql @SQL; -- Ejecuta la sentencia
-
-        BEGIN TRANSACTION;
-
-        -- 2) Normalizar y filtrar filas válidas
-        ;WITH CTE_Normalizado AS (
-            SELECT
-                ROW_NUMBER() OVER(ORDER BY (SELECT 1)) AS fila,
-                -- Quitar SN- y espacios
-                LTRIM(RTRIM(REPLACE([Nro de Socio], 'SN-', ''))) AS nroSocio,
-                LTRIM(RTRIM([Actividad]))             AS actividad,
-                [fecha de asistencia]                  AS fecha,
-                LTRIM(RTRIM([Asistencia]))             AS asistencia,
-                LTRIM(RTRIM([Profesor]))               AS profesor
-            FROM #TempDatos
-        ), CTE_Mapeo AS (
-            SELECT
-                n.fila,
-                n.nroSocio,
-                n.actividad,
-                n.fecha,
-                n.asistencia,
-                n.profesor,
-                -- Mapear socio
-                s.id_socio,
-                s.id_categoria,
-                -- Mapear actividad por fonético (DIFFERENCE ≥ 3)
-                a.id_actividad,
-                -- Separar nombre/apellido de profesor
-                prof_nombre   = LEFT(n.profesor,  CHARINDEX(' ', n.profesor + ' ') - 1),
-                prof_apellido = CASE 
-                                  WHEN CHARINDEX(' ', n.profesor) > 0
-                                  THEN SUBSTRING(n.profesor, CHARINDEX(' ',n.profesor)+1, 100)
-                                  ELSE ''
-                                END
-            FROM CTE_Normalizado n
-            LEFT JOIN usuarios.socio     s ON s.numero_socio = n.nroSocio
-            LEFT JOIN actividades.actividad a 
-                ON DIFFERENCE(a.nombre, n.actividad) >= 3
-            WHERE n.nroSocio   <> ''
-              AND n.actividad <> ''
-              AND n.fecha     IS NOT NULL
-        ), CTE_Validos AS (
-            -- Sólo las filas con socio y actividad mapeados
-            SELECT *
-            FROM CTE_Mapeo
-            WHERE id_socio      IS NOT NULL
-              AND id_actividad  IS NOT NULL
-        )
-
-        --------
-        -- 3) Insertar profesores (PERSONA) nuevos, ignorando los ya existentes
-        --------
-        INSERT INTO usuarios.persona (dni, nombre, apellido, email, fecha_nac, telefono, activo)
-        SELECT
-            NULL,  -- sin DNI
-            vm.prof_nombre,
-            vm.prof_apellido,
-            NULL,  -- sin email
-            NULL,  -- sin fecha_nac
-            NULL,  -- sin teléfono
-            1
-        FROM (
-            SELECT DISTINCT prof_nombre, prof_apellido
-            FROM CTE_Validos
-        ) AS vm
-        LEFT JOIN usuarios.persona p
-          ON LOWER(p.nombre)   = LOWER(vm.prof_nombre)
-         AND LOWER(p.apellido) = LOWER(vm.prof_apellido)
-        WHERE p.id_persona IS NULL;
-
-
-        -- 4) Insertar usuarios (USUARIO) nuevos para esos profesores
-        INSERT INTO usuarios.usuario (
-            id_persona, dni, nombre, apellido, email, fecha_nac, telefono, username, password_hash
-        )
-        SELECT
+                ''SELECT * FROM [presentismo_actividades$]'')
+            WHERE [Nro de Socio] IS NOT NULL 
+              AND LTRIM(RTRIM([Nro de Socio])) <> ''''
+              AND [Actividad] IS NOT NULL 
+              AND LTRIM(RTRIM([Actividad])) <> ''''
+              AND [fecha de asistencia] IS NOT NULL';
+        
+        EXEC sp_executesql @SQL; -- Importa los registros a la temporal
+        
+        -- Crear tabla temporal para datos procesados
+        CREATE TABLE #DatosProcesados (
+            numero_socio VARCHAR(20),
+            actividad_nombre NVARCHAR(100),
+            fecha_asistencia DATE,
+            asistencia VARCHAR(15),
+            profesor_nombre NVARCHAR(100),
+            id_socio INT,
+            id_actividad INT,
+            id_persona_profesor INT,
+            id_usuario_profesor INT,
+            dia VARCHAR(9),
+            id_clase INT
+        );
+        
+        -- Insertar datos procesados en tabla temporal
+        INSERT INTO #DatosProcesados
+        SELECT 
+            REPLACE(LTRIM(RTRIM([Nro de Socio])), 'SN-', '') AS numero_socio,
+            LTRIM(RTRIM([Actividad])) AS actividad_nombre,
+            [fecha de asistencia] AS fecha_asistencia,
+            LTRIM(RTRIM([Asistencia])) AS asistencia,
+            LTRIM(RTRIM([Profesor])) AS profesor_nombre,
+            s.id_socio,
+            a.id_actividad,
+            p.id_persona AS id_persona_profesor,
+            u.id_usuario AS id_usuario_profesor,
+            CASE DATENAME(WEEKDAY, [fecha de asistencia])
+                WHEN 'Monday' THEN 'lunes'
+                WHEN 'Tuesday' THEN 'martes'
+                WHEN 'Wednesday' THEN 'miercoles'
+                WHEN 'Thursday' THEN 'jueves'
+                WHEN 'Friday' THEN 'viernes'
+                WHEN 'Saturday' THEN 'sabado'
+                WHEN 'Sunday' THEN 'domingo'
+                ELSE DATENAME(WEEKDAY, [fecha de asistencia])
+            END AS dia,
+            c.id_clase
+        FROM #TempDatos
+        INNER JOIN usuarios.socio s ON s.numero_socio = REPLACE(LTRIM(RTRIM([Nro de Socio])), 'SN-', '')
+        INNER JOIN actividades.actividad a ON DIFFERENCE(a.nombre, LTRIM(RTRIM([Actividad]))) >= 3
+        LEFT JOIN usuarios.persona p ON DIFFERENCE(p.nombre + ' ' + p.apellido, LTRIM(RTRIM([Profesor]))) >= 3
+        LEFT JOIN usuarios.usuario u ON u.id_persona = p.id_persona
+        LEFT JOIN actividades.clase c ON c.id_actividad = a.id_actividad 
+                                    AND c.dia = CASE DATENAME(WEEKDAY, [fecha de asistencia])
+                                        WHEN 'Monday' THEN 'lunes'
+                                        WHEN 'Tuesday' THEN 'martes'
+                                        WHEN 'Wednesday' THEN 'miercoles'
+                                        WHEN 'Thursday' THEN 'jueves'
+                                        WHEN 'Friday' THEN 'viernes'
+                                        WHEN 'Saturday' THEN 'sabado'
+                                        WHEN 'Sunday' THEN 'domingo'
+                                        ELSE DATENAME(WEEKDAY, [fecha de asistencia])
+                                    END
+        WHERE [Nro de Socio] IS NOT NULL
+          AND LTRIM(RTRIM([Nro de Socio])) <> ''
+          AND [Actividad] IS NOT NULL
+          AND LTRIM(RTRIM([Actividad])) <> ''
+          AND [fecha de asistencia] IS NOT NULL
+          AND s.id_socio IS NOT NULL
+          AND a.id_actividad IS NOT NULL;
+        
+        -- Crear personas (profesores) si no existen
+        INSERT INTO usuarios.persona (nombre, apellido)
+        SELECT DISTINCT 
+            CASE 
+                WHEN CHARINDEX(' ', dp.profesor_nombre) > 0 THEN
+                    LEFT(dp.profesor_nombre, CHARINDEX(' ', dp.profesor_nombre) - 1)
+                ELSE
+                    dp.profesor_nombre
+            END AS nombre,
+            CASE 
+                WHEN CHARINDEX(' ', dp.profesor_nombre) > 0 THEN
+                    SUBSTRING(dp.profesor_nombre, CHARINDEX(' ', dp.profesor_nombre) + 1, LEN(dp.profesor_nombre))
+                ELSE
+                    ''
+            END AS apellido
+        FROM #DatosProcesados dp
+        WHERE dp.id_persona_profesor IS NULL
+          AND dp.profesor_nombre IS NOT NULL
+          AND LTRIM(RTRIM(dp.profesor_nombre)) <> ''
+          AND NOT EXISTS (
+              SELECT 1 FROM usuarios.persona p 
+              WHERE DIFFERENCE(p.nombre + ' ' + p.apellido, dp.profesor_nombre) >= 3
+          );
+        
+        -- Crear usuarios (profesores) si no existen
+        INSERT INTO usuarios.usuario (id_persona, username, password_hash)
+        SELECT DISTINCT 
             p.id_persona,
-            NULL,  -- sin DNI
-            p.nombre,
-            p.apellido,
-            NULL,  -- sin email
-            NULL,  -- sin fecha_nac
-            NULL,  -- sin teléfono
-            LOWER(REPLACE(p.nombre,' ',''))
-              + '.' +
-            LOWER(REPLACE(p.apellido,' ','')),
-            'default_hash'
-        FROM (
-            SELECT DISTINCT prof_nombre, prof_apellido
-            FROM CTE_Validos
-        ) AS vm
-        INNER JOIN usuarios.persona p
-          ON LOWER(p.nombre)   = LOWER(vm.prof_nombre)
-         AND LOWER(p.apellido) = LOWER(vm.prof_apellido)
-        LEFT JOIN usuarios.usuario u
-          ON u.id_persona = p.id_persona
-        WHERE u.id_usuario IS NULL;
-
-
-        -- 5) Insertar clases nuevas si no existen
-        INSERT INTO actividades.clase (
-            id_actividad, id_categoria, dia, horario, id_usuario
-        )
-        SELECT DISTINCT
-            vm.id_actividad,
-            vm.id_categoria,
-            DATENAME(WEEKDAY, vm.fecha),
-            '07:00',  -- horario por defecto
+            LOWER(REPLACE(p.nombre, ' ', '')) + '.' + LOWER(REPLACE(p.apellido, ' ', '')) AS username,
+            'default_hash' AS password_hash
+        FROM usuarios.persona p
+        INNER JOIN #DatosProcesados dp ON DIFFERENCE(p.nombre + ' ' + p.apellido, dp.profesor_nombre) >= 3
+        WHERE dp.id_usuario_profesor IS NULL
+          AND p.id_persona IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM usuarios.usuario u WHERE u.id_persona = p.id_persona
+          );
+        
+        -- Crear clases si no existen
+        INSERT INTO actividades.clase (id_actividad, id_categoria, dia, horario, id_usuario)
+        SELECT DISTINCT 
+            dp.id_actividad,
+            s.id_categoria,
+            dp.dia,
+            '07:00' AS horario, -- Horario por defecto
             u.id_usuario
-        FROM CTE_Validos vm
-        INNER JOIN usuarios.persona p
-          ON LOWER(p.nombre)   = LOWER(vm.prof_nombre)
-         AND LOWER(p.apellido) = LOWER(vm.prof_apellido)
-        INNER JOIN usuarios.usuario u
-          ON u.id_persona = p.id_persona
-        LEFT JOIN actividades.clase c
-          ON c.id_actividad = vm.id_actividad
-         AND c.dia          = DATENAME(WEEKDAY, vm.fecha)
-        WHERE c.id_clase IS NULL;
-
-
-        -- 6) Insertar presentismo en bloque, ignorando duplicados
-        INSERT INTO actividades.actividad_socio (
-            id_socio, id_actividad, presentismo, fecha
+        FROM #DatosProcesados dp
+        INNER JOIN usuarios.socio s ON s.id_socio = dp.id_socio
+        INNER JOIN usuarios.usuario u ON u.id_persona = dp.id_persona_profesor
+        WHERE dp.id_clase IS NULL
+          AND s.id_categoria IS NOT NULL
+          AND u.id_usuario IS NOT NULL
+          AND dp.dia IN ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo')
+          AND dp.id_persona_profesor IS NOT NULL
+          AND NOT EXISTS (
+              SELECT 1 FROM actividades.clase c 
+              WHERE c.id_actividad = dp.id_actividad 
+                AND c.dia = dp.dia
+                AND c.id_categoria = s.id_categoria
+          );
+        
+        -- Actualizar datos procesados con IDs de profesores y clases
+        UPDATE #DatosProcesados
+        SET 
+            id_persona_profesor = p.id_persona,
+            id_usuario_profesor = u.id_usuario,
+            id_clase = c.id_clase
+        FROM #DatosProcesados dp
+        LEFT JOIN usuarios.persona p ON DIFFERENCE(p.nombre + ' ' + p.apellido, dp.profesor_nombre) >= 3
+        LEFT JOIN usuarios.usuario u ON u.id_persona = p.id_persona
+        LEFT JOIN actividades.clase c ON c.id_actividad = dp.id_actividad 
+                                    AND c.dia = dp.dia
+        WHERE dp.dia IN ('lunes', 'martes', 'miercoles', 'jueves', 'viernes', 'sabado', 'domingo');
+        
+        -- Procesa los datos con CTE
+        WITH DatosProcesados AS (
+            SELECT 
+                dp.id_socio,
+                dp.id_actividad,
+                dp.fecha_asistencia,
+                dp.asistencia,
+                dp.id_clase
+            FROM #DatosProcesados dp
+            WHERE dp.id_socio IS NOT NULL
+              AND dp.id_actividad IS NOT NULL
+              AND dp.fecha_asistencia IS NOT NULL
+              AND dp.asistencia IS NOT NULL
+              AND LTRIM(RTRIM(dp.asistencia)) <> ''
         )
-        SELECT
-            vm.id_socio,
-            vm.id_actividad,
-            vm.asistencia,
-            vm.fecha
-        FROM CTE_Validos vm
-        LEFT JOIN actividades.actividad_socio ps
-          ON ps.id_socio      = vm.id_socio
-         AND ps.id_actividad  = vm.id_actividad
-         AND ps.fecha         = vm.fecha
-        WHERE ps.id_socio IS NULL;
-
-        COMMIT TRANSACTION;
-
-        -- Cleanup
+        -- Inserta registros nuevos
+        INSERT INTO actividades.actividad_socio (id_socio, id_actividad, presentismo, fecha)
+        SELECT 
+            dp.id_socio,
+            dp.id_actividad,
+            dp.asistencia,
+            dp.fecha_asistencia
+        FROM DatosProcesados dp
+        WHERE NOT EXISTS (
+            SELECT 1 FROM actividades.actividad_socio as2 
+            WHERE as2.id_socio = dp.id_socio 
+              AND as2.id_actividad = dp.id_actividad
+              AND as2.fecha = dp.fecha_asistencia
+        );
+        
+        -- Actualiza registros existentes
+        UPDATE actividades.actividad_socio
+        SET 
+            presentismo = dp.asistencia
+        FROM (
+            SELECT 
+                dp.id_socio,
+                dp.id_actividad,
+                dp.fecha_asistencia,
+                dp.asistencia
+            FROM #DatosProcesados dp
+            WHERE dp.id_socio IS NOT NULL
+              AND dp.id_actividad IS NOT NULL
+              AND dp.fecha_asistencia IS NOT NULL
+              AND dp.asistencia IS NOT NULL
+              AND LTRIM(RTRIM(dp.asistencia)) <> ''
+        ) dp
+        WHERE actividades.actividad_socio.id_socio = dp.id_socio
+          AND actividades.actividad_socio.id_actividad = dp.id_actividad
+          AND actividades.actividad_socio.fecha = dp.fecha_asistencia;
+        
+        DROP TABLE #DatosProcesados;
         DROP TABLE #TempDatos;
-
-        SELECT 'Éxito' AS Estado, 'Importación de presentismo completada' AS Mensaje;
+        
+        SELECT 'Éxito' AS Resultado, 'Importación de presentismo completada' AS Mensaje;
+        
     END TRY
     BEGIN CATCH
-        IF @@TRANCOUNT > 0
-            ROLLBACK TRANSACTION;
         IF OBJECT_ID('tempdb..#TempDatos') IS NOT NULL
             DROP TABLE #TempDatos;
-
-        DECLARE @Err NVARCHAR(4000) = ERROR_MESSAGE();
-        SELECT 'Error' AS Estado, 'Error en el proceso: ' + @Err AS Mensaje;
+        IF OBJECT_ID('tempdb..#DatosProcesados') IS NOT NULL
+            DROP TABLE #DatosProcesados;
+            
+        SELECT 'Error' AS Resultado, 
+               'Error general en el proceso: ' + ERROR_MESSAGE() AS Mensaje;
         RETURN -1;
     END CATCH
-END;
+END
 GO
 
 -- IMPORTACION Y PRUEBAS
@@ -1189,9 +1339,14 @@ EXEC actividades.ImportarActividades 'C:\Users\tomas\Desktop\proyecto-BDA\docs\D
 SELECT * FROM actividades.actividad
 GO
 
+-- Clima 2024
 EXEC facturacion.ImportarClima 
     @RutaBase = 'C:\Users\tomas\Desktop\proyecto-BDA\docs\',
     @Anio = 2024;
+-- Clima 2025
+EXEC facturacion.ImportarClima 
+    @RutaBase = 'C:\Users\tomas\Desktop\proyecto-BDA\docs\',
+    @Anio = 2025;
 select * from facturacion.clima 
 GO
 
