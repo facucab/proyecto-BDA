@@ -1369,3 +1369,71 @@ EXEC actividades.ImportarPresentismoActividades 'C:\Users\tomas\Desktop\proyecto
 SELECT * FROM actividades.actividad_socio
 SELECT * FROM usuarios.usuario
 GO
+
+/*
+USE Com5600G01;
+GO
+
+-- Importar categorías
+EXEC actividades.ImportarCategorias 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx';
+SELECT * FROM actividades.categoria;
+GO
+
+-- Importar socios
+EXEC usuarios.ImportarSocios 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx';
+SELECT 
+    s.*, 
+    os.descripcion AS obra_social_descripcion, 
+    os.nro_telefono AS obra_social_telefono
+FROM usuarios.socio s
+LEFT JOIN usuarios.obra_social os ON s.id_obra_social = os.id_obra_social;
+GO
+
+-- Importar actividades
+EXEC actividades.ImportarActividades 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx';
+SELECT * FROM actividades.actividad;
+GO
+
+-- Importar clima 2024
+EXEC facturacion.ImportarClima 
+    @RutaBase = 'C:\Users\Usuario\Desktop\Importaciones\',
+    @Anio = 2024;
+GO
+
+-- Importar clima 2025
+EXEC facturacion.ImportarClima 
+    @RutaBase = 'C:\Users\Usuario\Desktop\Importaciones\',
+    @Anio = 2025;
+GO
+
+SELECT * FROM facturacion.clima;
+GO
+
+-- Importar costos de pileta
+EXEC actividades.ImportarCostosPileta
+    @RutaArchivo = 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx',
+    @id_pileta = 1;
+GO
+
+SELECT * FROM actividades.costo;
+GO
+
+-- Importar grupo familiar
+EXEC usuarios.importarGrupoFamiliar 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx';
+SELECT * FROM usuarios.grupo_familiar;
+GO
+
+-- Importar facturas
+EXEC facturacion.ImportarFacturas 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx';
+SELECT * FROM facturacion.factura;
+GO
+
+-- Importar presentismo en actividades
+EXEC actividades.ImportarPresentismoActividades 'C:\Users\Usuario\Desktop\Importaciones\Datos socios.xlsx';
+GO
+
+SELECT * FROM actividades.actividad_socio;
+SELECT * FROM usuarios.usuario;
+GO
+
+*/
